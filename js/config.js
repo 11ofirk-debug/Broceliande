@@ -1,7 +1,6 @@
 // Broceliande M1 — ALL tuning values and scene coordinates.
 // Single source of truth (spec §17). Systems must import from here, never hard-code.
 // Values marked // TUNING are starting guesses expected to change after playtesting.
-// Values marked // PLACEHOLDER are layout stand-ins to be designed in a later phase.
 
 // ---------------------------------------------------------------------------
 // Stage & loop (§3.4, §3.5)
@@ -40,6 +39,14 @@ export const WOLF_RADIUS = 16;            // TUNING
 export const WOLF_DAMAGE = 3;
 export const WOLF_ATTACK_INTERVAL = 1.2;  // s
 
+// Wolf movement details (§12.3–12.5). Not in the spec's table; all TUNING.
+export const WOLF_WANDER_SPEED = 10;          // TUNING — px/s, slow lateral drift toward a wander target
+export const WOLF_WANDER_INTERVAL = [1.5, 4]; // TUNING — s between picking new wander targets [min, max]
+export const WOLF_SIDESTEP_SPEED = 55;        // TUNING — px/s, lateral speed when stepping round a wolf ahead
+export const WOLF_SLOT_CLAIM_DISTANCE = 70;   // TUNING — px before the lane end where a wolf claims a melee slot (waits here if none free; keep outside DRUID_APPROACH_RADIUS + 2×WOLF_RADIUS)
+export const DRUID_APPROACH_RADIUS = 86;      // TUNING — px, ring wolves walk round to reach a far melee slot (clears biters at DRUID_MELEE_RADIUS)
+export const WOLF_DIRECT_APPROACH_ANGLE = 0.6; // TUNING — rad; slots closer than this in angle are walked to directly
+
 // ---------------------------------------------------------------------------
 // 17.4 Turret (Pebble Sprinkler)
 // ---------------------------------------------------------------------------
@@ -52,6 +59,9 @@ export const UPGRADE_COST = { pits: 4, reeds: 0, feathers: 1 };
 export const UPGRADED_DAMAGE = 5;
 export const UPGRADED_FIRE_INTERVAL = 0.6; // s
 export const UPGRADED_RANGE_MULT = 1.2;
+export const TURRET_TURN_SPEED = 9;       // TUNING — rad/s, how fast a turret visibly turns toward its target (visual; firing does not wait for it)
+export const TURRET_MUZZLE_HEIGHT = 40;   // px above the slot where pebbles leave the sprinkler
+export const WOLF_HIT_HEIGHT = 10;        // px above a wolf's collision centre where pebbles strike its body
 
 // ---------------------------------------------------------------------------
 // 17.5 Vulture
@@ -66,6 +76,7 @@ export const VULTURE_SPEED = 140;           // TUNING — px/s, deliberately slo
 export const VULTURE_RADIUS = 14;           // TUNING
 export const VULTURE_MELEE_RANGE = 34;      // TUNING — px
 export const VULTURE_BLOCK_RADIUS = 36;     // TUNING — px
+export const VULTURE_FLIGHT_HEIGHT = 26;    // px a flying Vulture is drawn above its ground shadow (visual only)
 
 // ---------------------------------------------------------------------------
 // 17.6 Scene layout
@@ -73,45 +84,50 @@ export const VULTURE_BLOCK_RADIUS = 36;     // TUNING — px
 export const HUD_STRIP_HEIGHT = 80;       // px
 export const CORRIDOR_WIDTH = 110;        // TUNING — px
 export const LANE_LENGTH_FACTOR = 2.0;    // TUNING — target lane length ÷ straight-line spawn→Druid distance
+export const LANE_SAMPLES_PER_SEGMENT = 24; // polyline samples between two waypoints (§12.2)
 
-// PLACEHOLDER — rough winding waypoints; lanes are designed properly in the lane phase.
-// Spawn is the first point (at/just beyond the screen edge); the last point should end
-// at the edge of the Druid's melee ring (§12.2).
+// TUNING — lane waypoints (§12.1). The first point is the spawn, just off-screen; the last
+// point lies on the Druid's melee ring (DRUID_POS + DRUID_MELEE_RADIUS in the approach direction).
+// The debug panel reports each lane's length, length factor and unopposed travel time.
 export const LANES = [
   {
     id: 'upperLeft',
     name: 'Upper-left',
     waypoints: [
-      { x: -40, y: 200 }, { x: 220, y: 180 }, { x: 380, y: 320 }, { x: 250, y: 470 },
-      { x: 420, y: 560 }, { x: 640, y: 420 }, { x: 800, y: 300 }, { x: 900, y: 450 },
-      { x: 962, y: 574 },
+      { x: -40, y: 250 }, { x: 180, y: 280 }, { x: 360, y: 205 }, { x: 540, y: 210 },
+      { x: 625, y: 290 }, { x: 600, y: 385 }, { x: 500, y: 425 }, { x: 455, y: 490 },
+      { x: 490, y: 570 }, { x: 600, y: 615 }, { x: 720, y: 580 }, { x: 775, y: 470 },
+      { x: 770, y: 340 }, { x: 805, y: 255 }, { x: 875, y: 215 }, { x: 948, y: 258 },
+      { x: 980, y: 345 }, { x: 990, y: 450 }, { x: 1001, y: 549 },
     ],
   },
   {
     id: 'right',
     name: 'Right',
     waypoints: [
-      { x: 1960, y: 520 }, { x: 1720, y: 560 }, { x: 1600, y: 380 }, { x: 1400, y: 300 },
-      { x: 1260, y: 420 }, { x: 1420, y: 620 }, { x: 1300, y: 760 }, { x: 1120, y: 700 },
-      { x: 1060, y: 618 },
+      { x: 1980, y: 430 }, { x: 1760, y: 460 }, { x: 1620, y: 340 }, { x: 1440, y: 330 },
+      { x: 1350, y: 375 }, { x: 1340, y: 470 }, { x: 1420, y: 560 }, { x: 1545, y: 605 },
+      { x: 1605, y: 700 }, { x: 1560, y: 800 }, { x: 1380, y: 860 }, { x: 1220, y: 760 },
+      { x: 1150, y: 650 }, { x: 1059, y: 618 },
     ],
   },
   {
     id: 'bottomLeft',
     name: 'Bottom-left',
     waypoints: [
-      { x: -40, y: 900 }, { x: 200, y: 960 }, { x: 420, y: 840 }, { x: 360, y: 700 },
-      { x: 560, y: 680 }, { x: 700, y: 900 }, { x: 880, y: 880 }, { x: 950, y: 720 },
-      { x: 985, y: 645 },
+      { x: 250, y: 1140 }, { x: 270, y: 975 }, { x: 140, y: 880 }, { x: 125, y: 755 },
+      { x: 285, y: 660 }, { x: 490, y: 740 }, { x: 595, y: 955 }, { x: 740, y: 1000 },
+      { x: 890, y: 980 }, { x: 975, y: 895 }, { x: 990, y: 790 }, { x: 1001, y: 651 },
     ],
   },
 ];
 
-// PLACEHOLDER — 12 slots, ~4 per lane, irregular, outside corridors (designed with the lanes).
+// TUNING — 12 slots, ~4 per lane, irregular, outside corridors (§9.1).
+export const TURRET_SLOT_RADIUS = 30;     // TUNING — px, slot pad size (drawing and later clicking)
 export const TURRET_SLOTS = [
-  { x: 310, y: 250 }, { x: 520, y: 460 }, { x: 700, y: 330 }, { x: 830, y: 520 },
-  { x: 1560, y: 470 }, { x: 1480, y: 250 }, { x: 1330, y: 540 }, { x: 1200, y: 800 },
-  { x: 300, y: 820 }, { x: 560, y: 790 }, { x: 800, y: 780 }, { x: 1060, y: 470 },
+  { x: 210, y: 400 }, { x: 470, y: 330 }, { x: 650, y: 480 }, { x: 1090, y: 380 },   // mostly Upper-left
+  { x: 1530, y: 470 }, { x: 1420, y: 715 }, { x: 1235, y: 520 }, { x: 1720, y: 610 },  // mostly Right
+  { x: 375, y: 860 }, { x: 730, y: 845 }, { x: 1095, y: 865 }, { x: 470, y: 1010 },   // mostly Bottom-left
 ];
 
 // ---------------------------------------------------------------------------
@@ -126,17 +142,39 @@ export const FEATURE_TYPES = {
   pond:      { name: 'Pond',       searchTime: 2.0, yields: { pits: [0, 2], reeds: [1, 2] } },
 };
 
-// PLACEHOLDER positions — mix is final: 2 Trees, 1 Reed Patch, 1 Shrub, 2 Ruins, 2 Ponds.
+export const FEATURE_RADIUS = 36;         // TUNING — px, feature footprint (drawing, overlap checks, later clicking)
+
+// TUNING — positions. Mix is fixed: 2 Trees, 1 Reed Patch, 1 Shrub, 2 Ruins, 2 Ponds.
 export const FEATURES = [
-  { type: 'tree',      x: 140,  y: 380 },
+  { type: 'tree',      x: 330,  y: 560 },
   { type: 'tree',      x: 1700, y: 880 },
-  { type: 'reedPatch', x: 620,  y: 1000 },
+  { type: 'reedPatch', x: 1070, y: 1010 },
   { type: 'shrub',     x: 1180, y: 200 },
-  { type: 'ruins',     x: 560,  y: 180 },
+  { type: 'ruins',     x: 700,  y: 165 },
   { type: 'ruins',     x: 1780, y: 300 },
-  { type: 'pond',      x: 1400, y: 960 },
-  { type: 'pond',      x: 150,  y: 620 },
+  { type: 'pond',      x: 1480, y: 990 },
+  { type: 'pond',      x: 110,  y: 620 },
 ];
+
+// ---------------------------------------------------------------------------
+// Decorative forest (§5.3) — visual only, no gameplay effect.
+// Scattered once at start-up on a jittered grid with its own fixed seed, so the
+// layout is identical every run and automatically keeps clear of corridors,
+// slots and features when those are moved.
+// ---------------------------------------------------------------------------
+export const DECOR = {
+  seed: 1337,                 // fixed; independent of the gameplay seed
+  cellSize: 64,               // px, jittered grid cell; one candidate object per cell
+  treeChance: 0.42,           // per cell, away from corridors
+  bushChance: 0.22,
+  rockChance: 0.08,
+  edgeBand: 110,              // px from the screen border where trees always grow (boundary)
+  treeCorridorGap: 26,        // px beyond the corridor edge kept free of trees
+  smallCorridorGap: 4,        // px beyond the corridor edge kept free of bushes and rocks
+  objectGap: 46,              // px of clear ground around slots and features
+  clearingRadius: 120,        // px, open dirt clearing around the Druid
+  groundPatches: 70,          // subtle floor colour blobs
+};
 
 // ---------------------------------------------------------------------------
 // 17.8 Wave
@@ -156,3 +194,10 @@ export const WAVE = {
 // ---------------------------------------------------------------------------
 export const DEBUG_SEED = null;          // null = new random seed each restart; integer = fixed seed
 export const DEBUG_START_ENABLED = false;
+export const DEBUG_GRANT_AMOUNT = 10;   // G key: +this many of each resource
+
+// ---------------------------------------------------------------------------
+// Feedback (§16.3) — visual only
+// ---------------------------------------------------------------------------
+export const FLOATING_TEXT_TIME = 1.4;   // s a "+2 Pits" style text stays up (simulation time)
+export const FLOATING_TEXT_RISE = 40;    // px it drifts upward over that time

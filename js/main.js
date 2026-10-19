@@ -1,10 +1,14 @@
 // Bootstrap, stage scaling and the fixed-timestep loop (spec §3.4, §3.5).
 
 import * as C from './config.js';
-import { GameState, createGame, startEncounter, startCombat, endEncounter, updateGame, validateConfig } from './game.js';
+import { GameState, createGame, startEncounter, startCombat, endEncounter, updateGame, validateConfig, killAllWolves, grantResources } from './game.js';
 import { createInput } from './input.js';
 import { createRenderer } from './renderer.js';
 import { createUI } from './ui.js';
+import { createScene, validateLayout } from './scene.js';
+import { createInteraction, isInteractive } from './interaction.js';
+import { pick } from './picking.js';
+import { ActionState } from './states.js';
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('game-canvas');
@@ -31,24 +35,36 @@ fitStage();
 // ---------------------------------------------------------------------------
 validateConfig();
 
-const game = createGame();
+const scene = createScene();   // static layout: lane paths, decorative forest
+validateLayout(scene);
+
+const game = createGame(scene);
 const clock = { speed: 1, paused: false };            // acts on simulation time only
-const view = { debug: C.DEBUG_START_ENABLED, clickMarker: null, fps: 0 };
+// UI-only state: never read by the simulation.
+const view = { debug: C.DEBUG_START_ENABLED, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null };
+const interaction = createInteraction(game, view);
 
 function restart() {
   startEncounter(game);
   view.clickMarker = null;
+  interaction.closeMenu();
 }
 
-const renderer = createRenderer(canvas);
-const ui = createUI({
+const renderer = createRenderer(canvas, scene);
+const ui = createUI(scene, {
   onStartCombat: () => startCombat(game),
   onRestart: restart,
+  onMenuAction: () => interaction.onMenuAction(),
 });
 
-createInput(stage, canvas, () => scale, {
+const input = createInput(stage, canvas, () => scale, {
   onPointerDown(world, button) {
-    if (button === 0) view.clickMarker = world;
+    if (button === 0) {
+      view.clickMarker = world;
+      interaction.onLeftClick(world);
+    } else if (button === 2) {
+      interaction.onEscape();
+    }
   },
   onKeyDown(key) {
     switch (key) {
@@ -57,6 +73,9 @@ createInput(stage, canvas, () => scale, {
       case '1': case '2': case '4': clock.speed = Number(key); break;
       case 'n': if (game.state === GameState.PREP) startCombat(game); break;
       case 'r': restart(); break;
+      case 'k': killAllWolves(game); break; // TEMPORARY: kill all wolves to test Victory
+      case 'g': grantResources(game); break;
+      case 'Escape': interaction.onEscape(); break;
       default: break;
     }
   },
@@ -88,6 +107,13 @@ function frame(now) {
     steps++;
   }
   if (steps === C.MAX_STEPS_PER_FRAME) accumulator = 0; // drop backlog rather than spiral
+
+  // Hover is re-picked every frame so it stays correct when objects change under a still cursor.
+  view.pointer = input.mouse.inside ? { x: input.mouse.x, y: input.mouse.y } : null;
+  view.hover = input.mouse.inside ? pick(game, input.mouse) : null;
+  canvas.style.cursor = game.action.state === ActionState.SUMMON_PLACEMENT
+    ? 'crosshair'
+    : isInteractive(game, view.hover) ? 'pointer' : 'default';
 
   renderer.render(game, view);
   ui.update(game, clock, view);

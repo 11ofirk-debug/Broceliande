@@ -1,26 +1,169 @@
 // Canvas debug overlay (spec §18.2). Visual only — must not affect gameplay.
-// Phase 1: Druid main position and melee slots. More is added as systems arrive.
+// Lanes (waypoints, centrelines, corridor edges, spawns), Druid position and melee slots,
+// turret-slot and feature coordinates, wolf collision radii and IDs, turret IDs and target
+// lines, Vulture IDs, block radii and target lines. All turret ranges are drawn by the renderer in debug mode.
 
 import * as C from '../config.js';
 
 const COLOR = 'rgba(120, 220, 255, 0.9)';
+const EDGE_COLOR = 'rgba(120, 220, 255, 0.45)';
+const SPAWN_COLOR = 'rgba(255, 110, 110, 0.95)';
+const WOLF_COLOR = 'rgba(255, 150, 90, 0.95)';
+const TARGET_COLOR = 'rgba(255, 235, 120, 0.9)';
+const VULTURE_COLOR = 'rgba(255, 140, 220, 0.9)';
+const LABEL_BG = 'rgba(0, 0, 0, 0.55)';
+const STATE_TAGS = { WALKING: 'walk', WAITING: 'wait', APPROACHING: 'appr', BITING: 'bite' };
 
-export function drawDebugOverlay(ctx, game) {
+function label(ctx, text, x, y) {
+  const w = ctx.measureText(text).width;
+  ctx.fillStyle = LABEL_BG;
+  ctx.fillRect(x - 2, y - 13, w + 4, 17);
+  ctx.fillStyle = COLOR;
+  ctx.fillText(text, x, y);
+}
+
+function cross(ctx, x, y, size) {
+  ctx.beginPath();
+  ctx.moveTo(x - size, y);
+  ctx.lineTo(x + size, y);
+  ctx.moveTo(x, y - size);
+  ctx.lineTo(x, y + size);
+  ctx.stroke();
+}
+
+export function drawDebugOverlay(ctx, game, scene) {
   ctx.save();
   ctx.strokeStyle = COLOR;
   ctx.fillStyle = COLOR;
   ctx.lineWidth = 1.5;
-  ctx.font = '14px monospace';
+  ctx.font = '13px monospace';
 
-  // Druid main position
-  const d = C.DRUID_POS;
+  for (const lane of scene.lanes) drawLane(ctx, lane);
+  drawDruid(ctx, game);
+
+  ctx.strokeStyle = COLOR;
+  C.TURRET_SLOTS.forEach((s, i) => {
+    cross(ctx, s.x, s.y, 5);
+    label(ctx, `S${i} (${s.x}, ${s.y})`, s.x + 8, s.y + C.TURRET_SLOT_RADIUS + 14);
+  });
+  C.FEATURES.forEach((f, i) => {
+    ctx.strokeStyle = COLOR;
+    cross(ctx, f.x, f.y, 5);
+    label(ctx, `F${i} ${f.type} (${f.x}, ${f.y})`, f.x + 8, f.y + 22);
+  });
+
+  drawWolves(ctx, game);
+  drawTurretTargets(ctx, game);
+  drawVultureTargets(ctx, game);
+
+  ctx.restore();
+}
+
+function drawLane(ctx, lane) {
+  const { path } = lane;
+  const half = C.CORRIDOR_WIDTH / 2;
+
+  // Sampled centreline.
+  ctx.strokeStyle = COLOR;
   ctx.beginPath();
-  ctx.moveTo(d.x - 8, d.y);
-  ctx.lineTo(d.x + 8, d.y);
-  ctx.moveTo(d.x, d.y - 8);
-  ctx.lineTo(d.x, d.y + 8);
+  path.points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
   ctx.stroke();
-  ctx.fillText(`Druid (${d.x}, ${d.y})`, d.x + 10, d.y - 10);
+
+  // Corridor boundaries: centreline offset along the normal.
+  ctx.strokeStyle = EDGE_COLOR;
+  ctx.setLineDash([6, 6]);
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    path.points.forEach((p, i) => {
+      const n = path.normalAt(Math.min(p.s, path.length - 0.01));
+      const x = p.x + n.x * half * side;
+      const y = p.y + n.y * half * side;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Waypoints with index.
+  ctx.fillStyle = COLOR;
+  lane.waypoints.forEach((w, i) => {
+    ctx.beginPath();
+    ctx.arc(w.x, w.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText(String(i), w.x + 6, w.y - 6);
+  });
+
+  // Spawn point (first waypoint, just off-screen), marker clamped onto the screen.
+  const spawn = lane.waypoints[0];
+  const sx = Math.max(12, Math.min(C.STAGE_WIDTH - 12, spawn.x));
+  const sy = Math.max(C.HUD_STRIP_HEIGHT + 12, Math.min(C.STAGE_HEIGHT - 12, spawn.y));
+  ctx.strokeStyle = SPAWN_COLOR;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = 1.5;
+  const text = `SPAWN ${lane.name} (${spawn.x}, ${spawn.y})`;
+  const tx = Math.min(sx + 14, C.STAGE_WIDTH - ctx.measureText(text).width - 8);
+  const ty = sy > C.STAGE_HEIGHT - 30 ? sy - 16 : sy + 4;
+  label(ctx, text, tx, ty);
+}
+
+// Turret IDs and a line from each turret to its current target (§18.2).
+function drawTurretTargets(ctx, game) {
+  ctx.lineWidth = 1.5;
+  for (const t of game.turrets) {
+    const target = game.wolves.find((w) => w.id === t.targetId);
+    if (target) {
+      ctx.strokeStyle = TARGET_COLOR;
+      ctx.beginPath();
+      ctx.moveTo(t.x, t.y - C.TURRET_MUZZLE_HEIGHT);
+      ctx.lineTo(target.x, target.y - C.WOLF_HIT_HEIGHT);
+      ctx.stroke();
+    }
+    label(ctx, `T#${t.id}${t.upgraded ? ' +' : ''}`, t.x - 16, t.y - C.TURRET_MUZZLE_HEIGHT - 12);
+  }
+}
+
+// Vulture IDs and state, block radius, and a line to the current target (§18.2).
+function drawVultureTargets(ctx, game) {
+  ctx.lineWidth = 1.5;
+  for (const v of game.vultures) {
+    const target = game.wolves.find((w) => w.id === v.targetId);
+    if (target) {
+      ctx.strokeStyle = VULTURE_COLOR;
+      ctx.beginPath();
+      ctx.moveTo(v.x, v.y);
+      ctx.lineTo(target.x, target.y);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = VULTURE_COLOR;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.arc(v.x, v.y, C.VULTURE_BLOCK_RADIUS, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    label(ctx, `V#${v.id} ${v.state.toLowerCase()} ${v.remaining.toFixed(1)}s`, v.x + 18, v.y + 4);
+  }
+}
+
+function drawWolves(ctx, game) {
+  ctx.lineWidth = 1.5;
+  for (const w of game.wolves) {
+    ctx.strokeStyle = WOLF_COLOR;
+    ctx.beginPath();
+    ctx.arc(w.x, w.y, C.WOLF_RADIUS, 0, Math.PI * 2);
+    ctx.stroke();
+    label(ctx, `#${w.id} ${w.blockedBy !== null ? 'blocked' : STATE_TAGS[w.state]}`, w.x - 14, w.y + C.WOLF_RADIUS + 14);
+  }
+}
+
+function drawDruid(ctx, game) {
+  const d = C.DRUID_POS;
+  ctx.strokeStyle = COLOR;
+  cross(ctx, d.x, d.y, 8);
+  label(ctx, `Druid (${d.x}, ${d.y})`, d.x + 12, d.y - 12);
 
   // Melee ring and slots
   ctx.setLineDash([4, 4]);
@@ -28,12 +171,17 @@ export function drawDebugOverlay(ctx, game) {
   ctx.arc(d.x, d.y, C.DRUID_MELEE_RADIUS, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
-  for (let i = 0; i < C.DRUID_MELEE_SLOTS; i++) {
-    const a = (i / C.DRUID_MELEE_SLOTS) * Math.PI * 2;
+  // Approach ring wolves walk round to reach far slots.
+  ctx.setLineDash([2, 6]);
+  ctx.beginPath();
+  ctx.arc(d.x, d.y, C.DRUID_APPROACH_RADIUS, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Slots: filled orange when claimed by a wolf.
+  for (const slot of game.meleeSlots) {
+    ctx.fillStyle = slot.wolfId === null ? COLOR : WOLF_COLOR;
     ctx.beginPath();
-    ctx.arc(d.x + Math.cos(a) * C.DRUID_MELEE_RADIUS, d.y + Math.sin(a) * C.DRUID_MELEE_RADIUS, 4, 0, Math.PI * 2);
+    ctx.arc(slot.x, slot.y, 4, 0, Math.PI * 2);
     ctx.fill();
   }
-
-  ctx.restore();
 }

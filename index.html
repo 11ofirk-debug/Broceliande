@@ -11,7 +11,25 @@
 
     <div id="ui-layer">
       <div id="hud">
-        <div class="hud-left"></div>
+        <div class="hud-left">
+          <span class="hud-label">Druid</span>
+          <div id="hud-hp-bar"><div id="hud-hp-fill"></div></div>
+          <span id="hud-hp-text"></span>
+          <div id="hud-resources">
+            <span class="res" title="Peach Pits">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="12" rx="7" ry="9.5" fill="#b06a3c"/><path d="M12 3.5 Q8.5 12 12 20.5" stroke="#6b3a1f" stroke-width="1.8" fill="none"/></svg>
+              <span id="res-pits">0</span>
+            </span>
+            <span class="res" title="Reeds">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 23 L12 3" stroke="#86a845" stroke-width="2.2"/><path d="M12 19 Q7 15 5.5 10" stroke="#86a845" stroke-width="1.8" fill="none"/><rect x="9.3" y="4" width="5.4" height="10" rx="2.7" fill="#7a4c2c"/></svg>
+              <span id="res-reeds">0</span>
+            </span>
+            <span class="res" title="Feathers">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20 Q7 7 20 3 Q18 15 6 20 Z" fill="#ece6da"/><path d="M4.5 21.5 L16 7.5" stroke="#8f897f" stroke-width="1.4"/></svg>
+              <span id="res-feathers">0</span>
+            </span>
+          </div>
+        </div>
         <div class="hud-center">
           <span id="hud-phase"></span>
           <span id="hud-timer"></span>
@@ -28,6 +46,18 @@
           <div id="end-stats"></div>
           <button id="btn-restart" type="button">Restart</button>
         </div>
+      </div>
+
+      <div id="mode-banner" hidden>Placing Vulture — click the battlefield to place · Esc / right-click to cancel</div>
+
+      <div id="tooltip" hidden></div>
+
+      <div id="menu" hidden>
+        <div id="menu-title"></div>
+        <div id="menu-cost"></div>
+        <div id="menu-detail"></div>
+        <button id="menu-action" type="button"></button>
+        <div id="menu-reason"></div>
       </div>
 
       <pre id="debug-panel" hidden></pre>

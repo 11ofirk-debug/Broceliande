@@ -22,5 +22,8 @@ Then open http://localhost:8000 in Chrome.
 | `1` / `2` / `4` | Simulation speed ×1 / ×2 / ×4 |
 | `N` | Skip to next phase (Prep → Combat) |
 | `R` | Restart encounter |
+| `K` | Kill all living wolves (temporary, for testing Victory) |
+| `G` | Grant +10 of each resource |
+| `Esc` / right-click | Close menu, otherwise cancel the current action |
 
 All tuning values and coordinates live in `js/config.js`.
