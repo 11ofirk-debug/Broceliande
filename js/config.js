@@ -84,6 +84,7 @@ export const VULTURE_FLIGHT_HEIGHT = 26;    // px a flying Vulture is drawn abov
 export const HUD_STRIP_HEIGHT = 80;       // px
 export const CORRIDOR_WIDTH = 110;        // TUNING — px
 export const LANE_LENGTH_FACTOR = 2.0;    // TUNING — target lane length ÷ straight-line spawn→Druid distance
+export const LANE_LENGTH_TOLERANCE = 0.15; // start-up warning if a lane's length factor is off LANE_LENGTH_FACTOR by more than this fraction
 export const LANE_SAMPLES_PER_SEGMENT = 24; // polyline samples between two waypoints (§12.2)
 
 // TUNING — lane waypoints (§12.1). The first point is the spawn, just off-screen; the last

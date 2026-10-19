@@ -1,7 +1,7 @@
 // Canvas debug overlay (spec §18.2). Visual only — must not affect gameplay.
 // Lanes (waypoints, centrelines, corridor edges, spawns), Druid position and melee slots,
 // turret-slot and feature coordinates, wolf collision radii and IDs, turret IDs and target
-// lines, Vulture IDs, block radii and target lines. All turret ranges are drawn by the renderer in debug mode.
+// lines, Vulture IDs, block radii and target lines, pebble IDs. All turret ranges are drawn by the renderer in debug mode.
 
 import * as C from '../config.js';
 
@@ -55,6 +55,10 @@ export function drawDebugOverlay(ctx, game, scene) {
   drawWolves(ctx, game);
   drawTurretTargets(ctx, game);
   drawVultureTargets(ctx, game);
+  ctx.font = '11px monospace';
+  ctx.fillStyle = TARGET_COLOR;
+  for (const p of game.projectiles) ctx.fillText(`#${p.id}`, p.x + 7, p.y - 6);
+  ctx.font = '13px monospace';
 
   ctx.restore();
 }

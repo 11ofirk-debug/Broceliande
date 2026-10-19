@@ -25,7 +25,7 @@ function formatTime(seconds) {
 
 // Static layout lines for the debug panel: lane lengths/travel times and expected resources.
 function layoutDebugLines(scene) {
-  const lines = ['', 'Lanes (unopposed, WOLF_SPEED):'];
+  const lines = ['', `Lanes (unopposed, WOLF_SPEED; target ×${C.LANE_LENGTH_FACTOR.toFixed(2)}):`];
   for (const lane of scene.lanes) {
     const st = laneStats(lane);
     lines.push(`  ${lane.name.padEnd(12)}${Math.round(st.length)} px  ${st.travelTime.toFixed(1)} s  ×${st.factor.toFixed(2)}`);

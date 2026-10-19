@@ -46,6 +46,13 @@ export function validateLayout(scene) {
   C.FEATURES.forEach((f, i) => check(`Feature ${i} (${f.type})`, f, C.FEATURE_RADIUS));
 
   for (const lane of scene.lanes) {
+    const { factor } = laneStats(lane);
+    if (Math.abs(factor - C.LANE_LENGTH_FACTOR) > C.LANE_LENGTH_FACTOR * C.LANE_LENGTH_TOLERANCE) {
+      console.warn(`${lane.name} lane is ${factor.toFixed(2)}× its straight-line distance; target is LANE_LENGTH_FACTOR = ${C.LANE_LENGTH_FACTOR}`);
+    }
+  }
+
+  for (const lane of scene.lanes) {
     const end = lane.waypoints[lane.waypoints.length - 1];
     const r = Math.hypot(end.x - C.DRUID_POS.x, end.y - C.DRUID_POS.y);
     if (Math.abs(r - C.DRUID_MELEE_RADIUS) > 2) {

@@ -125,7 +125,7 @@ function checkEndConditions(game) {
   }
 }
 
-// TEMPORARY debug key K: kill every living wolf so Victory can be tested before turrets exist.
+// Extra debug key K (not in spec §18.1, kept on request): kill every living wolf, e.g. to check Victory and Restart quickly.
 export function killAllWolves(game) {
   if (game.state !== GameState.COMBAT) return;
   for (const wolf of [...game.wolves]) killWolf(game, wolf);

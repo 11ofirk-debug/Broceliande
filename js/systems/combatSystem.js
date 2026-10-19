@@ -1,5 +1,5 @@
 // Damage and death: turrets and pebbles (spec §10), wolves biting the Druid (§12.5).
-// Vultures are added in Phase 7.
+// Vulture pecks and blocking live in vultureSystem.js and use damageWolf from here.
 
 import * as C from '../config.js';
 import { WolfState, remainingDistance } from '../entities/wolf.js';

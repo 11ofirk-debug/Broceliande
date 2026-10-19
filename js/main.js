@@ -70,10 +70,12 @@ const input = createInput(stage, canvas, () => scale, {
     switch (key) {
       case 'd': view.debug = !view.debug; break;
       case 'p': clock.paused = !clock.paused; break;
-      case '1': case '2': case '4': clock.speed = Number(key); break;
+      case '1': case '2': case '4':
+        if (C.SIM_SPEEDS.includes(Number(key))) clock.speed = Number(key);
+        break;
       case 'n': if (game.state === GameState.PREP) startCombat(game); break;
       case 'r': restart(); break;
-      case 'k': killAllWolves(game); break; // TEMPORARY: kill all wolves to test Victory
+      case 'k': killAllWolves(game); break; // extra debug key (not in §18.1): kill all living wolves
       case 'g': grantResources(game); break;
       case 'Escape': interaction.onEscape(); break;
       default: break;
