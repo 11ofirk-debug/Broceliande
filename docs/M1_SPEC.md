@@ -504,9 +504,9 @@ Every value below MUST be defined in `config.js`, grouped and commented. Values 
 | Constant | Value | Notes |
 |---|---|---|
 | `SIM_STEP` | 1/60 s | Fixed timestep |
-| `PREP_DURATION` | 25 s | |
-| `BUILD_TIME` | 2.5 s | |
-| `UPGRADE_TIME` | 3.0 s | Changed from 1.2 s (see Section 21) |
+| `PREP_DURATION` | 28 s | Changed from 25 s (see 21.1) |
+| `BUILD_TIME` | 2.3 s | Changed from 2.5 s (see 21.1) |
+| `UPGRADE_TIME` | 2.5 s | Changed from 1.2 s, then 3.0 s (see Section 21) |
 
 ### 17.2 Druid
 
@@ -523,7 +523,7 @@ Every value below MUST be defined in `config.js`, grouped and commented. Values 
 
 | Constant | Value | Notes |
 |---|---|---|
-| `WOLF_HP` | 18 | TUNING — 6 base pebbles, 4 upgraded, 3 Vulture pecks |
+| `WOLF_HP` | 17 | TUNING — 6 base pebbles, 4 upgraded, 3 Vulture pecks. Changed from 18 (see 21.1) |
 | `WOLF_SPEED` | 72 px/s | TUNING — aim for 25–30 s lane traversal |
 | `WOLF_RADIUS` | 16 | TUNING |
 | `WOLF_DAMAGE` | 3 | |
@@ -538,7 +538,7 @@ Every value below MUST be defined in `config.js`, grouped and commented. Values 
 | `TURRET_FIRE_INTERVAL` | 0.75 s | |
 | `TURRET_RANGE` | 220 px | TUNING |
 | `PROJECTILE_SPEED` | 600 px/s | TUNING |
-| `UPGRADE_COST` | 4 Pits + 1 Feather | Changed (see Section 21) |
+| `UPGRADE_COST` | 2 Pits + 1 Feather | Changed (see Section 21) |
 | `UPGRADED_DAMAGE` | 5 | |
 | `UPGRADED_FIRE_INTERVAL` | 0.6 s | |
 | `UPGRADED_RANGE_MULT` | 1.2 | |
@@ -547,13 +547,13 @@ Every value below MUST be defined in `config.js`, grouped and commented. Values 
 
 | Constant | Value | Notes |
 |---|---|---|
-| `VULTURE_COST` | 3 Feathers | Changed from 2 (see Section 21) |
-| `VULTURE_HP` | 15 | |
+| `VULTURE_COST` | 1 Feather | Changed from 2, then 3 (see Section 21) |
+| `VULTURE_HP` | 16 | Changed from 15 (see 21.1) |
 | `VULTURE_DAMAGE` | 6 | |
 | `VULTURE_ATTACK_INTERVAL` | 0.7 s | |
 | `VULTURE_DURATION` | 12 s | |
-| `MAX_VULTURES` | 3 | |
-| `VULTURE_SPEED` | 140 px/s | TUNING — deliberately slowish so placement matters |
+| `MAX_VULTURES` | 2 | Changed from 3 (see 21.1) |
+| `VULTURE_SPEED` | 160 px/s | TUNING — deliberately slowish so placement matters. Changed from 140 (see 21.1) |
 | `VULTURE_RADIUS` | 14 | TUNING |
 | `VULTURE_MELEE_RANGE` | 34 px | TUNING |
 | `VULTURE_BLOCK_RADIUS` | 36 px | TUNING |
@@ -576,14 +576,14 @@ Every value below MUST be defined in `config.js`, grouped and commented. Values 
 | Type | Resources (min–max) | Search time |
 |---|---|---|
 | Tree | Pits 2–4 | 1.2 s |
-| Reed Patch | Reeds 1–3 | 1.4 s |
-| Shrub | Feathers 2–4 | 1.7 s |
-| Ruins | Pits 0–3, Feathers 0–2 | 1.8 s |
-| Pond | Pits 0–2, Reeds 1–2 | 2.0 s |
+| Reed Patch | Reeds 2–3 | 1.4 s |
+| Shrub | Feathers 2–3 | 1.7 s |
+| Ruins | Pits 2–3, Feathers 1–3 | 1.8 s |
+| Pond | Pits 2–3, Reeds 1–3 | 2.0 s |
 
 **`FEATURES` mix (8 total):** 2 Trees, 1 Reed Patch, 1 Shrub, 2 Ruins, 2 Ponds.
 
-**Economy intent (for reference):** searching everything takes about 13 s and yields on average ~11 Pits, ~5 Reeds, ~5 Feathers. Building five turrets would take another 12.5 s, so a player **cannot** search everything *and* build everything they can afford. They must choose between more searching, more building, and holding resources back for Combat (upgrades and Vultures). The debug panel SHOULD show expected-average totals so this can be checked after tuning.
+**Economy intent (for reference):** searching everything takes about 13 s and yields on average ~16 Pits, ~6.5 Reeds, ~6.5 Feathers (after the 21.1 tuning; originally ~11 / ~5 / ~5). Building five turrets would take another 11.5 s. With the original 25 s Prep, a player **could not** search everything *and* build everything they can afford. After the 21.1 tuning (28 s Prep, 2.3 s builds) the total is about 24.6 s, so this pressure is now weaker — see 21.1. They must choose between more searching, more building, and holding resources back for Combat (upgrades and Vultures). The debug panel SHOULD show expected-average totals so this can be checked after tuning.
 
 ### 17.8 Wave
 
@@ -731,3 +731,27 @@ For the designer's reference. These were deliberate changes made while preparing
 | Cancel rules | Partly ambiguous | Menus don't cancel; confirming does | Prevents accidental cancels |
 | Restart | "Fresh encounter" | Same layout, new yields | Keeps playtests comparable |
 | Debug | Overlay only | Plus pause, speed, skip, resources | Faster iteration |
+
+### 21.1 Playtest tuning (after M1 implementation)
+
+Changes made after the first playtests of the M1 build. Section 17 shows the current values.
+
+| Change | Was | Now |
+|---|---|---|
+| Prep duration | 25 s | 28 s |
+| Build time | 2.5 s | 2.3 s |
+| Upgrade time | 3.0 s | 2.5 s |
+| Wolf HP | 18 | 17 (still 6 base pebbles, 4 upgraded, 3 Vulture pecks) |
+| Upgrade cost | 4 Pits + 1 Feather | 2 Pits + 1 Feather |
+| Vulture cost | 3 Feathers | 1 Feather |
+| Vulture HP | 15 | 16 |
+| Max Vultures | 3 | 2 |
+| Vulture speed | 140 px/s | 160 px/s |
+| Reed Patch yield | Reeds 1–3 | Reeds 2–3 |
+| Shrub yield | Feathers 2–4 | Feathers 2–3 |
+| Ruins yield | Pits 0–3, Feathers 0–2 | Pits 2–3, Feathers 1–3 |
+| Pond yield | Pits 0–2, Reeds 1–2 | Pits 2–3, Reeds 1–3 |
+
+**Reason:** balance pass after first playtests. Simulations showed the original values made the encounter very hard to win: an average Prep killed about 14 of 35 wolves, and a strong Prep about 34.
+
+**Side effect to watch:** searching everything (~13.1 s) plus five builds (~11.5 s) now fits inside the 28 s Prep, which weakens the "search vs build" pressure described in 17.7.

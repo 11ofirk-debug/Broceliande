@@ -33,7 +33,7 @@ export const DRUID_ACTION_OFFSET = { x: -40, y: 10 };    // TUNING — Druid pos
 // ---------------------------------------------------------------------------
 // 17.3 Wolf
 // ---------------------------------------------------------------------------
-export const WOLF_HP = 16;                // TUNING — 6 base pebbles, 4 upgraded, 3 Vulture pecks
+export const WOLF_HP = 17;                // TUNING — 6 base pebbles, 4 upgraded, 3 Vulture pecks
 export const WOLF_SPEED = 72;             // TUNING — px/s, aim for 25–30 s lane traversal
 export const WOLF_RADIUS = 16;            // TUNING
 export const WOLF_DAMAGE = 3;
