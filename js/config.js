@@ -16,9 +16,9 @@ export const SIM_SPEEDS = [1, 2, 4];     // debug speed multipliers (keys 1 / 2 
 // ---------------------------------------------------------------------------
 // 17.1 Timing and phases
 // ---------------------------------------------------------------------------
-export const PREP_DURATION = 25;         // s
-export const BUILD_TIME = 2.5;           // s
-export const UPGRADE_TIME = 3.0;         // s
+export const PREP_DURATION = 28;         // s
+export const BUILD_TIME = 2.3;           // s
+export const UPGRADE_TIME = 2.5;         // s
 
 // ---------------------------------------------------------------------------
 // 17.2 Druid
@@ -33,7 +33,7 @@ export const DRUID_ACTION_OFFSET = { x: -40, y: 10 };    // TUNING — Druid pos
 // ---------------------------------------------------------------------------
 // 17.3 Wolf
 // ---------------------------------------------------------------------------
-export const WOLF_HP = 18;                // TUNING — 6 base pebbles, 4 upgraded, 3 Vulture pecks
+export const WOLF_HP = 16;                // TUNING — 6 base pebbles, 4 upgraded, 3 Vulture pecks
 export const WOLF_SPEED = 72;             // TUNING — px/s, aim for 25–30 s lane traversal
 export const WOLF_RADIUS = 16;            // TUNING
 export const WOLF_DAMAGE = 3;
@@ -55,7 +55,7 @@ export const TURRET_DAMAGE = 3;
 export const TURRET_FIRE_INTERVAL = 0.75; // s
 export const TURRET_RANGE = 220;          // TUNING — px
 export const PROJECTILE_SPEED = 600;      // TUNING — px/s
-export const UPGRADE_COST = { pits: 4, reeds: 0, feathers: 1 };
+export const UPGRADE_COST = { pits: 2, reeds: 0, feathers: 1 };
 export const UPGRADED_DAMAGE = 5;
 export const UPGRADED_FIRE_INTERVAL = 0.6; // s
 export const UPGRADED_RANGE_MULT = 1.2;
@@ -66,13 +66,13 @@ export const WOLF_HIT_HEIGHT = 10;        // px above a wolf's collision centre 
 // ---------------------------------------------------------------------------
 // 17.5 Vulture
 // ---------------------------------------------------------------------------
-export const VULTURE_COST = { pits: 0, reeds: 0, feathers: 3 };
-export const VULTURE_HP = 15;
+export const VULTURE_COST = { pits: 0, reeds: 0, feathers: 1 };
+export const VULTURE_HP = 16;
 export const VULTURE_DAMAGE = 6;
 export const VULTURE_ATTACK_INTERVAL = 0.7; // s
 export const VULTURE_DURATION = 12;         // s
-export const MAX_VULTURES = 3;
-export const VULTURE_SPEED = 140;           // TUNING — px/s, deliberately slowish so placement matters
+export const MAX_VULTURES = 2;
+export const VULTURE_SPEED = 160;           // TUNING — px/s, deliberately slowish so placement matters
 export const VULTURE_RADIUS = 14;           // TUNING
 export const VULTURE_MELEE_RANGE = 34;      // TUNING — px
 export const VULTURE_BLOCK_RADIUS = 36;     // TUNING — px
@@ -137,10 +137,10 @@ export const TURRET_SLOTS = [
 // yields: resource → [min, max] inclusive integers. All ranges TUNING.
 export const FEATURE_TYPES = {
   tree:      { name: 'Tree',       searchTime: 1.2, yields: { pits: [2, 4] } },
-  reedPatch: { name: 'Reed Patch', searchTime: 1.4, yields: { reeds: [1, 3] } },
-  shrub:     { name: 'Shrub',      searchTime: 1.7, yields: { feathers: [2, 4] } },
-  ruins:     { name: 'Ruins',      searchTime: 1.8, yields: { pits: [0, 3], feathers: [0, 2] } },
-  pond:      { name: 'Pond',       searchTime: 2.0, yields: { pits: [0, 2], reeds: [1, 2] } },
+  reedPatch: { name: 'Reed Patch', searchTime: 1.4, yields: { reeds: [2, 3] } },
+  shrub:     { name: 'Shrub',      searchTime: 1.7, yields: { feathers: [2, 3] } },
+  ruins:     { name: 'Ruins',      searchTime: 1.8, yields: { pits: [2, 3], feathers: [1, 3] } },
+  pond:      { name: 'Pond',       searchTime: 2.0, yields: { pits: [2, 3], reeds: [1, 3] } },
 };
 
 export const FEATURE_RADIUS = 36;         // TUNING — px, feature footprint (drawing, overlap checks, later clicking)
