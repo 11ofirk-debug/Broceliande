@@ -27,7 +27,8 @@ export function turretFireInterval(turret) {
   return turret.upgraded ? C.UPGRADED_FIRE_INTERVAL : C.TURRET_FIRE_INTERVAL;
 }
 
-// World point pebbles leave from: the cup at the top of the post.
+// World point pebbles leave from: the cup at the top of the post, which stands on a pad
+// TURRET_BASE_OFFSET below the location centre (M1c §2.1).
 export function turretMuzzle(turret) {
-  return { x: turret.x, y: turret.y - C.TURRET_MUZZLE_HEIGHT };
+  return { x: turret.x, y: turret.y + C.TURRET_BASE_OFFSET - C.TURRET_MUZZLE_HEIGHT };
 }

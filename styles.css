@@ -78,6 +78,76 @@ html, body {
   color: #d9a58f;
 }
 
+/* ---------- Step bar (M1b §6, step-mode Prep only) ---------- */
+#hud-steps {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+#hud-steps-bar {
+  position: relative;
+  width: 360px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid #4a5e36;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#hud-steps-fill,
+#hud-steps-preview {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+#hud-steps-fill {
+  left: 0;
+  background: #d9b65a;
+}
+
+/* Steps the hovered marker would spend (§5.2.3). */
+#hud-steps-preview {
+  background: #f6efd2;
+  box-shadow: inset 0 0 0 2px #9a7a2c;
+}
+
+/* Hovered marker costs more than what's left (§5.2.4). Period set from STEP_BAR_BLINK_HZ in js/ui.js. */
+#hud-steps-bar.blink {
+  animation: steps-blink var(--blink-period, 0.333s) step-end infinite;
+}
+
+#hud-steps-bar.blink #hud-steps-fill {
+  animation: steps-blink-fill var(--blink-period, 0.333s) step-end infinite;
+}
+
+@keyframes steps-blink {
+  0% { border-color: #e0553a; }
+  50% { border-color: #4a5e36; }
+}
+
+@keyframes steps-blink-fill {
+  0% { background: #e0553a; }
+  50% { background: #d9b65a; }
+}
+
+#hud-steps-text {
+  font-family: 'Consolas', monospace;
+  font-size: 24px;
+}
+
+/* Start Battle prompt once nothing valid and affordable remains (§5.6). */
+#btn-start-combat.pulse {
+  animation: start-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes start-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232, 160, 100, 0); background: #7a3b22; }
+  50% { box-shadow: 0 0 0 8px rgba(232, 160, 100, 0.45); background: #a0532f; }
+}
+
 .hud-left {
   display: flex;
   gap: 14px;
@@ -225,6 +295,10 @@ html, body {
   font-weight: bold;
   font-size: 22px;
   color: #f3e7c0;
+}
+
+#tooltip .tip-warn {
+  color: #e0806a;
 }
 
 #tooltip .tip-muted {

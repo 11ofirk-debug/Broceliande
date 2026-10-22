@@ -1,9 +1,13 @@
 // Canvas debug overlay (spec §18.2). Visual only — must not affect gameplay.
 // Lanes (waypoints, centrelines, corridor edges, spawns), Druid position and melee slots,
-// turret-slot and feature coordinates, wolf collision radii and IDs, turret IDs and target
+// all candidate locations (footprint, jitter, role, covered lanes), wolf collision radii and IDs, turret IDs and target
 // lines, Vulture IDs, block radii and target lines, pebble IDs. All turret ranges are drawn by the renderer in debug mode.
 
 import * as C from '../config.js';
+import { GameState } from '../states.js';
+import { isStepMode, isVisitTarget, stepCost } from '../systems/stepSystem.js';
+import { candidateProblems } from '../scene.js';
+import { turretMuzzle } from '../entities/turret.js';
 
 const COLOR = 'rgba(120, 220, 255, 0.9)';
 const EDGE_COLOR = 'rgba(120, 220, 255, 0.45)';
@@ -14,12 +18,19 @@ const VULTURE_COLOR = 'rgba(255, 140, 220, 0.9)';
 const LABEL_BG = 'rgba(0, 0, 0, 0.55)';
 const STATE_TAGS = { WALKING: 'walk', WAITING: 'wait', APPROACHING: 'appr', BITING: 'bite' };
 
-function label(ctx, text, x, y) {
+function label(ctx, text, x, y, color = COLOR) {
   const w = ctx.measureText(text).width;
   ctx.fillStyle = LABEL_BG;
   ctx.fillRect(x - 2, y - 13, w + 4, 17);
-  ctx.fillStyle = COLOR;
+  ctx.fillStyle = color;
   ctx.fillText(text, x, y);
+}
+
+// Step-mode Prep (M1b §4): current travel cost under each valid marker; red when unaffordable.
+function stepCostLabel(ctx, game, marker, x, y) {
+  if (!isStepMode(game) || game.state !== GameState.PREP || !isVisitTarget(game, marker)) return;
+  const cost = stepCost(game, marker);
+  label(ctx, `${cost} steps`, x, y, cost <= game.stepsRemaining ? TARGET_COLOR : SPAWN_COLOR);
 }
 
 function cross(ctx, x, y, size) {
@@ -41,16 +52,7 @@ export function drawDebugOverlay(ctx, game, scene) {
   for (const lane of scene.lanes) drawLane(ctx, lane);
   drawDruid(ctx, game);
 
-  ctx.strokeStyle = COLOR;
-  C.TURRET_SLOTS.forEach((s, i) => {
-    cross(ctx, s.x, s.y, 5);
-    label(ctx, `S${i} (${s.x}, ${s.y})`, s.x + 8, s.y + C.TURRET_SLOT_RADIUS + 14);
-  });
-  C.FEATURES.forEach((f, i) => {
-    ctx.strokeStyle = COLOR;
-    cross(ctx, f.x, f.y, 5);
-    label(ctx, `F${i} ${f.type} (${f.x}, ${f.y})`, f.x + 8, f.y + 22);
-  });
+  drawCandidates(ctx, game, scene);
 
   drawWolves(ctx, game);
   drawTurretTargets(ctx, game);
@@ -61,6 +63,57 @@ export function drawDebugOverlay(ctx, game, scene) {
   ctx.font = '13px monospace';
 
   ctx.restore();
+}
+
+// Label for this run's role of a candidate (M1c §6.2): T<slot>, F:<type> or V.
+function roleTag(game, role) {
+  if (role.kind === 'slot') return `T${role.index}`;
+  if (role.kind === 'feature') return `F:${C.FEATURE_TYPES[game.features[role.index].type].name}`;
+  return 'V';
+}
+
+// All 25 candidates (M1c §6.2): footprint and footprint + jitter circles around the
+// candidate, a line to this run's jittered position, index and role, and covered lanes for
+// turret slots (measured from the jittered position). Candidates failing start-up
+// validation are drawn red.
+function drawCandidates(ctx, game, scene) {
+  const failing = new Set(candidateProblems(scene).map((p) => p.index));
+  const laneNames = Object.fromEntries(scene.lanes.map((l) => [l.id, l.name]));
+  for (const c of scene.candidates) {
+    const role = game.layout.roles[c.index];
+    const placed = role.kind === 'slot' ? game.slots[role.index] : role.kind === 'feature' ? game.features[role.index] : null;
+    const color = failing.has(c.index) ? SPAWN_COLOR : COLOR;
+    if (placed) {
+      ctx.strokeStyle = TARGET_COLOR;
+      ctx.beginPath();
+      ctx.moveTo(c.x, c.y);
+      ctx.lineTo(placed.x, placed.y);
+      ctx.stroke();
+      ctx.fillStyle = TARGET_COLOR;
+      ctx.beginPath();
+      ctx.arc(placed.x, placed.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, C.LOCATION_RADIUS, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([3, 5]);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, C.LOCATION_RADIUS + C.LOCATION_JITTER, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    cross(ctx, c.x, c.y, 5);
+
+    const x = c.x - C.LOCATION_RADIUS;
+    let y = c.y + C.LOCATION_RADIUS + C.LOCATION_JITTER + 14;
+    label(ctx, `#${c.index} ${roleTag(game, role)} (${c.x}, ${c.y})`, x, y, color);
+    if (role.kind === 'slot') {
+      y += 17;
+      label(ctx, `covers ${placed.lanes.map((id) => laneNames[id]).join(', ') || 'none'}`, x, y, color);
+    }
+    if (role.kind !== 'vacant') stepCostLabel(ctx, game, { kind: role.kind, index: role.index }, x, y + 17);
+  }
 }
 
 function drawLane(ctx, lane) {
@@ -119,14 +172,15 @@ function drawTurretTargets(ctx, game) {
   ctx.lineWidth = 1.5;
   for (const t of game.turrets) {
     const target = game.wolves.find((w) => w.id === t.targetId);
+    const muzzle = turretMuzzle(t);
     if (target) {
       ctx.strokeStyle = TARGET_COLOR;
       ctx.beginPath();
-      ctx.moveTo(t.x, t.y - C.TURRET_MUZZLE_HEIGHT);
+      ctx.moveTo(muzzle.x, muzzle.y);
       ctx.lineTo(target.x, target.y - C.WOLF_HIT_HEIGHT);
       ctx.stroke();
     }
-    label(ctx, `T#${t.id}${t.upgraded ? ' +' : ''}`, t.x - 16, t.y - C.TURRET_MUZZLE_HEIGHT - 12);
+    label(ctx, `T#${t.id}${t.upgraded ? ' +' : ''}`, t.x - 16, muzzle.y - 20);
   }
 }
 

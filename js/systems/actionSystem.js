@@ -8,7 +8,10 @@ import { canAfford, deduct } from '../resources.js';
 import { searchTime, completeSearch } from './searchSystem.js';
 import { turretOnSlot, completeBuild, completeUpgrade } from './buildSystem.js';
 import { createVulture } from '../entities/vulture.js';
+import { canVisit, stepCost, markerPos } from './stepSystem.js';
 
+// Timed actions show a progress bar and can be cancelled. TRAVELLING is neither:
+// its steps are already spent and input is ignored until it lands (M1b §5.3).
 const TIMED = [ActionState.SEARCHING, ActionState.BUILDING, ActionState.UPGRADING];
 
 export function createIdleAction() {
@@ -54,6 +57,52 @@ export function isBuildingSlot(game, slotIndex) {
 export function startBuild(game, slotIndex) {
   if (!canStartBuild(game, slotIndex)) return false;
   return setAction(game, ActionState.BUILDING, slotIndex, C.BUILD_TIME);
+}
+
+export function isTravelling(game) {
+  return game.action.state === ActionState.TRAVELLING;
+}
+
+// Step mode (M1b §5.3): clicking a valid, affordable marker spends the steps now and starts
+// the travel tween. The search or build happens instantly on arrival. target: { kind, index }.
+export function startTravel(game, marker) {
+  if (game.action.state !== ActionState.IDLE || !canVisit(game, marker)) return false;
+  const cost = stepCost(game, marker);
+  if (!setAction(game, ActionState.TRAVELLING, { kind: marker.kind, index: marker.index }, C.TRAVEL_TWEEN_TIME)) return false;
+  game.action.from = game.druidPos;
+  // Debug undo (M1b §8): what this move is about to change.
+  game.moveHistory.push({
+    marker: game.action.target,
+    stepsRemaining: game.stepsRemaining,
+    druidPos: game.druidPos,
+    resources: { ...game.resources },
+  });
+  game.stepsRemaining -= cost;
+  return true;
+}
+
+// Debug key U (M1b §8): undo the last step-mode move, restoring steps, position, resources
+// and the marker (feature unsearched / turret removed). Only when idle in step-mode Prep.
+// The RNG is not rewound, so searching the feature again may roll a different yield.
+export function undoLastMove(game) {
+  if (game.state !== GameState.PREP || game.action.state !== ActionState.IDLE) return false;
+  const move = game.moveHistory.pop();
+  if (!move) return false;
+  game.stepsRemaining = move.stepsRemaining;
+  game.druidPos = move.druidPos;
+  game.resources = move.resources;
+  game.route.pop();
+  if (move.marker.kind === 'feature') game.features[move.marker.index].exhausted = false;
+  else game.turrets = game.turrets.filter((t) => t.slotIndex !== move.marker.index);
+  return true;
+}
+
+// Arrival: the Druid now stands at the marker, which is the origin of the next cost (§4).
+function completeTravel(game, marker) {
+  game.druidPos = markerPos(game, marker);
+  game.route.push(game.druidPos);
+  if (marker.kind === 'feature') completeSearch(game, marker.index);
+  else completeBuild(game, marker.index);
 }
 
 // Upgrade menu state for a turret (§11.1): { available, reason }. Only one upgrade at a
@@ -127,6 +176,14 @@ export function enforceActionAllowed(game) {
 
 export function updateAction(game, dt) {
   const a = game.action;
+  if (a.state === ActionState.TRAVELLING) {
+    a.elapsed += dt;
+    if (a.elapsed >= a.duration) {
+      game.action = createIdleAction();
+      completeTravel(game, a.target);
+    }
+    return;
+  }
   if (!isTimedAction(a)) return;
   a.elapsed += dt;
   if (a.elapsed < a.duration) return;
@@ -141,13 +198,29 @@ export function updateAction(game, dt) {
 export function actionTargetPos(game) {
   const a = game.action;
   if (a.state === ActionState.SEARCHING) return game.features[a.target];
-  if (a.state === ActionState.BUILDING || a.state === ActionState.UPGRADING) return C.TURRET_SLOTS[a.target];
+  if (a.state === ActionState.BUILDING || a.state === ActionState.UPGRADING) return game.slots[a.target];
   return null;
 }
 
+// Where the Druid stands for a logical position: home, or beside a marker.
+function standPos(p) {
+  if (p.x === C.DRUID_POS.x && p.y === C.DRUID_POS.y) return C.DRUID_POS;
+  return { x: p.x + C.DRUID_ACTION_OFFSET.x, y: p.y + C.DRUID_ACTION_OFFSET.y };
+}
+
 // Where the Druid is drawn (§7.3). Visual only: wolves always attack DRUID_POS.
+// In step mode he stays beside the last marker he visited (game.druidPos) and is
+// tweened between markers while TRAVELLING; in timed mode game.druidPos is always home.
 export function druidDisplayPos(game) {
+  const a = game.action;
+  if (a.state === ActionState.TRAVELLING) {
+    const from = standPos(a.from);
+    const to = standPos(markerPos(game, a.target));
+    const t = Math.min(1, a.elapsed / a.duration);
+    const e = t * t * (3 - 2 * t); // smoothstep ease
+    return { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e };
+  }
   const target = actionTargetPos(game);
-  if (!target) return C.DRUID_POS;
+  if (!target) return standPos(game.druidPos);
   return { x: target.x + C.DRUID_ACTION_OFFSET.x, y: target.y + C.DRUID_ACTION_OFFSET.y };
 }

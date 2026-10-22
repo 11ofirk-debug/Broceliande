@@ -21,6 +21,17 @@ export const BUILD_TIME = 2.3;           // s
 export const UPGRADE_TIME = 2.5;         // s
 
 // ---------------------------------------------------------------------------
+// M1b addendum §9 — step-budget Prep (docs/M1B_STEPS_ADDENDUM.md)
+// ---------------------------------------------------------------------------
+export const PREP_MODE = 'steps';          // 'steps' | 'timed' — mode at page load; debug key M toggles it
+export const STEP_PX = 25;                 // TUNING — px of straight-line travel per step
+export const STEP_BUDGET = 90;             // TUNING — steps available in step-mode Prep (~2,250 px)
+export const TRAVEL_TWEEN_TIME = 0.35;     // TUNING — s, Druid's travel animation to a marker
+export const STEP_BAR_BLINK_HZ = 3;        // TUNING — red blink rate of the step bar on an unaffordable hover (§5.2)
+export const CALIBRATION_SLOT_COUNT = 5;   // debug panel: "all features + N nearest slots" greedy figure (§8)
+export const CALIBRATION_TARGET_RATIO = 1.4; // that figure should be about this × STEP_BUDGET (§9 budget intent)
+
+// ---------------------------------------------------------------------------
 // 17.2 Druid
 // ---------------------------------------------------------------------------
 export const DRUID_HP = 80;
@@ -28,7 +39,7 @@ export const DRUID_POS = { x: 1010, y: 600 };           // TUNING — off-centre
 export const DRUID_RADIUS = 28;                          // TUNING
 export const DRUID_MELEE_RADIUS = 52;                    // TUNING
 export const DRUID_MELEE_SLOTS = 6;                      // TUNING — max simultaneous biters
-export const DRUID_ACTION_OFFSET = { x: -40, y: 10 };    // TUNING — Druid position beside a target
+export const DRUID_ACTION_OFFSET = { x: -58, y: 20 };    // TUNING — Druid position beside a target (just outside LOCATION_RADIUS)
 
 // ---------------------------------------------------------------------------
 // 17.3 Wolf
@@ -60,7 +71,7 @@ export const UPGRADED_DAMAGE = 5;
 export const UPGRADED_FIRE_INTERVAL = 0.6; // s
 export const UPGRADED_RANGE_MULT = 1.2;
 export const TURRET_TURN_SPEED = 9;       // TUNING — rad/s, how fast a turret visibly turns toward its target (visual; firing does not wait for it)
-export const TURRET_MUZZLE_HEIGHT = 40;   // px above the slot where pebbles leave the sprinkler
+export const TURRET_MUZZLE_HEIGHT = 40;   // px above the slot pad where pebbles leave the sprinkler
 export const WOLF_HIT_HEIGHT = 10;        // px above a wolf's collision centre where pebbles strike its body
 
 // ---------------------------------------------------------------------------
@@ -123,13 +134,8 @@ export const LANES = [
   },
 ];
 
-// TUNING — 12 slots, ~4 per lane, irregular, outside corridors (§9.1).
-export const TURRET_SLOT_RADIUS = 30;     // TUNING — px, slot pad size (drawing and later clicking)
-export const TURRET_SLOTS = [
-  { x: 210, y: 400 }, { x: 470, y: 330 }, { x: 650, y: 480 }, { x: 1090, y: 380 },   // mostly Upper-left
-  { x: 1530, y: 470 }, { x: 1420, y: 715 }, { x: 1235, y: 520 }, { x: 1720, y: 610 },  // mostly Right
-  { x: 375, y: 860 }, { x: 730, y: 845 }, { x: 1095, y: 865 }, { x: 470, y: 1010 },   // mostly Bottom-left
-];
+export const TURRET_SLOT_RADIUS = 30;     // TUNING — px, slot pad size (drawing only; must fit LOCATION_RADIUS)
+export const TURRET_BASE_OFFSET = 18;     // px the slot pad sits below its location centre, so pad + turret fit the footprint (M1c §2.1)
 
 // ---------------------------------------------------------------------------
 // 17.7 Searchable features
@@ -143,36 +149,81 @@ export const FEATURE_TYPES = {
   pond:      { name: 'Pond',       searchTime: 2.0, yields: { pits: [2, 3], reeds: [1, 3] } },
 };
 
-export const FEATURE_RADIUS = 36;         // TUNING — px, feature footprint (drawing, overlap checks, later clicking)
+export const FEATURE_RADIUS = 32;         // TUNING — px, feature sprite scale (drawing only; sprites must fit LOCATION_RADIUS)
 
-// TUNING — positions. Mix is fixed: 2 Trees, 1 Reed Patch, 1 Shrub, 2 Ruins, 2 Ponds.
-export const FEATURES = [
-  { type: 'tree',      x: 330,  y: 560 },
-  { type: 'tree',      x: 1700, y: 880 },
-  { type: 'reedPatch', x: 1070, y: 1010 },
-  { type: 'shrub',     x: 1180, y: 200 },
-  { type: 'ruins',     x: 700,  y: 165 },
-  { type: 'ruins',     x: 1780, y: 300 },
-  { type: 'pond',      x: 1480, y: 990 },
-  { type: 'pond',      x: 110,  y: 620 },
+// ---------------------------------------------------------------------------
+// M1c addendum — candidate locations and randomised layout (docs/M1C_LAYOUT_ADDENDUM.md §7)
+// ---------------------------------------------------------------------------
+export const RANDOMISE_LAYOUT = true;     // false = original fixed M1 layout: original types, no jitter (§3.1)
+export const LOCATION_RADIUS = 45;        // TUNING — px, footprint of every candidate; all feature/turret visuals fit inside; also the click area
+export const LOCATION_JITTER = 25;        // TUNING — px, max random offset of a chosen location
+export const LOCATION_GAP = 20;           // TUNING — px, extra spacing between candidates
+export const DECOR_MARGIN = 15;           // TUNING — px, decoration keeps this far beyond footprint + jitter
+export const DECOR_SEED = 12345;          // fixed; decoration is identical in every run
+export const LANE_MIN_TURRET_SLOTS = 3;   // TUNING — turret slots that must cover each lane
+export const FEATURE_ROUTE_MIN_FACTOR = 0.75; // TUNING — greedy all-feature route ≥ this × STEP_BUDGET
+export const FEATURE_ROUTE_MAX_FACTOR = 1.10; // TUNING — … and ≤ this × STEP_BUDGET
+export const MAX_LAYOUT_ATTEMPTS = 200;
+
+// Exactly 25 candidates (§2). The first 20 are the original M1 positions, with their role and
+// feature type kept so RANDOMISE_LAYOUT: false reproduces the original layout (§3.1). Their
+// order matches the original TURRET_SLOTS / FEATURES arrays, so slot and feature indices are
+// unchanged. The last 5 were added for M1c and are vacant in the fixed layout.
+// Start-up validation (scene.js) warns about any candidate that breaks the §2 rules.
+export const CANDIDATE_LOCATIONS = [
+  // Original turret slots, ~4 per lane (§9.1)
+  { x: 210,  y: 400,  role: 'slot' },   // 0  mostly Upper-left
+  { x: 470,  y: 330,  role: 'slot' },   // 1
+  { x: 650,  y: 480,  role: 'slot' },   // 2
+  { x: 1090, y: 380,  role: 'slot' },   // 3
+  { x: 1530, y: 470,  role: 'slot' },   // 4  mostly Right
+  { x: 1420, y: 715,  role: 'slot' },   // 5
+  { x: 1235, y: 520,  role: 'slot' },   // 6
+  { x: 1720, y: 610,  role: 'slot' },   // 7
+  { x: 375,  y: 860,  role: 'slot' },   // 8  mostly Bottom-left
+  { x: 730,  y: 845,  role: 'slot' },   // 9
+  { x: 1095, y: 865,  role: 'slot' },   // 10
+  { x: 470,  y: 1010, role: 'slot' },   // 11
+  // Original features. Mix: 2 Trees, 1 Reed Patch, 1 Shrub, 2 Ruins, 2 Ponds.
+  { x: 330,  y: 560,  role: 'feature', type: 'tree' },      // 12
+  { x: 1700, y: 880,  role: 'feature', type: 'tree' },      // 13
+  { x: 1070, y: 1010, role: 'feature', type: 'reedPatch' }, // 14
+  { x: 1180, y: 200,  role: 'feature', type: 'shrub' },     // 15
+  { x: 700,  y: 165,  role: 'feature', type: 'ruins' },     // 16
+  { x: 1780, y: 300,  role: 'feature', type: 'ruins' },     // 17
+  { x: 1480, y: 990,  role: 'feature', type: 'pond' },      // 18
+  { x: 110,  y: 620,  role: 'feature', type: 'pond' },      // 19
+  // New in M1c (TUNING): placed in open ground away from the others; vacant in the fixed layout.
+  { x: 70,   y: 1010 }, // 20  bottom-left corner (Bottom-left lane)
+  { x: 1490, y: 150 },  // 21  top, right of centre (Right lane)
+  { x: 100,  y: 150 },  // 22  top-left corner (Upper-left lane)
+  { x: 1270, y: 980 },  // 23  bottom, right of centre (Right lane)
+  { x: 1820, y: 750 },  // 24  right edge (Right lane)
 ];
 
+// Original fixed M1 layout, derived from the candidates above (RANDOMISE_LAYOUT: false).
+export const TURRET_SLOTS = CANDIDATE_LOCATIONS.filter((c) => c.role === 'slot').map(({ x, y }) => ({ x, y }));
+export const FEATURES = CANDIDATE_LOCATIONS.filter((c) => c.role === 'feature').map(({ x, y, type }) => ({ type, x, y }));
+
 // ---------------------------------------------------------------------------
-// Decorative forest (§5.3) — visual only, no gameplay effect.
-// Scattered once at start-up on a jittered grid with its own fixed seed, so the
-// layout is identical every run and automatically keeps clear of corridors,
-// slots and features when those are moved.
+// Decorative forest (§5.3, M1c §5) — visual only, no gameplay effect.
+// Scattered once at start-up on a jittered grid seeded with DECOR_SEED, so it is identical
+// in every run and mode. Each object's drawn extent (a circle `lift` px above its base with
+// radius `r`, both × its size) must stay clear of every corridor and of every candidate
+// location's footprint + jitter + DECOR_MARGIN, including vacant ones.
 // ---------------------------------------------------------------------------
 export const DECOR = {
-  seed: 1337,                 // fixed; independent of the gameplay seed
   cellSize: 64,               // px, jittered grid cell; one candidate object per cell
   treeChance: 0.42,           // per cell, away from corridors
   bushChance: 0.22,
   rockChance: 0.08,
   edgeBand: 110,              // px from the screen border where trees always grow (boundary)
-  treeCorridorGap: 26,        // px beyond the corridor edge kept free of trees
-  smallCorridorGap: 4,        // px beyond the corridor edge kept free of bushes and rocks
-  objectGap: 46,              // px of clear ground around slots and features
+  corridorGap: 2,             // px kept between any object's drawn extent and a corridor edge
+  extent: {                   // drawn extent per kind, in units of the object's size (matches render/environment.js)
+    tree: { lift: 40, r: 48 },
+    bush: { lift: 10, r: 22 },
+    rock: { lift: 7, r: 17 },
+  },
   clearingRadius: 120,        // px, open dirt clearing around the Druid
   groundPatches: 70,          // subtle floor colour blobs
 };

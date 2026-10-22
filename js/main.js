@@ -1,7 +1,7 @@
 // Bootstrap, stage scaling and the fixed-timestep loop (spec §3.4, §3.5).
 
 import * as C from './config.js';
-import { GameState, createGame, startEncounter, startCombat, endEncounter, updateGame, validateConfig, killAllWolves, grantResources } from './game.js';
+import { GameState, createGame, startEncounter, startCombat, endEncounter, updateGame, validateConfig, killAllWolves, grantResources, togglePrepMode } from './game.js';
 import { createInput } from './input.js';
 import { createRenderer } from './renderer.js';
 import { createUI } from './ui.js';
@@ -9,6 +9,7 @@ import { createScene, validateLayout } from './scene.js';
 import { createInteraction, isInteractive } from './interaction.js';
 import { pick } from './picking.js';
 import { ActionState } from './states.js';
+import { undoLastMove } from './systems/actionSystem.js';
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('game-canvas');
@@ -44,15 +45,16 @@ const clock = { speed: 1, paused: false };            // acts on simulation time
 const view = { debug: C.DEBUG_START_ENABLED, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null };
 const interaction = createInteraction(game, view);
 
-function restart() {
-  startEncounter(game);
+// options.newSeed: always a new seed, so a new layout even with DEBUG_SEED set (debug L).
+function restart(options) {
+  startEncounter(game, options);
   view.clickMarker = null;
   interaction.closeMenu();
 }
 
 const renderer = createRenderer(canvas, scene);
 const ui = createUI(scene, {
-  onStartCombat: () => startCombat(game),
+  onStartCombat: () => interaction.onStartCombat(),
   onRestart: restart,
   onMenuAction: () => interaction.onMenuAction(),
 });
@@ -75,6 +77,9 @@ const input = createInput(stage, canvas, () => scale, {
         break;
       case 'n': if (game.state === GameState.PREP) startCombat(game); break;
       case 'r': restart(); break;
+      case 'l': restart({ newSeed: true }); break;      // M1c §6.1: restart with a new layout
+      case 'm': togglePrepMode(game); restart(); break; // M1b §2: switch timed / steps Prep
+      case 'u': undoLastMove(game); break;              // M1b §8: undo last step-mode move
       case 'k': killAllWolves(game); break; // extra debug key (not in §18.1): kill all living wolves
       case 'g': grantResources(game); break;
       case 'Escape': interaction.onEscape(); break;

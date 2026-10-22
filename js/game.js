@@ -7,10 +7,12 @@ import { updateWolfMovement } from './systems/movementSystem.js';
 import { updateMelee, killWolf, updateTurrets, updateProjectiles } from './systems/combatSystem.js';
 import { createIdleAction, updateAction, enforceActionAllowed } from './systems/actionSystem.js';
 import { createFeatures } from './entities/searchableFeature.js';
+import { generateLayout } from './layout.js';
 import { emptyResources, add } from './resources.js';
 import { updateEffects } from './effects.js';
 import { updateVultures, updateBlocking, expireVultures } from './systems/vultureSystem.js';
-import { GameState } from './states.js';
+import { isStepMode } from './systems/stepSystem.js';
+import { GameState, PrepMode } from './states.js';
 
 export { GameState };
 
@@ -44,15 +46,22 @@ function createMeleeSlots() {
 export function createGame(scene) {
   return {
     state: GameState.START,
+    prepMode: C.PREP_MODE, // PrepMode; kept across restarts, toggled by debug M (M1b §2)
     lanes: scene.lanes,
     seed: null,
     rng: null,
-    prepRemaining: 0,  // s, counts down during PREP
+    prepRemaining: 0,  // s, counts down during timed PREP
+    stepsRemaining: 0, // step-mode PREP budget (M1b §4)
+    druidPos: C.DRUID_POS, // where the Druid logically stands; only leaves home in step-mode Prep
+    route: [],             // step-mode Prep: DRUID_POS then every visited marker centre (M1b §5.5)
+    moveHistory: [],       // step-mode Prep: per-move snapshots for the debug undo (M1b §8)
     combatTime: 0,     // s, counts up during COMBAT
     druidHp: 0,
     druidLastHitTime: -Infinity, // combat time of the last bite (hit flash)
     resources: emptyResources(),
-    features: createFeatures(),
+    layout: null,      // this run's layout (M1c §3): slots, features, candidate roles, fairness stats
+    slots: [],         // this run's turret slot positions { x, y, candidate, lanes }
+    features: [],
     turrets: [],
     projectiles: [],
     vultures: [],
@@ -77,17 +86,24 @@ function setState(game, next) {
   return true;
 }
 
-// Page load (START → PREP) and Restart (any → PREP). Layout comes from config and
-// never changes; only the seed (and therefore yields) is re-rolled.
-export function startEncounter(game) {
-  game.seed = C.DEBUG_SEED ?? makeRandomSeed();
+// Page load (START → PREP) and Restart (any → PREP). Each start draws a new seed (unless
+// DEBUG_SEED is set) and generates this run's layout from it before anything else uses the
+// RNG (M1c §3). newSeed: always draw a new seed, even with DEBUG_SEED (debug key L, §6.1).
+export function startEncounter(game, { newSeed = false } = {}) {
+  game.seed = newSeed ? makeRandomSeed() : (C.DEBUG_SEED ?? makeRandomSeed());
   game.rng = createRng(game.seed);
+  game.layout = generateLayout(game.rng, game.lanes);
+  game.slots = game.layout.slots;
   game.prepRemaining = C.PREP_DURATION;
+  game.stepsRemaining = C.STEP_BUDGET;
+  game.druidPos = C.DRUID_POS;
+  game.route = [C.DRUID_POS];
+  game.moveHistory = [];
   game.combatTime = 0;
   game.druidHp = C.DRUID_HP;
   game.druidLastHitTime = -Infinity;
   game.resources = emptyResources();
-  game.features = createFeatures();
+  game.features = createFeatures(game.layout);
   game.turrets = [];
   game.projectiles = [];
   game.vultures = [];
@@ -103,12 +119,20 @@ export function startEncounter(game) {
   setState(game, GameState.PREP);
 }
 
-// Prep timer reaching 0, Start Combat button, or debug N.
+// Prep timer reaching 0, Start Combat / Start Battle button, or debug N.
 export function startCombat(game) {
   if (game.state !== GameState.PREP) return;
   game.prepRemaining = 0;
+  game.druidPos = C.DRUID_POS; // step mode: the Druid snaps home and the trail is cleared (M1b §5.6)
+  game.route = [];
+  game.moveHistory = [];
   setState(game, GameState.COMBAT);
-  enforceActionAllowed(game); // a search or build in progress is cancelled at no cost (§9.3)
+  enforceActionAllowed(game); // a search, build or travel in progress is cancelled (§9.3)
+}
+
+// Debug key M (M1b §2): switch Prep mode. The caller restarts the encounter.
+export function togglePrepMode(game) {
+  game.prepMode = isStepMode(game) ? PrepMode.TIMED : PrepMode.STEPS;
 }
 
 export function endEncounter(game, result) {
@@ -141,10 +165,11 @@ export function grantResources(game) {
 export function updateGame(game, dt) {
   switch (game.state) {
     case GameState.PREP:
-      game.prepRemaining -= dt;
+      // Step mode has no countdown: Prep ends only via Start Battle (M1b §5.6).
+      if (!isStepMode(game)) game.prepRemaining -= dt;
       updateAction(game, dt);
       updateEffects(game, dt);
-      if (game.prepRemaining <= 0) startCombat(game);
+      if (!isStepMode(game) && game.prepRemaining <= 0) startCombat(game);
       break;
     case GameState.COMBAT:
       game.combatTime += dt;
@@ -167,6 +192,9 @@ export function updateGame(game, dt) {
 
 // Start-up validation of config (spec §14).
 export function validateConfig() {
+  if (!Object.values(PrepMode).includes(C.PREP_MODE)) {
+    console.error(`PREP_MODE is "${C.PREP_MODE}", expected one of: ${Object.values(PrepMode).join(', ')}`);
+  }
   let total = 0;
   for (const lane of C.LANES) {
     const bursts = C.WAVE[lane.id];

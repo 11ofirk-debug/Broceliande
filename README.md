@@ -21,7 +21,10 @@ Then open http://localhost:8000 in Chrome.
 | `P` | Pause / resume simulation |
 | `1` / `2` / `4` | Simulation speed ×1 / ×2 / ×4 |
 | `N` | Skip to next phase (Prep → Combat) |
-| `R` | Restart encounter |
+| `R` | Restart encounter (keeps the current Prep mode; new layout unless `DEBUG_SEED` is set) |
+| `L` | Restart with a new seed and layout, even if `DEBUG_SEED` is set — see `docs/M1C_LAYOUT_ADDENDUM.md` |
+| `M` | Toggle Prep mode (steps / timed) and restart — see `docs/M1B_STEPS_ADDENDUM.md` |
+| `U` | Undo the last step-mode Prep move (restores steps, position, resources, marker) |
 | `K` | Kill all living wolves (extra, not in the spec; handy for checking Victory) |
 | `G` | Grant +10 of each resource |
 | `Esc` / right-click | Close menu, otherwise cancel the current action |

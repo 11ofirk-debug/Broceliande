@@ -7,18 +7,22 @@ import { drawFloor, drawCorridors, drawDecor } from './render/environment.js';
 import {
   drawTurretSlot, drawDruid, drawFeature, drawWolf, drawWolfHpBar, drawDruidHpBar,
   drawTurret, drawRange, drawProgressBar, drawFloatingText, drawPebble,
-  drawVulture, drawVultureStatus, drawVultureGhost,
+  drawVulture, drawVultureStatus, drawVultureGhost, featureBase, slotBase,
 } from './render/entities.js';
 import { turretRange } from './entities/turret.js';
 import { druidDisplayPos, actionTargetPos, isTimedAction, isUpgradingSlot } from './systems/actionSystem.js';
+import { isStepMode, routePreview } from './systems/stepSystem.js';
 
 const HIT_FLASH_TIME = 0.15; // s of hit flash on the Druid (bite) or a wolf (pebble); visual only
-// Height of each feature sprite above its base, in FEATURE_RADIUS units (where its progress bar goes).
-const FEATURE_TOP = { tree: 2.6, shrub: 1.9, ruins: 2.0, reedPatch: 1.7, pond: 1.2 };
+const PROGRESS_GAP = 12;     // px between the top of a location's footprint and its progress bar
 
 const COLORS = {
   hudBackdrop: '#10160e',
   marker: '#ffe066',
+  trail: 'rgba(245, 232, 190, 0.32)',   // route so far (M1b §5.5)
+  preview: 'rgba(250, 240, 205, 0.95)', // route preview (M1b §5.2.2)
+  previewBad: 'rgba(235, 85, 58, 0.95)', // preview when unaffordable (§5.2.4)
+  labelBg: 'rgba(16, 22, 14, 0.85)',
 };
 
 export function createRenderer(canvas, scene) {
@@ -36,10 +40,11 @@ export function createRenderer(canvas, scene) {
     // Ground layer.
     drawFloor(ctx, scene);
     drawCorridors(ctx, scene);
-    C.TURRET_SLOTS.forEach((slot, i) => {
+    game.slots.forEach((slot, i) => {
       drawTurretSlot(ctx, slot, !isPrep, isPrep && hover?.kind === 'slot' && hover.index === i);
     });
     drawRanges(ctx, game, view);
+    if (isPrep && isStepMode(game)) drawRouteTrail(ctx, game.route);
 
     // Upright layer, y-sorted so lower objects appear in front (§5.2).
     const druidPos = druidDisplayPos(game);
@@ -48,10 +53,10 @@ export function createRenderer(canvas, scene) {
     const drawables = [
       ...decor,
       ...game.features.map((f) => ({
-        y: f.y,
+        y: featureBase(f).y,
         draw: () => drawFeature(ctx, f, isPrep && hover?.kind === 'feature' && hover.index === f.index),
       })),
-      ...game.turrets.map((t) => ({ y: t.y, draw: () => drawTurret(ctx, t, isUpgradingSlot(game, t.slotIndex)) })),
+      ...game.turrets.map((t) => ({ y: slotBase(t).y, draw: () => drawTurret(ctx, t, isUpgradingSlot(game, t.slotIndex)) })),
       { y: druidPos.y + C.DRUID_RADIUS * 0.6, draw: () => drawDruid(ctx, druidPos.x, druidPos.y, hurt) },
       ...game.wolves.map((w) => ({
         y: w.y + C.WOLF_RADIUS * 0.5,
@@ -71,6 +76,8 @@ export function createRenderer(canvas, scene) {
     // Nothing can hurt the Druid in Prep, so his world HP bar only appears from Combat on.
     if (!isPrep) drawDruidHpBar(ctx, druidPos.x, druidPos.y, game.druidHp);
     drawActionProgress(ctx, game, druidPos);
+    const preview = routePreview(game, hover);
+    if (preview) drawRoutePreview(ctx, preview);
     for (const t of game.floatingTexts) {
       drawFloatingText(ctx, t.text, t.x, t.y - (t.age / C.FLOATING_TEXT_TIME) * C.FLOATING_TEXT_RISE, t.age / C.FLOATING_TEXT_TIME);
     }
@@ -102,7 +109,7 @@ function drawRanges(ctx, game, view) {
   if (game.state === GameState.PREP && hover?.kind === 'slot') shown.add(hover.index);
   if (view.menu?.kind === 'build') shown.add(view.menu.index);
   if (game.action.state === ActionState.BUILDING) shown.add(game.action.target);
-  for (const i of shown) drawRange(ctx, C.TURRET_SLOTS[i].x, C.TURRET_SLOTS[i].y, C.TURRET_RANGE);
+  for (const i of shown) drawRange(ctx, game.slots[i].x, game.slots[i].y, C.TURRET_RANGE);
 
   for (const t of game.turrets) {
     const hovered = hover?.kind === 'turret' && hover.index === t.slotIndex;
@@ -118,12 +125,57 @@ function drawRanges(ctx, game, view) {
 function drawActionProgress(ctx, game, druidPos) {
   if (!isTimedAction(game.action)) return;
   const p = actionTargetPos(game);
-  const above = game.action.state === ActionState.SEARCHING
-    ? C.FEATURE_RADIUS * FEATURE_TOP[game.features[game.action.target].type]
-    : C.TURRET_SLOT_RADIUS + 40;
   const druidTop = druidPos.y - C.DRUID_RADIUS * 2.55; // top of his HP bar in Combat
-  const y = Math.min(p.y - above, druidTop - 16);
+  const y = Math.min(p.y - C.LOCATION_RADIUS - PROGRESS_GAP, druidTop - 16);
   drawProgressBar(ctx, p.x, y, game.action.elapsed / game.action.duration);
+}
+
+// Faint solid line through every visited marker, starting at home (M1b §5.5).
+function drawRouteTrail(ctx, route) {
+  if (route.length < 2) return;
+  ctx.save();
+  ctx.strokeStyle = COLORS.trail;
+  ctx.lineWidth = 4;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  route.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Dashed line from the Druid's position to the hovered marker, with the step cost at its
+// midpoint; red when the marker costs more than what's left (M1b §5.2.2, §5.2.4).
+function drawRoutePreview(ctx, { from, to, cost, affordable }) {
+  const color = affordable ? COLORS.preview : COLORS.previewBad;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.setLineDash([12, 10]);
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const text = `${cost} ${cost === 1 ? 'step' : 'steps'}`;
+  const mx = (from.x + to.x) / 2;
+  const my = (from.y + to.y) / 2;
+  ctx.font = 'bold 20px Georgia, serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const w = ctx.measureText(text).width + 16;
+  ctx.fillStyle = COLORS.labelBg;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(mx - w / 2, my - 15, w, 30, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.fillText(text, mx, my + 1);
+  ctx.restore();
 }
 
 // Debug: crosshair where the player last clicked, to check screen → world conversion.

@@ -1,5 +1,6 @@
-// Static encounter scene built once from config: lane paths, decorative forest,
-// layout checks and the layout stats shown in the debug panel (spec §5, §12, §18.3).
+// Static encounter scene built once from config: lane paths, candidate locations, decorative
+// forest, layout checks and the layout stats shown in the debug panel (spec §5, §12, §18.3;
+// M1c §2, §5). Nothing here depends on the run seed, so it is identical in every run.
 
 import * as C from './config.js';
 import { createLanePath } from './lanePath.js';
@@ -12,7 +13,15 @@ export function createScene() {
     waypoints: lane.waypoints,
     path: createLanePath(lane.waypoints),
   }));
-  const scene = { lanes, decor: null, groundPatches: null };
+  // Lanes each candidate could cover as a turret slot (M1c §4.1): some centreline point
+  // within the base TURRET_RANGE.
+  const candidates = C.CANDIDATE_LOCATIONS.map((c, index) => ({
+    index,
+    x: c.x,
+    y: c.y,
+    lanes: lanes.filter((lane) => lane.path.distanceTo(c) <= C.TURRET_RANGE).map((lane) => lane.id),
+  }));
+  const scene = { lanes, candidates, decor: null, groundPatches: null };
   scatterDecor(scene);
   return scene;
 }
@@ -24,26 +33,44 @@ function corridorDistance(lanes, p) {
   return best;
 }
 
+// Radius around a candidate that can be occupied by its object once jittered.
+const OCCUPIED_RADIUS = C.LOCATION_RADIUS + C.LOCATION_JITTER;
+
 // ---------------------------------------------------------------------------
 // Start-up layout checks: warnings only, never block the game.
 // ---------------------------------------------------------------------------
-export function validateLayout(scene) {
-  const half = C.CORRIDOR_WIDTH / 2;
-  const check = (label, p, radius) => {
-    for (const lane of scene.lanes) {
-      const d = lane.path.distanceTo(p);
-      if (d < half + radius) {
-        console.warn(`${label} at (${p.x}, ${p.y}) overlaps the ${lane.name} corridor ` +
-          `(${Math.round(d)} px from centreline, needs ≥ ${half + radius})`);
-      }
-    }
-    if (p.y - radius < C.HUD_STRIP_HEIGHT) {
-      console.warn(`${label} at (${p.x}, ${p.y}) sits under the HUD strip`);
-    }
-  };
 
-  C.TURRET_SLOTS.forEach((s, i) => check(`Turret slot ${i}`, s, C.TURRET_SLOT_RADIUS));
-  C.FEATURES.forEach((f, i) => check(`Feature ${i} (${f.type})`, f, C.FEATURE_RADIUS));
+// Candidate rules (M1c §2). Returns a list of { index, problem } for the debug panel too.
+export function candidateProblems(scene) {
+  const problems = [];
+  const clearance = C.CORRIDOR_WIDTH / 2 + OCCUPIED_RADIUS;
+  const spacing = 2 * OCCUPIED_RADIUS + C.LOCATION_GAP;
+  for (const c of scene.candidates) {
+    const add = (problem) => problems.push({ index: c.index, problem });
+    if (c.lanes.length === 0) add(`no lane centreline within TURRET_RANGE (${C.TURRET_RANGE} px)`);
+    const d = corridorDistance(scene.lanes, c);
+    if (d < clearance) add(`${Math.round(d)} px from a corridor centreline, needs ≥ ${clearance} (short by ${Math.ceil(clearance - d)})`);
+    if (c.x - OCCUPIED_RADIUS < 0 || c.x + OCCUPIED_RADIUS > C.STAGE_WIDTH
+      || c.y - OCCUPIED_RADIUS < C.HUD_STRIP_HEIGHT || c.y + OCCUPIED_RADIUS > C.STAGE_HEIGHT) {
+      add(`footprint + jitter leaves the screen or reaches the HUD strip`);
+    }
+    for (const o of scene.candidates) {
+      if (o.index <= c.index) continue;
+      const gap = Math.hypot(o.x - c.x, o.y - c.y);
+      if (gap < spacing) add(`${Math.round(gap)} px from candidate ${o.index}, needs ≥ ${spacing}`);
+    }
+  }
+  return problems;
+}
+
+export function validateLayout(scene) {
+  if (C.CANDIDATE_LOCATIONS.length !== 25) {
+    console.warn(`CANDIDATE_LOCATIONS has ${C.CANDIDATE_LOCATIONS.length} entries, expected 25 (M1c §2)`);
+  }
+  for (const { index, problem } of candidateProblems(scene)) {
+    const c = scene.candidates[index];
+    console.warn(`Candidate ${index} at (${c.x}, ${c.y}): ${problem}`);
+  }
 
   for (const lane of scene.lanes) {
     const { factor } = laneStats(lane);
@@ -86,40 +113,50 @@ export function expectedResources() {
 }
 
 // ---------------------------------------------------------------------------
-// Decorative forest: deterministic jittered-grid scatter (visual only).
+// Decorative forest: deterministic jittered-grid scatter (visual only, M1c §5).
 // ---------------------------------------------------------------------------
+
+// Whether a decor object of this kind and size, based at p, stays clear of corridors and of
+// every candidate (footprint + jitter + margin). Tested on its drawn extent, not its base.
+function decorFits(scene, kind, p, size) {
+  const D = C.DECOR;
+  const e = D.extent[kind];
+  const centre = { x: p.x, y: p.y - e.lift * size };
+  const r = e.r * size;
+  if (corridorDistance(scene.lanes, centre) - C.CORRIDOR_WIDTH / 2 < r + D.corridorGap) return false;
+  const keepOut = OCCUPIED_RADIUS + C.DECOR_MARGIN + r;
+  return scene.candidates.every((c) => Math.hypot(centre.x - c.x, centre.y - c.y) >= keepOut);
+}
+
 function scatterDecor(scene) {
   const D = C.DECOR;
-  const rng = createRng(D.seed);
-  const half = C.CORRIDOR_WIDTH / 2;
+  const rng = createRng(C.DECOR_SEED);
   const top = C.HUD_STRIP_HEIGHT;
-  const blockers = [
-    ...C.TURRET_SLOTS.map((p) => ({ x: p.x, y: p.y, r: C.TURRET_SLOT_RADIUS + D.objectGap })),
-    ...C.FEATURES.map((p) => ({ x: p.x, y: p.y, r: C.FEATURE_RADIUS + D.objectGap })),
-    { x: C.DRUID_POS.x, y: C.DRUID_POS.y, r: D.clearingRadius },
-  ];
-  const blocked = (p) => blockers.some((b) => Math.hypot(p.x - b.x, p.y - b.y) < b.r);
+  const inClearing = (p) => Math.hypot(p.x - C.DRUID_POS.x, p.y - C.DRUID_POS.y) < D.clearingRadius;
 
   const decor = [];
   for (let gy = top; gy < C.STAGE_HEIGHT + D.cellSize; gy += D.cellSize) {
     for (let gx = -D.cellSize / 2; gx < C.STAGE_WIDTH + D.cellSize / 2; gx += D.cellSize) {
+      // Draw every random value up front so each cell's rolls never depend on the checks below.
       const p = { x: gx + rng.range(0, D.cellSize), y: gy + rng.range(0, D.cellSize) };
       const roll = rng.next();
       const size = rng.range(0.8, 1.25);
       const variant = rng.int(0, 2);
-      if (blocked(p)) continue;
+      if (inClearing(p)) continue;
 
-      const corridorGap = corridorDistance(scene.lanes, p) - half;
       const edge = Math.min(p.x, C.STAGE_WIDTH - p.x, p.y - top, C.STAGE_HEIGHT - p.y);
       const treeChance = edge < D.edgeBand ? 1 : D.treeChance;
 
       let kind = null;
-      if (roll < treeChance) kind = corridorGap > D.treeCorridorGap ? 'tree' : 'bush';
+      if (roll < treeChance) kind = 'tree';
       else if (roll < treeChance + D.bushChance) kind = 'bush';
       else if (roll < treeChance + D.bushChance + D.rockChance) kind = 'rock';
-      if (!kind || corridorGap < D.smallCorridorGap) continue;
+      if (!kind) continue;
       // Trees need canopy room below the HUD strip.
       if (kind === 'tree' && p.y < top + 60) kind = 'bush';
+      // A tree with no room becomes a bush if that fits.
+      if (kind === 'tree' && !decorFits(scene, kind, p, size)) kind = 'bush';
+      if (!decorFits(scene, kind, p, size)) continue;
 
       decor.push({ kind, x: p.x, y: p.y, size, variant });
     }

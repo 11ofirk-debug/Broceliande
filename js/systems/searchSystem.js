@@ -23,5 +23,5 @@ export function completeSearch(game, featureIndex) {
   feature.exhausted = true;
 
   const parts = RESOURCE_KEYS.filter((k) => gained[k] > 0).map((k) => `+${gained[k]} ${resourceName(k, gained[k])}`);
-  addFloatingText(game, parts.length ? parts.join('  ') : 'Nothing found', feature.x, feature.y - C.FEATURE_RADIUS * 2);
+  addFloatingText(game, parts.length ? parts.join('  ') : 'Nothing found', feature.x, feature.y - C.LOCATION_RADIUS - 20);
 }

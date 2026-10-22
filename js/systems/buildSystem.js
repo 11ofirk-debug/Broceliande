@@ -17,7 +17,7 @@ export function completeBuild(game, slotIndex) {
     return;
   }
   deduct(game.resources, C.TURRET_COST);
-  game.turrets.push(createTurret(game.nextEntityId++, slotIndex, C.TURRET_SLOTS[slotIndex]));
+  game.turrets.push(createTurret(game.nextEntityId++, slotIndex, game.slots[slotIndex]));
 }
 
 // Upgrade completion (§11.2): deduct, then apply the upgraded stats. Fails with no

@@ -5,23 +5,10 @@ import { turretOnSlot } from './systems/buildSystem.js';
 import { druidDisplayPos } from './systems/actionSystem.js';
 import { GameState } from './states.js';
 
-// Features are drawn upright above their base point, so the hit area is an
-// ellipse covering the base and the body.
-function hitsFeature(f, p) {
-  const R = C.FEATURE_RADIUS;
-  const dx = (p.x - f.x) / R;
-  const dy = (p.y - (f.y - R * 0.5)) / (R * 1.25);
-  return dx * dx + dy * dy <= 1;
-}
-
-// Slots are flat pads (drawn as a squashed ellipse); a built turret also stands up from it.
-function hitsSlot(slot, p, hasTurret) {
-  const R = C.TURRET_SLOT_RADIUS;
-  const cy = hasTurret ? slot.y - R * 0.6 : slot.y;
-  const ry = hasTurret ? R * 1.4 : R * 0.8;
-  const dx = (p.x - slot.x) / R;
-  const dy = (p.y - cy) / ry;
-  return dx * dx + dy * dy <= 1;
+// Features, slots and turrets are all hit-tested on their location's footprint circle,
+// which contains everything drawn there (M1c §2.1).
+function hitsFootprint(loc, p) {
+  return Math.hypot(p.x - loc.x, p.y - loc.y) <= C.LOCATION_RADIUS;
 }
 
 // The Druid is drawn upright around his display position.
@@ -32,17 +19,17 @@ function hitsDruid(d, p) {
   return dx * dx + dy * dy <= 1;
 }
 
-// Returns { kind: 'feature' | 'slot' | 'turret' | 'druid', index } or null. Lower objects win
-// ties, matching y-sorted drawing (the one in front is picked).
+// Returns { kind: 'feature' | 'slot' | 'turret' | 'druid', index } or null. Footprints never
+// overlap, but lower objects win ties, matching y-sorted drawing (the one in front is picked).
 export function pick(game, p) {
   if (p.y < C.HUD_STRIP_HEIGHT) return null;
   let best = null;
   game.features.forEach((f, index) => {
-    if (hitsFeature(f, p) && (!best || f.y > best.y)) best = { kind: 'feature', index, y: f.y };
+    if (hitsFootprint(f, p) && (!best || f.y > best.y)) best = { kind: 'feature', index, y: f.y };
   });
-  C.TURRET_SLOTS.forEach((slot, index) => {
+  game.slots.forEach((slot, index) => {
     const turret = turretOnSlot(game, index);
-    if (hitsSlot(slot, p, !!turret) && (!best || slot.y > best.y)) {
+    if (hitsFootprint(slot, p) && (!best || slot.y > best.y)) {
       best = { kind: turret ? 'turret' : 'slot', index, y: slot.y };
     }
   });

@@ -8,8 +8,10 @@ import { GameState, ActionState } from './states.js';
 import { pick } from './picking.js';
 import {
   startSearch, startBuild, startUpgrade, cancelAction, isBuildingSlot, isUpgradingSlot,
-  startSummonPlacement, exitSummonPlacement, placeVulture,
+  startSummonPlacement, exitSummonPlacement, placeVulture, startTravel, isTravelling,
 } from './systems/actionSystem.js';
+import { isStepMode, canVisit } from './systems/stepSystem.js';
+import { startCombat } from './game.js';
 
 export function createInteraction(game, view) {
   function closeMenu() {
@@ -25,6 +27,13 @@ export function createInteraction(game, view) {
     }
     const hit = pick(game, world);
     const isPrep = game.state === GameState.PREP;
+
+    // Step-mode Prep (M1b §5.3): no menus. Clicking a valid, affordable marker travels there
+    // and acts on arrival; anything else does nothing. Input is ignored while travelling.
+    if (isPrep && isStepMode(game)) {
+      if (hit) startTravel(game, hit);
+      return;
+    }
 
     if (hit?.kind === 'feature' && isPrep && !game.features[hit.index].exhausted) {
       // Starting a search confirms a new action, so it also closes any open menu.
@@ -67,7 +76,12 @@ export function createInteraction(game, view) {
     if (menu.kind === 'summon' && startSummonPlacement(game)) closeMenu();
   }
 
-  return { onLeftClick, onEscape, onMenuAction, closeMenu };
+  // Start Combat / Start Battle button. Ignored mid-travel so a paid move always lands.
+  function onStartCombat() {
+    if (!isTravelling(game)) startCombat(game);
+  }
+
+  return { onLeftClick, onEscape, onMenuAction, onStartCombat, closeMenu };
 }
 
 // Whether the hovered object reacts to a click right now (for the pointer cursor).
@@ -78,6 +92,7 @@ export function isInteractive(game, hover) {
     return hover.kind === 'turret' && !isUpgradingSlot(game, hover.index);
   }
   if (game.state !== GameState.PREP) return false;
+  if (isStepMode(game)) return !isTravelling(game) && canVisit(game, hover);
   if (hover.kind === 'feature') return !game.features[hover.index].exhausted;
   if (hover.kind === 'slot') return !isBuildingSlot(game, hover.index);
   return false;

@@ -62,14 +62,31 @@ const COLORS = {
   durationBack: 'rgba(0, 0, 0, 0.45)',
 };
 
+// M1c §2.1: every feature and turret is drawn inside its location's footprint circle
+// (LOCATION_RADIUS around the location centre). Upright sprites therefore stand on a base
+// point below the centre; these offsets centre each sprite's drawn extent on the location.
+// Visual only: gameplay (range, travel cost, targeting) uses the location centre.
+const FEATURE_BASE_OFFSET = { tree: 36, reedPatch: 15, shrub: 20, ruins: 22, pond: 0 };
+
+// Ground point a feature's sprite stands on (also its y-sort key).
+export function featureBase(feature) {
+  return { x: feature.x, y: feature.y + FEATURE_BASE_OFFSET[feature.type] };
+}
+
+// Ground point a slot pad and its turret stand on.
+export function slotBase(slot) {
+  return { x: slot.x, y: slot.y + C.TURRET_BASE_OFFSET };
+}
+
 // Turret slot: flat stone pad on the ground. Faint during Combat (spec §9.1), brighter when hovered.
 export function drawTurretSlot(ctx, slot, faint, hovered) {
   const r = C.TURRET_SLOT_RADIUS;
+  const { x, y } = slotBase(slot);
   ctx.save();
   ctx.globalAlpha = faint ? 0.35 : 1;
   ctx.fillStyle = hovered ? COLORS.slotFillHover : COLORS.slotFill;
   ctx.beginPath();
-  ctx.ellipse(slot.x, slot.y, r, r * 0.7, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y, r, r * 0.7, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = COLORS.slotRim;
   ctx.lineWidth = 2.5;
@@ -219,10 +236,10 @@ export function drawWolfHpBar(ctx, wolf) {
   drawHpBar(ctx, wolf.x, wolf.y - C.WOLF_RADIUS * 2.9, 30, wolf.hp / C.WOLF_HP);
 }
 
-// Searchable feature, anchored at (x, y). A soft glow marks it as interactive;
-// hovered: brighter glow; exhausted: dimmed, no glow (§8.4).
+// Searchable feature, centred on its location (M1c §2.1). A soft glow filling the footprint
+// marks it as interactive; hovered: brighter glow; exhausted: dimmed, no glow (§8.4).
 export function drawFeature(ctx, feature, hovered) {
-  const { x, y } = feature;
+  const { x, y } = featureBase(feature);
   const R = C.FEATURE_RADIUS;
   ctx.save();
   if (feature.exhausted) {
@@ -230,7 +247,7 @@ export function drawFeature(ctx, feature, hovered) {
   } else {
     ctx.fillStyle = hovered ? COLORS.featureGlowHover : COLORS.featureGlow;
     ctx.beginPath();
-    ctx.ellipse(x, y, R + 6, (R + 6) * 0.6, 0, 0, Math.PI * 2);
+    ctx.arc(feature.x, feature.y, C.LOCATION_RADIUS - 1, 0, Math.PI * 2); // −1: anti-aliased edge stays inside
     ctx.fill();
   }
 
@@ -246,11 +263,12 @@ export function drawFeature(ctx, feature, hovered) {
 }
 
 // Pebble Sprinkler: a stick post with rotating stick arms and a pebble cup on the
-// arm that points along turret.angle (§10.1). Stands on its slot pad.
-// upgrading: drawn faded (it is not firing); upgraded: gold ring and bands (§11.2).
+// arm that points along turret.angle (§10.1). Stands on its slot pad, with its pebble cup
+// hub at the muzzle (turretMuzzle). upgrading: drawn faded (it is not firing); upgraded:
+// gold ring and bands (§11.2).
 export function drawTurret(ctx, turret, upgrading) {
-  const { x, y } = turret;
-  const top = y - 40;
+  const { x, y } = slotBase(turret);
+  const top = y - C.TURRET_MUZZLE_HEIGHT;
   ctx.save();
   if (turret.upgraded) {
     ctx.strokeStyle = COLORS.upgradeBand;
@@ -384,7 +402,7 @@ export function drawFloatingText(ctx, text, x, y, t) {
 }
 
 function drawPeachTree(ctx, x, y, R) {
-  drawShadow(ctx, x, y, R * 0.8, R * 0.25);
+  drawShadow(ctx, x, y, R * 0.65, R * 0.25);
   ctx.fillStyle = '#5a3d26';
   ctx.fillRect(x - 5, y - R * 1.1, 10, R * 1.1);
   const cy = y - R * 1.6;

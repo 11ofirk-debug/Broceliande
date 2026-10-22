@@ -4,10 +4,12 @@
 
 import * as C from './config.js';
 import { GameState, ActionState } from './states.js';
-import { laneStats, expectedResources } from './scene.js';
+import { laneStats, expectedResources, candidateProblems } from './scene.js';
+import { routeBand } from './layout.js';
 import { canAfford, formatCost } from './resources.js';
-import { canStartBuild, upgradeAvailability, summonAvailability, druidDisplayPos } from './systems/actionSystem.js';
+import { canStartBuild, upgradeAvailability, summonAvailability, druidDisplayPos, isTravelling } from './systems/actionSystem.js';
 import { turretOnSlot } from './systems/buildSystem.js';
+import { isStepMode, stepCost, canVisit, anyVisitable, routePreview, calibrationFigures } from './systems/stepSystem.js';
 
 const RESOURCE_LABELS = { pits: 'Peach Pits', reeds: 'Reeds', feathers: 'Feathers' };
 const POPUP_GAP = 16; // px between a world object and its tooltip/menu
@@ -30,10 +32,35 @@ function layoutDebugLines(scene) {
     const st = laneStats(lane);
     lines.push(`  ${lane.name.padEnd(12)}${Math.round(st.length)} px  ${st.travelTime.toFixed(1)} s  ×${st.factor.toFixed(2)}`);
   }
+  // M1c §2: candidate validation summary (details are in the console and drawn red in the overlay).
+  const failing = [...new Set(candidateProblems(scene).map((p) => p.index))];
+  lines.push('', `Candidates: ${scene.candidates.length}, ${failing.length ? `failing validation: #${failing.join(' #')}` : 'all valid'}`);
   const res = expectedResources();
   lines.push('', 'Search all features (avg):');
   lines.push(`  Pits ${res.pits}  Reeds ${res.reeds}  Feathers ${res.feathers}`);
   lines.push(`  Search time ${res.searchTime.toFixed(1)} s`);
+  return lines;
+}
+
+// This run's layout lines for the debug panel (M1c §6.3, M1b §8). Recomputed each frame;
+// the layout only changes on restart.
+function runDebugLines(game, scene) {
+  const L = game.layout;
+  const band = routeBand();
+  const failures = Object.entries(L.failures).map(([k, n]) => `${k.replace('coverage:', 'cover ')} ${n}`).join(' · ') || 'none';
+  const lines = ['', `Layout: ${L.randomised ? 'randomised' : 'FIXED (RANDOMISE_LAYOUT false)'}  attempts ${L.attempts}/${C.MAX_LAYOUT_ATTEMPTS}  (L = new seed)`];
+  if (L.randomised) lines.push(`  failed constraints over all attempts: ${failures}`);
+  lines.push(`  Lane coverage (min ${C.LANE_MIN_TURRET_SLOTS}): ${scene.lanes.map((lane) => `${lane.name} ${L.coverage[lane.id]}`).join(' · ')}`);
+  lines.push(`  Feature route ${L.routeCost} steps  (band ${Math.ceil(band.min)}–${Math.floor(band.max)})`);
+  if (L.fallback) lines.push(`  ⚠ FALLBACK: best failed attempt used — fails ${L.failed.join(', ')}`);
+
+  // M1b §8: greedy nearest-neighbour routes from home, for tuning STEP_BUDGET.
+  const cal = calibrationFigures(game);
+  const ratio = cal.featuresAndSlots.steps / C.STEP_BUDGET;
+  lines.push('', `Step calibration (greedy from home, budget ${C.STEP_BUDGET}):`);
+  lines.push(`  ${cal.features.visits} features            ${cal.features.steps} steps`);
+  lines.push(`  + ${C.CALIBRATION_SLOT_COUNT} nearest slots (${cal.featuresAndSlots.visits})  ${cal.featuresAndSlots.steps} steps`);
+  lines.push(`  = ${ratio.toFixed(2)} × budget (target ≈ ${C.CALIBRATION_TARGET_RATIO}; budget for target ${Math.round(cal.featuresAndSlots.steps / C.CALIBRATION_TARGET_RATIO)})`);
   return lines;
 }
 
@@ -56,6 +83,11 @@ export function createUI(scene, callbacks) {
     hud: document.getElementById('hud'),
     phase: document.getElementById('hud-phase'),
     timer: document.getElementById('hud-timer'),
+    steps: document.getElementById('hud-steps'),
+    stepsBar: document.getElementById('hud-steps-bar'),
+    stepsFill: document.getElementById('hud-steps-fill'),
+    stepsPreview: document.getElementById('hud-steps-preview'),
+    stepsText: document.getElementById('hud-steps-text'),
     wolves: document.getElementById('hud-wolves'),
     hpFill: document.getElementById('hud-hp-fill'),
     hpText: document.getElementById('hud-hp-text'),
@@ -81,6 +113,7 @@ export function createUI(scene, callbacks) {
   };
 
   el.hud.style.height = `${C.HUD_STRIP_HEIGHT}px`;
+  el.stepsBar.style.setProperty('--blink-period', `${1 / C.STEP_BAR_BLINK_HZ}s`);
   el.startCombat.addEventListener('click', () => callbacks.onStartCombat());
   el.restart.addEventListener('click', () => callbacks.onRestart());
   el.menuAction.addEventListener('click', () => callbacks.onMenuAction());
@@ -96,11 +129,12 @@ export function createUI(scene, callbacks) {
       lastState = game.state;
     }
     updateHud(el, game);
+    updateStepBar(el, game, view);
     tooltipKey = updateTooltip(el, game, view, tooltipKey);
     menuKey = updateMenu(el, game, view, menuKey);
     el.modeBanner.hidden = game.action.state !== ActionState.SUMMON_PLACEMENT;
     updateEndOverlay(el, game);
-    updateDebugPanel(el, game, clock, view, layoutLines);
+    updateDebugPanel(el, game, clock, view, layoutLines, scene);
   }
 
   return { update };
@@ -119,6 +153,9 @@ function updateHud(el, game) {
   }
   setText(el.wolves, isCombat ? `Wolves: ${C.WAVE_TOTAL - game.wolvesKilled} / ${C.WAVE_TOTAL}` : '');
   el.startCombat.hidden = !isPrep;
+  setText(el.startCombat, isStepMode(game) ? 'Start Battle' : 'Start Combat');
+  // Nothing left to click: prompt the player to start (M1b §5.6).
+  el.startCombat.classList.toggle('pulse', isPrep && isStepMode(game) && !isTravelling(game) && !anyVisitable(game));
 
   const hpFrac = Math.max(0, game.druidHp) / C.DRUID_HP;
   const hpWidth = `${hpFrac * 100}%`;
@@ -129,35 +166,78 @@ function updateHud(el, game) {
   for (const [k, node] of Object.entries(el.res)) setText(node, String(game.resources[k]));
 }
 
-// Feature tooltip on hover, PREP only (§8.4). Rebuilt only when its content changes.
+// Step bar (M1b §6): remaining fill, the segment the hovered marker would spend, and a red
+// blink when it costs more than what's left. Visual state only; reads the shared preview.
+function updateStepBar(el, game, view) {
+  const shown = game.state === GameState.PREP && isStepMode(game);
+  el.steps.hidden = !shown;
+  el.timer.hidden = shown;
+  if (!shown) return;
+
+  const preview = routePreview(game, view.hover);
+  const spend = preview?.affordable ? preview.cost : 0;
+  const pct = (n) => `${(n / C.STEP_BUDGET) * 100}%`;
+  const fillWidth = pct(game.stepsRemaining - spend);
+  if (el.stepsFill.style.width !== fillWidth) el.stepsFill.style.width = fillWidth;
+  el.stepsPreview.hidden = spend === 0;
+  el.stepsPreview.style.left = pct(game.stepsRemaining - spend);
+  el.stepsPreview.style.width = pct(spend);
+  el.stepsBar.classList.toggle('blink', !!preview && !preview.affordable);
+  setText(el.stepsText, `${game.stepsRemaining} / ${C.STEP_BUDGET}`);
+}
+
+// Tooltip content for the hovered object in Prep, or null (§8.4; step mode M1b §5.2.1).
+// { title, lines: [[className, text]], anchor: { x, y, halfWidth } }.
+function tooltipContent(game, hover) {
+  if (game.state !== GameState.PREP || !hover) return null;
+  const stepMode = isStepMode(game);
+  // Travel cost changes as the Druid moves; hidden mid-travel, when it has no origin yet.
+  const preview = stepMode ? routePreview(game, hover) : null;
+  const travelLine = preview && [preview.affordable ? '' : 'tip-warn', `Travel: ${preview.cost} ${preview.cost === 1 ? 'step' : 'steps'}`];
+
+  if (hover.kind === 'feature') {
+    const feature = game.features[hover.index];
+    const type = C.FEATURE_TYPES[feature.type];
+    const lines = feature.exhausted
+      ? [['tip-muted', 'Searched']]
+      : Object.entries(type.yields).map(([res, [min, max]]) => ['', `${RESOURCE_LABELS[res]}: ${min}–${max}`]);
+    if (!feature.exhausted && !stepMode) lines.push(['', `Search: ${type.searchTime.toFixed(1)} sec`]);
+    if (travelLine) lines.push(travelLine);
+    return { title: type.name, lines, anchor: { x: feature.x, y: feature.y, halfWidth: C.LOCATION_RADIUS } };
+  }
+  // Empty slots only have a tooltip in step mode, which has no build menu (M1b §5.3).
+  if (hover.kind === 'slot' && stepMode) {
+    const slot = game.slots[hover.index];
+    const lines = [['', formatCost(C.TURRET_COST)]];
+    if (travelLine) lines.push(travelLine);
+    if (!canAfford(game.resources, C.TURRET_COST)) lines.push(['tip-warn', 'Not enough resources']);
+    return { title: 'Pebble Sprinkler', lines, anchor: { x: slot.x, y: slot.y, halfWidth: C.LOCATION_RADIUS } };
+  }
+  return null;
+}
+
+// Hover tooltip, PREP only. Rebuilt only when its content changes.
 function updateTooltip(el, game, view, prevKey) {
-  const hover = view.hover;
-  const feature = game.state === GameState.PREP && hover?.kind === 'feature' ? game.features[hover.index] : null;
-  const key = feature ? `${feature.index}:${feature.exhausted}` : null;
+  const content = tooltipContent(game, view.hover);
+  const key = content ? JSON.stringify(content) : null;
   if (key === prevKey) return key;
 
-  el.tooltip.hidden = !feature;
-  if (!feature) return key;
+  el.tooltip.hidden = !content;
+  if (!content) return key;
 
-  const type = C.FEATURE_TYPES[feature.type];
   el.tooltip.replaceChildren();
   const title = document.createElement('div');
   title.className = 'tip-title';
-  title.textContent = type.name;
+  title.textContent = content.title;
   el.tooltip.append(title);
-  const lines = feature.exhausted
-    ? [['tip-muted', 'Searched']]
-    : [
-      ...Object.entries(type.yields).map(([res, [min, max]]) => ['', `${RESOURCE_LABELS[res]}: ${min}–${max}`]),
-      ['', `Search: ${type.searchTime.toFixed(1)} sec`],
-    ];
-  for (const [cls, text] of lines) {
+  for (const [cls, text] of content.lines) {
     const line = document.createElement('div');
     line.className = cls;
     line.textContent = text;
     el.tooltip.append(line);
   }
-  placeBeside(el.tooltip, feature.x, feature.y - C.FEATURE_RADIUS * 0.6, C.FEATURE_RADIUS);
+  const { x, y, halfWidth } = content.anchor;
+  placeBeside(el.tooltip, x, y, halfWidth);
   return key;
 }
 
@@ -225,8 +305,8 @@ Lasts ${C.VULTURE_DURATION} s · flies to the wolf nearest to it`);
       const d = druidDisplayPos(game);
       placeBeside(el.menu, d.x, d.y - C.DRUID_RADIUS * 0.6, C.DRUID_RADIUS);
     } else {
-      const slot = C.TURRET_SLOTS[menu.index];
-      placeBeside(el.menu, slot.x, slot.y, C.TURRET_SLOT_RADIUS);
+      const slot = game.slots[menu.index];
+      placeBeside(el.menu, slot.x, slot.y, C.LOCATION_RADIUS);
     }
   }
   return key;
@@ -241,16 +321,29 @@ function updateEndOverlay(el, game) {
   setText(el.endStats, `Combat time ${formatTime(game.combatTime)}  ·  Wolves killed ${game.wolvesKilled} / ${C.WAVE_TOTAL}`);
 }
 
-function updateDebugPanel(el, game, clock, view, layoutLines) {
+function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
   el.debugPanel.hidden = !view.debug;
   if (!view.debug) return;
   const speed = clock.paused ? `PAUSED (×${clock.speed})` : `×${clock.speed}`;
   const a = game.action;
-  const action = a.target === null ? a.state : `${a.state} #${a.target} ${a.elapsed.toFixed(1)}/${a.duration.toFixed(1)} s`;
+  const target = a.state === ActionState.TRAVELLING ? `→ ${a.target.kind} #${a.target.index}` : `#${a.target}`;
+  const action = a.target === null ? a.state : `${a.state} ${target} ${a.elapsed.toFixed(1)}/${a.duration.toFixed(1)} s`;
+  const stepLines = [];
+  if (isStepMode(game)) {
+    const d = game.druidPos;
+    stepLines.push(`Steps:  ${game.stepsRemaining} / ${C.STEP_BUDGET}  (${C.STEP_PX} px/step)`);
+    stepLines.push(`Druid at: (${Math.round(d.x)}, ${Math.round(d.y)})  moves ${game.moveHistory.length} (U undoes)`);
+    const h = view.hover;
+    if (game.state === GameState.PREP && (h?.kind === 'feature' || h?.kind === 'slot')) {
+      stepLines.push(`Hover:  ${h.kind} #${h.index}  cost ${stepCost(game, h)}  ${canVisit(game, h) ? 'clickable' : 'not clickable'}`);
+    }
+  }
   setText(el.debugPanel, [
     `Seed:   ${game.seed}`,
+    `Mode:   ${game.prepMode}  (M to toggle + restart)`,
     `State:  ${game.state}`,
     `Action: ${action}`,
+    ...stepLines,
     `Speed:  ${speed}`,
     `FPS:    ${Math.round(view.fps)}`,
     '',
@@ -259,5 +352,6 @@ function updateDebugPanel(el, game, clock, view, layoutLines) {
     `Resources: Pits ${game.resources.pits}  Reeds ${game.resources.reeds}  Feathers ${game.resources.feathers}`,
     `Turrets: ${game.turrets.length}  Pebbles in flight: ${game.projectiles.length}  Vultures: ${game.vultures.length}/${C.MAX_VULTURES}`,
     ...layoutLines,
+    ...runDebugLines(game, scene),
   ].join('\n'));
 }
