@@ -4,6 +4,7 @@ export const GameState = Object.freeze({
   START: 'START',
   PREP: 'PREP',
   COMBAT: 'COMBAT',
+  ENDING: 'ENDING', // M1e §1: END_DELAY between Combat and the result; game.pendingResult holds it
   VICTORY: 'VICTORY',
   DEFEAT: 'DEFEAT',
 });

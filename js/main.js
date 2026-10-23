@@ -1,7 +1,7 @@
 // Bootstrap, stage scaling and the fixed-timestep loop (spec §3.4, §3.5).
 
 import * as C from './config.js';
-import { GameState, createGame, startEncounter, startCombat, endEncounter, updateGame, validateConfig, killAllWolves, grantResources, togglePrepMode } from './game.js';
+import { GameState, createGame, startEncounter, startCombat, beginEnding, updateGame, validateConfig, killAllEnemies, spawnDebugBear, grantResources, togglePrepMode } from './game.js';
 import { createInput } from './input.js';
 import { createRenderer } from './renderer.js';
 import { createUI } from './ui.js';
@@ -10,6 +10,7 @@ import { createInteraction, isInteractive } from './interaction.js';
 import { pick } from './picking.js';
 import { ActionState } from './states.js';
 import { undoLastMove } from './systems/actionSystem.js';
+import { toggleDropMult } from './systems/dropSystem.js';
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('game-canvas');
@@ -42,7 +43,7 @@ validateLayout(scene);
 const game = createGame(scene);
 const clock = { speed: 1, paused: false };            // acts on simulation time only
 // UI-only state: never read by the simulation.
-const view = { debug: C.DEBUG_START_ENABLED, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null };
+const view = { debug: C.DEBUG_START_ENABLED, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null, menuHoverType: null }; // menuHoverType: build-menu card under the pointer (range preview)
 const interaction = createInteraction(game, view);
 
 // options.newSeed: always a new seed, so a new layout even with DEBUG_SEED set (debug L).
@@ -56,7 +57,7 @@ const renderer = createRenderer(canvas, scene);
 const ui = createUI(scene, {
   onStartCombat: () => interaction.onStartCombat(),
   onRestart: restart,
-  onMenuAction: () => interaction.onMenuAction(),
+  onMenuAction: (option) => interaction.onMenuAction(option),
 });
 
 const input = createInput(stage, canvas, () => scale, {
@@ -80,8 +81,10 @@ const input = createInput(stage, canvas, () => scale, {
       case 'l': restart({ newSeed: true }); break;      // M1c §6.1: restart with a new layout
       case 'm': togglePrepMode(game); restart(); break; // M1b §2: switch timed / steps Prep
       case 'u': undoLastMove(game); break;              // M1b §8: undo last step-mode move
-      case 'k': killAllWolves(game); break; // extra debug key (not in §18.1): kill all living wolves
+      case 'k': killAllEnemies(game); break; // extra debug key (not in §18.1): kill all living enemies
+      case 'b': spawnDebugBear(game); break;  // M1e §6: spawn a Bear at the start of a random lane (Combat only)
       case 'g': grantResources(game); break;
+      case 'x': toggleDropMult(game); break;            // M1d §3: enemy drop chances ×1 / ×DEBUG_DROP_MULT
       case 'Escape': interaction.onEscape(); break;
       default: break;
     }
@@ -90,7 +93,7 @@ const input = createInput(stage, canvas, () => scale, {
 
 // Temporary console hook so VICTORY/DEFEAT and Restart can be tested before wolves exist:
 //   broceliande.forceEnd('VICTORY')  /  broceliande.forceEnd('DEFEAT')
-window.broceliande = { game, forceEnd: (result) => endEncounter(game, result) };
+window.broceliande = { game, forceEnd: (result) => beginEnding(game, result) };
 
 startEncounter(game); // START → PREP on page load
 

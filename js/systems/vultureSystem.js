@@ -1,22 +1,24 @@
 // Vultures (spec §15.3–15.4): local targeting, straight-line flight, landing, pecking,
-// retargeting, expiry, and blocking wolves while landed.
+// retargeting, expiry, and blocking enemies while landed. Vultures treat every enemy type alike.
 
 import * as C from '../config.js';
 import { VultureState } from '../entities/vulture.js';
-import { damageWolf } from './combatSystem.js';
+import { damageEnemy } from './combatSystem.js';
+import { enemyType } from '../entities/enemy.js';
+import { blockingSquirrels } from './squirrelSystem.js';
 
 // Geometric tolerance (px) so a Vulture landing exactly at melee range does not flicker
 // between landed and flying from rounding error (which would reset its attack timer).
 const LANDING_SLACK = 1;
 
-function nearestWolf(game, x, y) {
+function nearestEnemy(game, x, y) {
   let best = null;
   let bestDist = Infinity;
-  for (const wolf of game.wolves) {
-    const d = Math.hypot(wolf.x - x, wolf.y - y);
+  for (const enemy of game.enemies) {
+    const d = Math.hypot(enemy.x - x, enemy.y - y);
     if (d < bestDist) {
       bestDist = d;
-      best = wolf;
+      best = enemy;
     }
   }
   return best;
@@ -25,9 +27,9 @@ function nearestWolf(game, x, y) {
 export function updateVultures(game, dt) {
   for (const v of game.vultures) {
     // Sticky target: only re-picked when it dies (or there was none).
-    let target = game.wolves.find((w) => w.id === v.targetId) ?? null;
+    let target = game.enemies.find((e) => e.id === v.targetId) ?? null;
     if (!target) {
-      target = nearestWolf(game, v.x, v.y);
+      target = nearestEnemy(game, v.x, v.y);
       v.targetId = target ? target.id : null;
       v.state = target ? VultureState.FLYING : VultureState.HOVERING;
       v.attackTimer = 0;
@@ -62,40 +64,45 @@ export function updateVultures(game, dt) {
       if (v.attackTimer >= C.VULTURE_ATTACK_INTERVAL) {
         v.attackTimer -= C.VULTURE_ATTACK_INTERVAL;
         v.lastPeckTime = game.combatTime;
-        damageWolf(game, target, C.VULTURE_DAMAGE); // if it dies, next step picks a new target
+        damageEnemy(game, target, C.VULTURE_DAMAGE); // if it dies, next step picks a new target
       }
     }
   }
 }
 
-// §15.4: a wolf whose centre is within VULTURE_BLOCK_RADIUS of a landed Vulture stops
-// and bites it (the nearest one if several). Runs before movement each step; a wolf
-// with no blocker this step simply resumes.
+// §15.4: an enemy (any type) whose centre is within the block radius of a landed Vulture stops and
+// attacks it (the nearest one if several). With SQUIRREL_BLOCKS_WOLVES, a waiting Squirrel blocks and
+// is attacked the same way (M1d §2.4). Runs before movement each step; an enemy with no blocker
+// this step simply resumes.
 export function updateBlocking(game, dt) {
-  const landed = game.vultures.filter((v) => v.state === VultureState.LANDED);
-  for (const wolf of game.wolves) {
+  const blockers = [
+    ...game.vultures.filter((v) => v.state === VultureState.LANDED).map((unit) => ({ unit, radius: C.VULTURE_BLOCK_RADIUS })),
+    ...blockingSquirrels(game).map((unit) => ({ unit, radius: C.SQUIRREL_BLOCK_RADIUS })),
+  ];
+  for (const enemy of game.enemies) {
     let blocker = null;
     let bestDist = Infinity;
-    for (const v of landed) {
-      const d = Math.hypot(v.x - wolf.x, v.y - wolf.y);
-      if (d <= C.VULTURE_BLOCK_RADIUS && d < bestDist) {
+    for (const { unit, radius } of blockers) {
+      const d = Math.hypot(unit.x - enemy.x, unit.y - enemy.y);
+      if (d <= radius && d < bestDist) {
         bestDist = d;
-        blocker = v;
+        blocker = unit;
       }
     }
     if (!blocker) {
-      wolf.blockedBy = null;
-      wolf.vultureBiteTimer = 0;
+      enemy.blockedBy = null;
+      enemy.vultureBiteTimer = 0;
       continue;
     }
-    if (wolf.blockedBy !== blocker.id) wolf.vultureBiteTimer = 0; // newly blocked: wind up a bite
-    wolf.blockedBy = blocker.id;
-    wolf.facing = blocker.x >= wolf.x ? 1 : -1;
-    wolf.vultureBiteTimer += dt;
-    if (wolf.vultureBiteTimer >= C.WOLF_ATTACK_INTERVAL) {
-      wolf.vultureBiteTimer -= C.WOLF_ATTACK_INTERVAL;
-      wolf.lastBiteTime = game.combatTime;
-      blocker.hp -= C.WOLF_DAMAGE;
+    if (enemy.blockedBy !== blocker.id) enemy.vultureBiteTimer = 0; // newly blocked: wind up a bite
+    enemy.blockedBy = blocker.id;
+    enemy.facing = blocker.x >= enemy.x ? 1 : -1;
+    const t = enemyType(enemy); // attacks the blocker with its own type's damage and interval (M1e §3.4)
+    enemy.vultureBiteTimer += dt;
+    if (enemy.vultureBiteTimer >= t.attackInterval) {
+      enemy.vultureBiteTimer -= t.attackInterval;
+      enemy.lastBiteTime = game.combatTime;
+      blocker.hp -= t.damage;
       blocker.lastHitTime = game.combatTime;
     }
   }

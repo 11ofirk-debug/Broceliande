@@ -71,22 +71,32 @@ export function createLanePath(waypoints) {
     return { x: -t.y, y: t.x };
   }
 
-  // Shortest distance from point p to the centreline.
-  function distanceTo(p) {
-    let best = Infinity;
+  // Nearest point on the centreline to p: { x, y, s, dist }.
+  function closestPoint(p) {
+    let best = null;
     for (let i = 0; i < points.length - 1; i++) {
-      best = Math.min(best, distanceToSegment(p, points[i], points[i + 1]));
+      const a = points[i];
+      const b = points[i + 1];
+      const q = closestOnSegment(p, a, b);
+      if (!best || q.dist < best.dist) best = { x: q.x, y: q.y, s: a.s + (b.s - a.s) * q.t, dist: q.dist };
     }
     return best;
   }
 
-  return { points, length, pointAt, tangentAt, normalAt, distanceTo };
+  // Shortest distance from point p to the centreline.
+  function distanceTo(p) {
+    return closestPoint(p).dist;
+  }
+
+  return { points, length, pointAt, tangentAt, normalAt, closestPoint, distanceTo };
 }
 
-function distanceToSegment(p, a, b) {
+function closestOnSegment(p, a, b) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const len2 = dx * dx + dy * dy;
   const t = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
-  return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
+  const x = a.x + dx * t;
+  const y = a.y + dy * t;
+  return { x, y, t, dist: Math.hypot(p.x - x, p.y - y) };
 }

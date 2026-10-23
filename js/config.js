@@ -16,16 +16,15 @@ export const SIM_SPEEDS = [1, 2, 4];     // debug speed multipliers (keys 1 / 2 
 // ---------------------------------------------------------------------------
 // 17.1 Timing and phases
 // ---------------------------------------------------------------------------
-export const PREP_DURATION = 28;         // s
-export const BUILD_TIME = 2.3;           // s
-export const UPGRADE_TIME = 2.5;         // s
+export const PREP_DURATION = 28;         // s  (build and upgrade times: TURRET_TYPES levels)
+export const END_DELAY = 1.5;            // s of ENDING between the last kill / Druid death and the result overlay (M1e §1)
 
 // ---------------------------------------------------------------------------
 // M1b addendum §9 — step-budget Prep (docs/M1B_STEPS_ADDENDUM.md)
 // ---------------------------------------------------------------------------
 export const PREP_MODE = 'steps';          // 'steps' | 'timed' — mode at page load; debug key M toggles it
 export const STEP_PX = 25;                 // TUNING — px of straight-line travel per step
-export const STEP_BUDGET = 90;             // TUNING — steps available in step-mode Prep (~2,250 px)
+export const STEP_BUDGET = 96;             // TUNING — steps available in step-mode Prep (~2,250 px)
 export const TRAVEL_TWEEN_TIME = 0.35;     // TUNING — s, Druid's travel animation to a marker
 export const STEP_BAR_BLINK_HZ = 3;        // TUNING — red blink rate of the step bar on an unaffordable hover (§5.2)
 export const CALIBRATION_SLOT_COUNT = 5;   // debug panel: "all features + N nearest slots" greedy figure (§8)
@@ -40,39 +39,111 @@ export const DRUID_RADIUS = 28;                          // TUNING
 export const DRUID_MELEE_RADIUS = 52;                    // TUNING
 export const DRUID_MELEE_SLOTS = 6;                      // TUNING — max simultaneous biters
 export const DRUID_ACTION_OFFSET = { x: -58, y: 20 };    // TUNING — Druid position beside a target (just outside LOCATION_RADIUS)
+export const DRUID_MELEE_DAMAGE = 1;                    // M1e §2: Druid strikes the weakest attacker in his melee slots
+export const DRUID_MELEE_INTERVAL = 1.8;                 // s between strike impacts, counted only while he is idle in Combat
+// M1f §4: each strike is wind-up → swing + lunge → impact (damage lands here) → recover.
+export const STRIKE_WINDUP_TIME = 0.12;                  // s, staff rotates back away from the target
+export const STRIKE_SWING_TIME = 0.10;                   // s, staff swings through while the Druid lunges
+export const STRIKE_RECOVER_TIME = 0.18;                 // s, staff and Druid return to rest (visual only)
+export const STRIKE_LUNGE_PX = 10;                       // px the Druid lunges toward the target (visual only)
 
 // ---------------------------------------------------------------------------
-// 17.3 Wolf
+// 17.3 Enemies (wolf §12–13; Bear M1e §3). Data-driven: one entry per type, one shared
+// entity and set of systems. Drop tables (M1d §1.1, M1e §3.3): each resource is rolled
+// independently on death; amounts are uniform inclusive integers.
 // ---------------------------------------------------------------------------
-export const WOLF_HP = 17;                // TUNING — 6 base pebbles, 4 upgraded, 3 Vulture pecks
-export const WOLF_SPEED = 72;             // TUNING — px/s, aim for 25–30 s lane traversal
-export const WOLF_RADIUS = 16;            // TUNING
-export const WOLF_DAMAGE = 3;
-export const WOLF_ATTACK_INTERVAL = 1.2;  // s
+export const WOLF_DROPS = [
+  { resource: 'feathers', chance: 0.05, min: 1, max: 2 },
+  { resource: 'pits',     chance: 0.08, min: 1, max: 2 },
+  { resource: 'reeds',    chance: 0.02, min: 1, max: 1 },
+];
+export const BEAR_DROPS = [               // TUNING
+  { resource: 'feathers', chance: 0.35, min: 1, max: 2 },
+  { resource: 'pits',     chance: 0.50, min: 2, max: 3 },
+  { resource: 'reeds',    chance: 0.20, min: 1, max: 1 },
+];
+// hitHeight: px above the collision centre where pebbles strike the body (visual aim point).
+// meleeSlotsUsed: adjacent Druid melee slots the enemy occupies while attacking him.
+export const ENEMY_TYPES = {
+  wolf: {
+    name: 'Wolf', plural: 'Wolves',
+    hp: 17,              // TUNING — 6 base pebbles, 4 upgraded, 3 Vulture pecks
+    speed: 82,           // TUNING — px/s, aim for 25–30 s lane traversal
+    radius: 16,          // TUNING
+    damage: 3,
+    attackInterval: 1.2, // s
+    meleeSlotsUsed: 1,
+    hitHeight: 10,
+    drops: WOLF_DROPS,
+  },
+  bear: {
+    name: 'Bear', plural: 'Bears',
+    hp: 90,              // TUNING — 5× wolf
+    speed: 48,           // TUNING — px/s, about two-thirds wolf speed
+    radius: 26,          // TUNING — bulky, but a wolf can still pass it in the corridor
+    damage: 8,           // TUNING
+    attackInterval: 2.0, // TUNING — s
+    meleeSlotsUsed: 2,   // TUNING — two adjacent Druid melee slots (M1e §3.5)
+    hitHeight: 20,
+    drops: BEAR_DROPS,
+  },
+};
 
-// Wolf movement details (§12.3–12.5). Not in the spec's table; all TUNING.
-export const WOLF_WANDER_SPEED = 10;          // TUNING — px/s, slow lateral drift toward a wander target
-export const WOLF_WANDER_INTERVAL = [1.5, 4]; // TUNING — s between picking new wander targets [min, max]
-export const WOLF_SIDESTEP_SPEED = 55;        // TUNING — px/s, lateral speed when stepping round a wolf ahead
-export const WOLF_SLOT_CLAIM_DISTANCE = 70;   // TUNING — px before the lane end where a wolf claims a melee slot (waits here if none free; keep outside DRUID_APPROACH_RADIUS + 2×WOLF_RADIUS)
-export const DRUID_APPROACH_RADIUS = 86;      // TUNING — px, ring wolves walk round to reach a far melee slot (clears biters at DRUID_MELEE_RADIUS)
-export const WOLF_DIRECT_APPROACH_ANGLE = 0.6; // TUNING — rad; slots closer than this in angle are walked to directly
+// Enemy movement details (§12.3–12.5), shared by all types. Not in the spec's table; all TUNING.
+export const ENEMY_WANDER_SPEED = 10;          // TUNING — px/s, slow lateral drift toward a wander target
+export const ENEMY_WANDER_INTERVAL = [1.5, 4]; // TUNING — s between picking new wander targets [min, max]
+export const ENEMY_SIDESTEP_SPEED = 55;        // TUNING — px/s, lateral speed when stepping round an enemy ahead
+export const ENEMY_SLOT_CLAIM_DISTANCE = 70;   // TUNING — px before the lane end where an enemy claims melee slots (waits here if none free; keep outside DRUID_APPROACH_RADIUS + 2×wolf radius)
+export const DRUID_APPROACH_RADIUS = 86;       // TUNING — px, ring wolves walk round to reach a far melee slot (clears biters at DRUID_MELEE_RADIUS); larger enemies use it + their extra radius
+export const ENEMY_DIRECT_APPROACH_ANGLE = 0.6; // TUNING — rad; slots closer than this in angle are walked to directly
 
 // ---------------------------------------------------------------------------
 // 17.4 Turret (Pebble Sprinkler)
 // ---------------------------------------------------------------------------
-export const TURRET_COST = { pits: 2, reeds: 1, feathers: 0 };
-export const TURRET_DAMAGE = 3;
-export const TURRET_FIRE_INTERVAL = 0.75; // s
-export const TURRET_RANGE = 220;          // TUNING — px
-export const PROJECTILE_SPEED = 600;      // TUNING — px/s
-export const UPGRADE_COST = { pits: 2, reeds: 0, feathers: 1 };
-export const UPGRADED_DAMAGE = 5;
-export const UPGRADED_FIRE_INTERVAL = 0.6; // s
-export const UPGRADED_RANGE_MULT = 1.2;
-export const TURRET_TURN_SPEED = 9;       // TUNING — rad/s, how fast a turret visibly turns toward its target (visual; firing does not wait for it)
+export const TURRET_RANGE = 220;          // TUNING — px, the Pebble Sprinkler's base range (also used for lane coverage, M1c §4.1)
+export const PROJECTILE_SPEED = 600;      // TUNING — px/s, pebbles
 export const TURRET_MUZZLE_HEIGHT = 40;   // px above the slot pad where pebbles leave the sprinkler
-export const WOLF_HIT_HEIGHT = 10;        // px above a wolf's collision centre where pebbles strike its body
+
+// Turret types (M1f §5.1), data-driven like enemies. Per type: base `range` and its `levels`.
+// Level 1's cost / time are the build cost and time; later levels' are the upgrade (to that
+// level) cost and time; upgrades go one level at a time. `rangeMult` multiplies the base range.
+// attack: 'projectile' (homing pebble, damage on hit) or 'cloud' (pellet that bursts into a
+// lingering poison cloud, M1f §6).
+export const TURRET_TYPES = {
+  sprinkler: {
+    name: 'Pebble Sprinkler',
+    attack: 'projectile',
+    range: TURRET_RANGE,
+    muzzleHeight: TURRET_MUZZLE_HEIGHT,  // px above the slot pad where pebbles leave (the cup)
+    // M1e §4. Levels 1 and 2 keep the values the game already used (build 2.3 s, upgrade
+    // 2 Pits + 1 Feather in 2.5 s), which differ from the M1e addendum's §4.2 table.
+    levels: [
+      { damage: 3, fireInterval: 0.75, rangeMult: 1.0,  cost: { pits: 2, reeds: 1, feathers: 0 }, time: 2.3 }, // 1 (built)
+      { damage: 5, fireInterval: 0.6,  rangeMult: 1.2,  cost: { pits: 2, reeds: 0, feathers: 1 }, time: 2.5 }, // 2 (upgrade)
+      { damage: 7, fireInterval: 0.5,  rangeMult: 1.35, cost: { pits: 6, reeds: 0, feathers: 2 }, time: 4.0 }, // 3 (upgrade) — TUNING
+    ],
+  },
+  toader: {
+    name: 'Poison Toader',
+    attack: 'cloud',
+    range: 340,                          // px
+    muzzleHeight: 20,                    // px above the slot pad where pellets leave (the mouth)
+    // damage: impact damage to the direct target. Build time matches the Sprinkler's (2.3 s).
+    levels: [
+      { damage: 2, fireInterval: 3.5, rangeMult: 1.0, cost: { pits: 0, reeds: 2, feathers: 0 }, time: 2.3 }, // 1 only — upgrades later
+    ],
+    pelletSpeed: 450,                    // TUNING — px/s
+    cloud: {
+      radius: 70,                        // TUNING — px; hits enemies whose body overlaps it
+      duration: 5.2,                     // s
+      tickInterval: 0.6,                 // s; first tick 0.8 s after the burst (5 ticks in 4.2 s)
+      tickDamage: 1,                     // to every enemy in the cloud, per tick
+    },
+  },
+};
+export const CLOUD_GROW_TIME = 0.3;       // s, a cloud grows from pellet size to full radius (visual only)
+export const CLOUD_FADE_TIME = 0.6;       // s, it fades out over its last moments (visual only)
+export const TURRET_TURN_SPEED = 9;       // TUNING — rad/s, how fast a turret visibly turns toward its target (visual; firing does not wait for it)
 
 // ---------------------------------------------------------------------------
 // 17.5 Vulture
@@ -231,15 +302,40 @@ export const DECOR = {
 // ---------------------------------------------------------------------------
 // 17.8 Wave
 // ---------------------------------------------------------------------------
-export const WAVE_TOTAL = 35;
-export const BURST_STAGGER = 0.6;        // TUNING — s between wolves in one burst
+export const WAVE_TOTAL = 35;            // wolves in the wave (validated at start-up)
+export const BEAR_COUNT = 3;             // TUNING — Bears in the wave (M1e §3.6, validated at start-up)
+export const BURST_STAGGER = 0.6;        // TUNING — s between enemies in one burst
+export const RANDOMISE_BEAR_LANES = true; // M1e §3.6: shuffle the Bears across lanes each run (one per lane); false = lanes as written below
 
-// TUNING — bursts per lane id; time = seconds since Combat began.
+// TUNING — bursts per lane id; time = seconds since Combat began. type: an ENEMY_TYPES key,
+// default 'wolf'. Bears are single-unit bursts at 22 / 32 / 42 s (M1e §3.6).
 export const WAVE = {
-  upperLeft:  [{ time: 0, count: 3 }, { time: 12, count: 2 }, { time: 24, count: 3 }, { time: 40, count: 4 }],
-  right:      [{ time: 5, count: 2 }, { time: 16, count: 3 }, { time: 30, count: 3 }, { time: 48, count: 4 }],
-  bottomLeft: [{ time: 9, count: 3 }, { time: 20, count: 2 }, { time: 35, count: 3 }, { time: 52, count: 3 }],
+  upperLeft:  [{ time: 0, count: 3 }, { time: 12, count: 2 }, { time: 22, count: 1, type: 'bear' }, { time: 24, count: 3 }, { time: 40, count: 4 }],
+  right:      [{ time: 5, count: 2 }, { time: 16, count: 3 }, { time: 30, count: 3 }, { time: 32, count: 1, type: 'bear' }, { time: 48, count: 4 }],
+  bottomLeft: [{ time: 9, count: 3 }, { time: 20, count: 2 }, { time: 35, count: 3 }, { time: 42, count: 1, type: 'bear' }, { time: 52, count: 3 }],
 };
+
+// ---------------------------------------------------------------------------
+// M1d addendum — drops and Squirrel (docs/M1D_DROPS_SQUIRREL_ADDENDUM.md). Drop tables are
+// with the enemy types (17.3).
+// ---------------------------------------------------------------------------
+// M1d §2.2 — Squirrel summon: collects drops. Values from the addendum's table, tuned
+// independently of the Vulture.
+export const SQUIRREL_COST = { pits: 1, reeds: 0, feathers: 0 }; // TUNING
+export const SQUIRREL_HP = 15;              // TUNING
+export const SQUIRREL_DURATION = 12;        // TUNING — s
+export const SQUIRREL_SPEED = 140;          // TUNING — px/s, straight line, ignores terrain
+export const MAX_SQUIRRELS = 3;             // TUNING — separate from MAX_VULTURES
+export const SQUIRREL_RADIUS = 12;          // TUNING
+export const SQUIRREL_PICKUP_RANGE = 14;    // TUNING — px, collects a drop within this distance
+export const SQUIRREL_BLOCKS_WOLVES = false; // §2.4: true = a waiting Squirrel blocks and is bitten like a landed Vulture
+export const SQUIRREL_BLOCK_RADIUS = 36;    // TUNING — px, used only when SQUIRREL_BLOCKS_WOLVES (same as VULTURE_BLOCK_RADIUS)
+
+export const RESOURCE_ICON_SIZE = 28;     // px, resource icons in the HUD panel
+export const MENU_PORTRAIT_SIZE = 40;     // px, creature / turret images in menus (M1f §2)
+export const MENU_COST_ICON_SIZE = 18;    // px, resource icons in cost rows (M1f §3)
+export const DROP_ICON_SCALE = 0.7;       // drop icons on the ground, relative to RESOURCE_ICON_SIZE
+export const DROP_SPACING = 16;           // TUNING — px between items dropped by one wolf
 
 // ---------------------------------------------------------------------------
 // 17.9 Debug
@@ -247,9 +343,14 @@ export const WAVE = {
 export const DEBUG_SEED = null;          // null = new random seed each restart; integer = fixed seed
 export const DEBUG_START_ENABLED = false;
 export const DEBUG_GRANT_AMOUNT = 10;   // G key: +this many of each resource
+export const DEBUG_DROP_MULT = 10;      // X key toggles wolf drop chances between ×1 and ×this (M1d §3)
 
 // ---------------------------------------------------------------------------
 // Feedback (§16.3) — visual only
 // ---------------------------------------------------------------------------
 export const FLOATING_TEXT_TIME = 1.4;   // s a "+2 Pits" style text stays up (simulation time)
 export const FLOATING_TEXT_RISE = 40;    // px it drifts upward over that time
+export const DRUID_SWIPE_TIME = 0.25;   // s a Druid strike swoosh arc stays visible (M1e §2.4, M1f §4)
+export const STRIKE_SPARK_TIME = 0.2;   // s the impact spark on the target stays visible (M1f §4)
+export const STRIKE_KNOCKBACK_PX = 3;   // px the target is pushed back visually on impact (simulation position unchanged)
+export const STRIKE_KNOCKBACK_TIME = 0.15; // s for that visual knock-back to settle

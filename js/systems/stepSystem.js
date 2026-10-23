@@ -5,6 +5,7 @@ import * as C from '../config.js';
 import { GameState, PrepMode, ActionState } from '../states.js';
 import { canAfford } from '../resources.js';
 import { turretOnSlot } from './buildSystem.js';
+import { buildCost, TURRET_TYPE_KEYS } from '../entities/turret.js';
 
 export function isStepMode(game) {
   return game.prepMode === PrepMode.STEPS;
@@ -21,11 +22,17 @@ export function stepCost(game, marker) {
   return Math.ceil(Math.hypot(p.x - game.druidPos.x, p.y - game.druidPos.y) / C.STEP_PX);
 }
 
-// Whether a marker is a valid step-mode target, ignoring the step budget (§5.1).
+// Turret types the player can currently pay for (M1f §5.2).
+export function affordableTurretTypes(game) {
+  return TURRET_TYPE_KEYS.filter((type) => canAfford(game.resources, buildCost(type)));
+}
+
+// Whether a marker is a valid step-mode target, ignoring the step budget (§5.1). A slot needs
+// at least one affordable turret type (M1f §5.2).
 export function isVisitTarget(game, marker) {
   if (!marker) return false;
   if (marker.kind === 'feature') return !game.features[marker.index].exhausted;
-  if (marker.kind === 'slot') return !turretOnSlot(game, marker.index) && canAfford(game.resources, C.TURRET_COST);
+  if (marker.kind === 'slot') return !turretOnSlot(game, marker.index) && affordableTurretTypes(game).length > 0;
   return false;
 }
 

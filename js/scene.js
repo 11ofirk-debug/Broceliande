@@ -97,7 +97,7 @@ export function laneStats(lane) {
   return {
     length: lane.path.length,
     factor: lane.path.length / straight,
-    travelTime: lane.path.length / C.WOLF_SPEED,
+    travelTime: lane.path.length / C.ENEMY_TYPES.wolf.speed,
   };
 }
 

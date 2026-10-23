@@ -1,6 +1,6 @@
 // Canvas debug overlay (spec §18.2). Visual only — must not affect gameplay.
 // Lanes (waypoints, centrelines, corridor edges, spawns), Druid position and melee slots,
-// all candidate locations (footprint, jitter, role, covered lanes), wolf collision radii and IDs, turret IDs and target
+// all candidate locations (footprint, jitter, role, covered lanes), enemy collision radii, IDs and held melee slots, turret IDs and target
 // lines, Vulture IDs, block radii and target lines, pebble IDs. All turret ranges are drawn by the renderer in debug mode.
 
 import * as C from '../config.js';
@@ -12,9 +12,12 @@ import { turretMuzzle } from '../entities/turret.js';
 const COLOR = 'rgba(120, 220, 255, 0.9)';
 const EDGE_COLOR = 'rgba(120, 220, 255, 0.45)';
 const SPAWN_COLOR = 'rgba(255, 110, 110, 0.95)';
-const WOLF_COLOR = 'rgba(255, 150, 90, 0.95)';
+const ENEMY_COLOR = 'rgba(255, 150, 90, 0.95)';
 const TARGET_COLOR = 'rgba(255, 235, 120, 0.9)';
 const VULTURE_COLOR = 'rgba(255, 140, 220, 0.9)';
+const SQUIRREL_COLOR = 'rgba(170, 255, 140, 0.95)';
+const MELEE_COLOR = 'rgba(255, 255, 255, 0.95)';
+const CLOUD_COLOR = 'rgba(210, 150, 255, 0.95)';
 const LABEL_BG = 'rgba(0, 0, 0, 0.55)';
 const STATE_TAGS = { WALKING: 'walk', WAITING: 'wait', APPROACHING: 'appr', BITING: 'bite' };
 
@@ -54,9 +57,11 @@ export function drawDebugOverlay(ctx, game, scene) {
 
   drawCandidates(ctx, game, scene);
 
-  drawWolves(ctx, game);
+  drawEnemies(ctx, game);
   drawTurretTargets(ctx, game);
   drawVultureTargets(ctx, game);
+  drawSquirrelTargets(ctx, game);
+  drawCloudsAndPellets(ctx, game);
   ctx.font = '11px monospace';
   ctx.fillStyle = TARGET_COLOR;
   for (const p of game.projectiles) ctx.fillText(`#${p.id}`, p.x + 7, p.y - 6);
@@ -171,16 +176,16 @@ function drawLane(ctx, lane) {
 function drawTurretTargets(ctx, game) {
   ctx.lineWidth = 1.5;
   for (const t of game.turrets) {
-    const target = game.wolves.find((w) => w.id === t.targetId);
+    const target = game.enemies.find((e) => e.id === t.targetId);
     const muzzle = turretMuzzle(t);
     if (target) {
       ctx.strokeStyle = TARGET_COLOR;
       ctx.beginPath();
       ctx.moveTo(muzzle.x, muzzle.y);
-      ctx.lineTo(target.x, target.y - C.WOLF_HIT_HEIGHT);
+      ctx.lineTo(target.x, target.y - C.ENEMY_TYPES[target.type].hitHeight);
       ctx.stroke();
     }
-    label(ctx, `T#${t.id}${t.upgraded ? ' +' : ''}`, t.x - 16, muzzle.y - 20);
+    label(ctx, `T#${t.id} ${t.type === 'toader' ? 'Toader' : 'Spr'} L${t.level}`, t.x - 16, muzzle.y - 20);
   }
 }
 
@@ -188,7 +193,7 @@ function drawTurretTargets(ctx, game) {
 function drawVultureTargets(ctx, game) {
   ctx.lineWidth = 1.5;
   for (const v of game.vultures) {
-    const target = game.wolves.find((w) => w.id === v.targetId);
+    const target = game.enemies.find((e) => e.id === v.targetId);
     if (target) {
       ctx.strokeStyle = VULTURE_COLOR;
       ctx.beginPath();
@@ -206,14 +211,80 @@ function drawVultureTargets(ctx, game) {
   }
 }
 
-function drawWolves(ctx, game) {
+// M1d §3: Squirrel → target lines and IDs/state; claimed drops ringed with their claimer's ID.
+function drawSquirrelTargets(ctx, game) {
   ctx.lineWidth = 1.5;
-  for (const w of game.wolves) {
-    ctx.strokeStyle = WOLF_COLOR;
+  for (const d of game.drops) {
+    if (d.claimedBy === null) continue;
+    ctx.strokeStyle = SQUIRREL_COLOR;
     ctx.beginPath();
-    ctx.arc(w.x, w.y, C.WOLF_RADIUS, 0, Math.PI * 2);
+    ctx.arc(d.x, d.y, 13, 0, Math.PI * 2);
     ctx.stroke();
-    label(ctx, `#${w.id} ${w.blockedBy !== null ? 'blocked' : STATE_TAGS[w.state]}`, w.x - 14, w.y + C.WOLF_RADIUS + 14);
+  }
+  for (const s of game.squirrels) {
+    const target = game.drops.find((d) => d.id === s.targetId);
+    if (target) {
+      ctx.strokeStyle = SQUIRREL_COLOR;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(target.x, target.y);
+      ctx.stroke();
+    }
+    if (C.SQUIRREL_BLOCKS_WOLVES) {
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, C.SQUIRREL_BLOCK_RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    label(ctx, `S#${s.id} ${s.state.toLowerCase()} ${s.remaining.toFixed(1)}s${target ? ` → #${target.id}` : ''}`, s.x + 16, s.y + 4, SQUIRREL_COLOR);
+  }
+}
+
+// M1f §7: each cloud's damage reach (cloud radius, plus a wolf's radius as a dashed ring, since
+// an enemy is hit when its body overlaps) with time left; each pellet's line to its target, or
+// to the spot it will burst on if the target has died.
+function drawCloudsAndPellets(ctx, game) {
+  ctx.lineWidth = 1.5;
+  for (const c of game.clouds) {
+    const spec = C.TURRET_TYPES[c.source].cloud;
+    ctx.strokeStyle = CLOUD_COLOR;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, spec.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, spec.radius + C.ENEMY_TYPES.wolf.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    label(ctx, `C#${c.id} ${(spec.duration - c.age).toFixed(1)}s ticks ${c.ticks}`, c.x - 30, c.y + spec.radius + 30, CLOUD_COLOR);
+  }
+  for (const p of game.projectiles) {
+    if (p.kind !== 'pellet') continue;
+    const target = game.enemies.find((e) => e.id === p.targetId);
+    const tx = target ? target.x : p.lastX;
+    const ty = target ? target.y : p.lastY;
+    if (tx === null) continue;
+    ctx.strokeStyle = CLOUD_COLOR;
+    ctx.setLineDash(target ? [] : [4, 4]); // dashed: target dead, flying to its last position
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(tx, ty);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function drawEnemies(ctx, game) {
+  ctx.lineWidth = 1.5;
+  for (const w of game.enemies) {
+    ctx.strokeStyle = ENEMY_COLOR;
+    ctx.beginPath();
+    ctx.arc(w.x, w.y, w.radius, 0, Math.PI * 2); // collision radius (Bears: 26 px, M1e §6)
+    ctx.stroke();
+    const tag = w.type === 'wolf' ? '' : `${C.ENEMY_TYPES[w.type].name} `;
+    const slots = w.slots.length ? ` s${w.slots.join('+')}` : '';
+    label(ctx, `${tag}#${w.id} ${w.blockedBy !== null ? 'blocked' : STATE_TAGS[w.state]}${slots}`, w.x - 14, w.y + w.radius + 14);
   }
 }
 
@@ -229,17 +300,35 @@ function drawDruid(ctx, game) {
   ctx.arc(d.x, d.y, C.DRUID_MELEE_RADIUS, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
-  // Approach ring wolves walk round to reach far slots.
+  // Approach ring wolves walk round to reach far slots (larger enemies use a wider one).
   ctx.setLineDash([2, 6]);
   ctx.beginPath();
   ctx.arc(d.x, d.y, C.DRUID_APPROACH_RADIUS, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
-  // Slots: filled orange when claimed by a wolf.
+  // Slots: filled orange when claimed by an enemy, labelled with the holder's ID (M1e §6; a Bear holds two).
+  ctx.font = '11px monospace';
   for (const slot of game.meleeSlots) {
-    ctx.fillStyle = slot.wolfId === null ? COLOR : WOLF_COLOR;
+    ctx.fillStyle = slot.enemyId === null ? COLOR : ENEMY_COLOR;
     ctx.beginPath();
     ctx.arc(slot.x, slot.y, 4, 0, Math.PI * 2);
     ctx.fill();
+    if (slot.enemyId !== null) {
+      const out = 14; // label just outside the ring
+      ctx.fillText(`${slot.index}:#${slot.enemyId}`, slot.x + Math.cos(slot.angle) * out - 12, slot.y + Math.sin(slot.angle) * out + 4);
+    }
+  }
+  ctx.font = '13px monospace';
+
+  // Druid melee target line (M1e §6): to the attacker his next strike will hit.
+  const target = game.enemies.find((e) => e.id === game.druidMeleeTargetId);
+  if (target) {
+    ctx.strokeStyle = MELEE_COLOR;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(d.x, d.y);
+    ctx.lineTo(target.x, target.y);
+    ctx.stroke();
+    ctx.lineWidth = 1.5;
   }
 }

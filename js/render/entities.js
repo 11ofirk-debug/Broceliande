@@ -3,6 +3,7 @@
 
 import * as C from '../config.js';
 import { drawShadow } from './environment.js';
+import { resourceIconImage } from '../icons.js';
 
 const COLORS = {
   slotFill: 'rgba(170, 160, 130, 0.35)',
@@ -29,6 +30,10 @@ const COLORS = {
   stoneDark: '#5f5d55',
   moss: '#4f6e34',
   wolf: '#2b2430',
+  bear: '#3b2618',
+  bearDark: '#24160d',
+  bearHit: '#a88a78',
+  bearMuzzle: '#5c3d27',
   wolfDark: '#1a151d',
   wolfHit: '#b9a9b8',
   pebbleFlight: '#c9c2b2',
@@ -47,8 +52,10 @@ const COLORS = {
   cup: '#4a3a2c',
   pebble: '#b8b2a4',
   upgradeBand: '#e8c547',
+  level3Band: '#8fd8ff',
   rangeFill: 'rgba(255, 245, 200, 0.08)',
   rangeEdge: 'rgba(255, 245, 200, 0.7)',
+  nextRangeEdge: 'rgba(255, 245, 200, 0.4)',
   progress: '#f0d878',
   floatText: '#fff1c4',
   floatOutline: 'rgba(30, 20, 10, 0.85)',
@@ -60,6 +67,30 @@ const COLORS = {
   vultureBeak: '#e3c15a',
   duration: '#e8c547',
   durationBack: 'rgba(0, 0, 0, 0.45)',
+  swipe: 'rgba(255, 252, 235, 1)',
+  swipeGlow: 'rgba(255, 236, 170, 0.45)',
+  spark: '#fffbe8',
+  strikeFlash: '#f4f0ff',
+  toaderBody: '#4f8a3c',
+  toaderBelly: '#9cc46a',
+  toaderSpot: '#8a4fb0',
+  toaderEye: '#f2e27a',
+  toaderPipe: '#6c3d8c',
+  toaderPipeCap: '#a173c4',
+  toaderMouth: '#3b1d4f',
+  toaderMouthLine: '#2b4a22',
+  pellet: '#8f4fc4',
+  pelletLight: '#d6b3f0',
+  cloudCore: 'rgba(150, 90, 190, 0.55)',
+  cloudMid: 'rgba(110, 170, 90, 0.40)',
+  cloudEdge: 'rgba(120, 180, 100, 0.2)',
+  cloudSwirl: 'rgba(210, 180, 240, 0.45)',
+  cloudRing: 'rgba(190, 150, 230, 0.75)',
+  squirrel: '#8b5530',
+  squirrelHit: '#c09070',
+  squirrelBelly: '#e6cfa6',
+  squirrelTail: '#a0623a',
+  squirrelTailTip: '#c58a5a',
 };
 
 // M1c §2.1: every feature and turret is drawn inside its location's footprint circle
@@ -67,6 +98,31 @@ const COLORS = {
 // point below the centre; these offsets centre each sprite's drawn extent on the location.
 // Visual only: gameplay (range, travel cost, targeting) uses the location centre.
 const FEATURE_BASE_OFFSET = { tree: 36, reedPatch: 15, shrub: 20, ruins: 22, pond: 0 };
+
+// Wolf drop idle effect (M1d §1.3), visual only: a slow bob and a soft pulsing glow.
+const DROP_BOB_PX = 1.5;
+const DROP_BOB_PERIOD = 2.4;   // s
+const DROP_GLOW_ALPHA = [0.16, 0.34];
+
+// A dropped resource item on the ground: the shared HUD icon at DROP_ICON_SCALE (M1d §1.3).
+// t: seconds (wall clock, for the idle effect only).
+export function drawDrop(ctx, drop, t) {
+  const size = C.RESOURCE_ICON_SIZE * C.DROP_ICON_SCALE;
+  const phase = Math.sin((t / DROP_BOB_PERIOD + drop.id * 0.37) * Math.PI * 2);
+  const glow = DROP_GLOW_ALPHA[0] + (DROP_GLOW_ALPHA[1] - DROP_GLOW_ALPHA[0]) * (phase + 1) / 2;
+  ctx.save();
+  const g = ctx.createRadialGradient(drop.x, drop.y, 0, drop.x, drop.y, size * 0.6);
+  g.addColorStop(0, `rgba(255, 240, 190, ${glow})`);
+  g.addColorStop(1, 'rgba(255, 240, 190, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(drop.x, drop.y, size * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  drawShadow(ctx, drop.x, drop.y + size * 0.42, size * 0.32, size * 0.1);
+  const img = resourceIconImage(drop.resource);
+  if (img.complete) ctx.drawImage(img, drop.x - size / 2, drop.y - size / 2 - phase * DROP_BOB_PX, size, size);
+  ctx.restore();
+}
 
 // Ground point a feature's sprite stands on (also its y-sort key).
 export function featureBase(feature) {
@@ -95,24 +151,81 @@ export function drawTurretSlot(ctx, slot, faint, hovered) {
   ctx.restore();
 }
 
-// The Druid, drawn upright and centred on (x, y) with feet just below. hurt: brief red flash.
-export function drawDruid(ctx, x, y, hurt) {
+// The Druid standing at rest: staff upright, no lunge, facing right.
+export const DRUID_REST_POSE = { staffAngle: 0, lungeX: 0, lungeY: 0, facing: 1 };
+
+// The Druid, upright around (x, y) with feet just below. hurt: brief red flash.
+// defeat: 0 standing … 1 fallen; a defeated Druid tips over onto his back and greys out (M1e §1.2).
+// pose (M1f §4): staffAngle in rad around his hand (+ swings the top toward where he faces),
+// lunge offset in px, facing ±1 (mirrors him so the staff side faces his target).
+export function drawDruid(ctx, x, y, hurt, defeat = 0, pose = DRUID_REST_POSE) {
   const r = C.DRUID_RADIUS;
   const feet = y + r * 0.6;
   drawShadow(ctx, x, feet, r * 0.9, r * 0.3);
+  ctx.save();
+  if (defeat > 0) {
+    ctx.translate(x, feet);
+    ctx.rotate(-defeat * 1.35);
+    ctx.translate(-x, -feet);
+    ctx.filter = `grayscale(${defeat})`;
+    ctx.globalAlpha = 1 - 0.25 * defeat;
+  }
+  ctx.translate(pose.lungeX, pose.lungeY);
+  if (pose.facing < 0) {
+    ctx.translate(x, 0);
+    ctx.scale(-1, 1);
+    ctx.translate(-x, 0);
+  }
+  drawDruidBody(ctx, x, y, r, feet, hurt && defeat === 0, pose.staffAngle);
+  ctx.restore();
+}
 
-  // Staff behind the body.
-  ctx.strokeStyle = COLORS.staff;
-  ctx.lineWidth = 4;
+// Druid strike swoosh (M1e §2.4, M1f §4): a bright, broad crescent sweeping across the
+// target's direction, with a soft glow, fading out. t: 0 … 1 over DRUID_SWIPE_TIME.
+export function drawSwipe(ctx, s, t) {
+  const angle = Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
+  const reach = Math.hypot(s.x2 - s.x1, s.y2 - s.y1) * 0.9;
+  const sweep = -0.5 + t * 1.0; // the arc sweeps across the target direction
+  const cy = s.y1 - C.DRUID_RADIUS * 0.4;
+  ctx.save();
+  ctx.globalAlpha = 1 - t * t;
+  ctx.lineCap = 'round';
+  for (const [width, color] of [[16, COLORS.swipeGlow], [8, COLORS.swipe]]) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.arc(s.x1, cy, reach, angle + sweep - 0.6, angle + sweep + 0.35);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Impact spark on the target (M1f §4): a white burst of rays, growing and fading. t: 0 … 1.
+export function drawSpark(ctx, s, t) {
+  const inner = 4 + t * 6;
+  const outer = 10 + t * 14;
+  ctx.save();
+  ctx.globalAlpha = 1 - t;
+  ctx.strokeStyle = COLORS.spark;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(x + r * 0.75, feet);
-  ctx.lineTo(x + r * 0.75, y - r * 1.9);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + 0.2;
+    ctx.moveTo(s.x + Math.cos(a) * inner, s.y + Math.sin(a) * inner);
+    ctx.lineTo(s.x + Math.cos(a) * outer, s.y + Math.sin(a) * outer);
+  }
   ctx.stroke();
-  ctx.fillStyle = COLORS.staffGem;
+  ctx.fillStyle = COLORS.spark;
   ctx.beginPath();
-  ctx.arc(x + r * 0.75, y - r * 2, 5, 0, Math.PI * 2);
+  ctx.arc(s.x, s.y, 5 * (1 - t) + 2, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
 
+// Body drawn facing right. The staff turns around his hand by staffAngle and is drawn in
+// front of the robe so a strike reads clearly.
+function drawDruidBody(ctx, x, y, r, feet, hurt, staffAngle) {
   // Robe.
   ctx.fillStyle = COLORS.robe;
   ctx.beginPath();
@@ -142,6 +255,30 @@ export function drawDruid(ctx, x, y, hurt) {
   ctx.closePath();
   ctx.fill();
 
+  // Staff, turning around his hand (M1f §4). At rest it stands upright from his feet to above
+  // his head, as before; the gem marks its top.
+  const handX = x + r * 0.68;
+  const handY = y - r * 0.45;
+  ctx.save();
+  ctx.translate(handX, handY);
+  ctx.rotate(staffAngle);
+  ctx.strokeStyle = COLORS.staff;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.moveTo(0, r * 1.05);
+  ctx.lineTo(0, -r * 1.45);
+  ctx.stroke();
+  ctx.fillStyle = COLORS.staffGem;
+  ctx.beginPath();
+  ctx.arc(0, -r * 1.55, 5.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = COLORS.skin; // hand gripping the staff
+  ctx.beginPath();
+  ctx.arc(handX, handY, 4, 0, Math.PI * 2);
+  ctx.fill();
+
   if (hurt) {
     ctx.fillStyle = COLORS.hitFlash;
     ctx.beginPath();
@@ -152,8 +289,8 @@ export function drawDruid(ctx, x, y, hurt) {
 
 // Demonic Wolf: side-view quadruped with red eyes, standing on its collision centre.
 // hit: brief pale flash when a pebble lands; lunging: just bit something.
-export function drawWolf(ctx, wolf, hit, lunging) {
-  const r = C.WOLF_RADIUS;
+export function drawWolf(ctx, wolf, hit, lunging) { // (enemy of type wolf)
+  const r = wolf.radius;
   const feet = wolf.y + r * 0.5;
   drawShadow(ctx, wolf.x, feet, r * 1.1, r * 0.3);
 
@@ -180,7 +317,7 @@ export function drawWolf(ctx, wolf, hit, lunging) {
   ctx.moveTo(-14, -17);
   ctx.quadraticCurveTo(-22, -18, -25, -26);
   ctx.stroke();
-  ctx.fillStyle = hit ? COLORS.wolfHit : COLORS.wolf;
+  ctx.fillStyle = hit === 'strike' ? COLORS.strikeFlash : hit ? COLORS.wolfHit : COLORS.wolf; // 'strike': white flash from a Druid strike (M1f §4)
   ctx.beginPath();
   ctx.ellipse(0, -16, 16, 8, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -230,10 +367,74 @@ export function drawDruidHpBar(ctx, x, y, hp) {
   drawHpBar(ctx, x, y - C.DRUID_RADIUS * 2.55, 56, hp / C.DRUID_HP);
 }
 
-// Wolf HP bar: hidden until the wolf first takes damage (§13).
-export function drawWolfHpBar(ctx, wolf) {
-  if (wolf.hp >= C.WOLF_HP) return;
-  drawHpBar(ctx, wolf.x, wolf.y - C.WOLF_RADIUS * 2.9, 30, wolf.hp / C.WOLF_HP);
+// Enemy HP bars (§13, M1e §3.4): hidden until first damage; sized to the sprite.
+// lift: bar height above the collision centre, × radius; width in px.
+const HP_BAR = { wolf: { lift: 2.9, width: 30 }, bear: { lift: 1.75, width: 48 } };
+
+export function drawEnemyHpBar(ctx, enemy) {
+  const maxHp = C.ENEMY_TYPES[enemy.type].hp;
+  if (enemy.hp >= maxHp) return;
+  const bar = HP_BAR[enemy.type];
+  drawHpBar(ctx, enemy.x, enemy.y - enemy.radius * bar.lift, bar.width, enemy.hp / maxHp);
+}
+
+// Demonic Bear (M1e §3.7): bulky side-view quadruped, dark brown with hunched shoulders and
+// the wolves' glowing red eyes. Drawn at radius 26 facing right, feet below its centre.
+// hit: brief pale flash; lunging: just struck something.
+export function drawBear(ctx, bear, hit, lunging) {
+  const r = bear.radius;
+  const feet = bear.y + r * 0.5;
+  drawShadow(ctx, bear.x, feet, r * 1.25, r * 0.32);
+
+  ctx.save();
+  ctx.translate(bear.x, feet);
+  ctx.scale(bear.facing * (r / 26), r / 26);
+  if (lunging) ctx.translate(6, 0);
+
+  // Heavy legs with a slow lumbering swing.
+  const swing = Math.sin(bear.stride * 0.18) * 3;
+  ctx.fillStyle = COLORS.bearDark;
+  for (const [x, dir] of [[-17, 1], [-8, -1], [9, -1], [18, 1]]) {
+    ctx.beginPath();
+    ctx.roundRect(x - 4 + swing * dir * 0.5, -16, 8, 16, 3);
+    ctx.fill();
+  }
+
+  const body = hit === 'strike' ? COLORS.strikeFlash : hit ? COLORS.bearHit : COLORS.bear;
+  ctx.fillStyle = body;
+  ctx.beginPath(); // stubby tail
+  ctx.arc(-26, -26, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath(); // body
+  ctx.ellipse(0, -24, 26, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath(); // hunched shoulders
+  ctx.ellipse(9, -31, 15, 12, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath(); // head and ears
+  ctx.ellipse(25, -27, 10.5, 9, 0.1, 0, Math.PI * 2);
+  ctx.arc(19, -35, 4, 0, Math.PI * 2);
+  ctx.arc(26, -36, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = COLORS.bearMuzzle;
+  ctx.beginPath();
+  ctx.ellipse(33, -24, 6.5, 4.5, 0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = COLORS.wolfDark;
+  ctx.beginPath(); // nose
+  ctx.arc(38.5, -25, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Glowing red eyes, like the wolf's.
+  ctx.fillStyle = COLORS.wolfEyeGlow;
+  ctx.beginPath();
+  ctx.arc(28, -30, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = COLORS.wolfEye;
+  ctx.beginPath();
+  ctx.arc(28, -30, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 // Searchable feature, centred on its location (M1c §2.1). A soft glow filling the footprint
@@ -264,18 +465,25 @@ export function drawFeature(ctx, feature, hovered) {
 
 // Pebble Sprinkler: a stick post with rotating stick arms and a pebble cup on the
 // arm that points along turret.angle (§10.1). Stands on its slot pad, with its pebble cup
-// hub at the muzzle (turretMuzzle). upgrading: drawn faded (it is not firing); upgraded:
-// gold ring and bands (§11.2).
+// hub at the muzzle (turretMuzzle). upgrading: drawn faded (it is not firing).
+// Level 2: gold ring and bands (§11.2). Level 3 (M1e §4.4): a double ring and bands in sky
+// blue, and slightly longer arms with a bigger cup.
 export function drawTurret(ctx, turret, upgrading) {
   const { x, y } = slotBase(turret);
   const top = y - C.TURRET_MUZZLE_HEIGHT;
+  const band = turret.level >= 3 ? COLORS.level3Band : COLORS.upgradeBand;
+  const armLength = turret.level >= 3 ? 29 : 27;
+  const cupRadius = turret.level >= 3 ? 7 : 6.5;
   ctx.save();
-  if (turret.upgraded) {
-    ctx.strokeStyle = COLORS.upgradeBand;
+  if (turret.level >= 2) {
+    ctx.strokeStyle = band;
     ctx.lineWidth = 3.5;
-    ctx.beginPath();
-    ctx.ellipse(x, y, C.TURRET_SLOT_RADIUS - 2, (C.TURRET_SLOT_RADIUS - 2) * 0.7, 0, 0, Math.PI * 2);
-    ctx.stroke();
+    const rings = turret.level >= 3 ? [C.TURRET_SLOT_RADIUS - 2, C.TURRET_SLOT_RADIUS + 3] : [C.TURRET_SLOT_RADIUS - 2];
+    for (const r of rings) {
+      ctx.beginPath();
+      ctx.ellipse(x, y, r, r * 0.7, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
   if (upgrading) ctx.globalAlpha = 0.5;
   drawShadow(ctx, x, y, 20, 7);
@@ -297,7 +505,7 @@ export function drawTurret(ctx, turret, upgrading) {
   const arms = [0, 1, 2].map((i) => ({ a: turret.angle + (i * 2 * Math.PI) / 3, cup: i === 0 }));
   arms.sort((p, q) => Math.sin(p.a) - Math.sin(q.a));
   for (const { a, cup } of arms) {
-    const ex = x + Math.cos(a) * 27;
+    const ex = x + Math.cos(a) * armLength;
     const ey = top + Math.sin(a) * 11;
     ctx.strokeStyle = COLORS.stickLight;
     ctx.lineWidth = 3.5;
@@ -308,7 +516,7 @@ export function drawTurret(ctx, turret, upgrading) {
     if (cup) {
       ctx.fillStyle = COLORS.cup;
       ctx.beginPath();
-      ctx.arc(ex, ey, 6.5, 0, Math.PI * 2);
+      ctx.arc(ex, ey, cupRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = COLORS.pebble;
       ctx.beginPath();
@@ -320,9 +528,9 @@ export function drawTurret(ctx, turret, upgrading) {
   ctx.beginPath();
   ctx.arc(x, top, 4.5, 0, Math.PI * 2);
   ctx.fill();
-  if (turret.upgraded) {
-    // Gold bands on the post and hub.
-    ctx.strokeStyle = COLORS.upgradeBand;
+  if (turret.level >= 2) {
+    // Bands on the post and hub, in the level colour.
+    ctx.strokeStyle = band;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(x - 6, top + 14);
@@ -330,7 +538,7 @@ export function drawTurret(ctx, turret, upgrading) {
     ctx.moveTo(x - 6, top + 22);
     ctx.lineTo(x + 6, top + 22);
     ctx.stroke();
-    ctx.fillStyle = COLORS.upgradeBand;
+    ctx.fillStyle = band;
     ctx.beginPath();
     ctx.arc(x, top, 5, 0, Math.PI * 2);
     ctx.fill();
@@ -339,6 +547,138 @@ export function drawTurret(ctx, turret, upgrading) {
 }
 
 // Pebble in flight (§10.3).
+// Poison Toader (M1f §6.5): a squat green-and-purple toad contraption on its slot pad, with
+// pipes on its back and a wide mouth that opens briefly when it fires. Drawn front-on; it fits
+// inside LOCATION_RADIUS. mouthOpen: 0 … 1. upgrading: faded (not firing).
+const TOADER_MOUTH_TIME = 0.25; // s the mouth stays open after a shot (visual only)
+
+export function toaderMouthOpen(turret, t) {
+  const age = t - turret.lastFireTime;
+  return age >= 0 && age < TOADER_MOUTH_TIME ? 1 - age / TOADER_MOUTH_TIME : 0;
+}
+
+export function drawToader(ctx, turret, upgrading, mouthOpen = 0) {
+  const { x, y } = slotBase(turret);
+  ctx.save();
+  if (upgrading) ctx.globalAlpha = 0.5;
+  drawShadow(ctx, x, y, 24, 8);
+  ctx.translate(x, y);
+
+  // Pipes on its back, behind the body.
+  ctx.strokeStyle = COLORS.toaderPipe;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-12, -20);
+  ctx.lineTo(-19, -34);
+  ctx.moveTo(11, -22);
+  ctx.lineTo(16, -33);
+  ctx.stroke();
+  ctx.fillStyle = COLORS.toaderPipeCap;
+  for (const [px, py] of [[-19, -34], [16, -33]]) {
+    ctx.beginPath();
+    ctx.ellipse(px, py, 4.5, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Body, belly and purple spots.
+  ctx.fillStyle = COLORS.toaderBody;
+  ctx.beginPath();
+  ctx.ellipse(0, -13, 23, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = COLORS.toaderBelly;
+  ctx.beginPath();
+  ctx.ellipse(0, -7, 15, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = COLORS.toaderSpot;
+  for (const [sx, sy, sr] of [[-14, -17, 3.5], [13, -18, 3], [-5, -23, 2.5], [6, -24, 2]]) {
+    ctx.beginPath();
+    ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Bulging eyes.
+  for (const ex of [-9, 9]) {
+    ctx.fillStyle = COLORS.toaderBody;
+    ctx.beginPath();
+    ctx.arc(ex, -26, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = COLORS.toaderEye;
+    ctx.beginPath();
+    ctx.arc(ex, -26.5, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1a1410';
+    ctx.beginPath();
+    ctx.ellipse(ex, -26.5, 1.2, 2.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Wide mouth: a line at rest, an open purple maw when it fires.
+  if (mouthOpen > 0) {
+    ctx.fillStyle = COLORS.toaderMouth;
+    ctx.beginPath();
+    ctx.ellipse(0, -11, 15, 2 + 6 * mouthOpen, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.strokeStyle = COLORS.toaderMouthLine;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(-15, -12);
+    ctx.quadraticCurveTo(0, -7, 15, -12);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Toader pellet in flight (M1f §6.5): a small purple ball with a highlight.
+export function drawPellet(ctx, p) {
+  ctx.save();
+  ctx.fillStyle = COLORS.pellet;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = COLORS.pelletLight;
+  ctx.beginPath();
+  ctx.arc(p.x - 1.5, p.y - 1.5, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// Poison cloud (M1f §6.5): grows from pellet size to its full radius over CLOUD_GROW_TIME,
+// swirls slowly, and fades out over its last CLOUD_FADE_TIME. Its outer ring is drawn at the
+// damage radius, so the visible edge matches what it hits. radius: full damage radius.
+export function drawCloud(ctx, cloud, radius, duration) {
+  const grow = Math.min(1, cloud.age / C.CLOUD_GROW_TIME);
+  const r = 5 + (radius - 5) * grow;
+  const fade = Math.min(1, Math.max(0, (duration - cloud.age) / C.CLOUD_FADE_TIME));
+  const pulse = 1 + 0.06 * Math.sin(cloud.age * 4);
+  ctx.save();
+  ctx.globalAlpha = fade;
+  const g = ctx.createRadialGradient(cloud.x, cloud.y, 0, cloud.x, cloud.y, r);
+  g.addColorStop(0, COLORS.cloudCore);
+  g.addColorStop(0.7, COLORS.cloudMid);
+  g.addColorStop(1, COLORS.cloudEdge);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cloud.x, cloud.y, r, 0, Math.PI * 2);
+  ctx.fill();
+  // Slow swirl: two arcs turning inside.
+  ctx.strokeStyle = COLORS.cloudSwirl;
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 2; i++) {
+    const a = cloud.age * 1.6 + i * Math.PI;
+    ctx.beginPath();
+    ctx.arc(cloud.x, cloud.y, r * 0.55 * pulse, a, a + 1.6);
+    ctx.stroke();
+  }
+  // Edge ring at the damage radius.
+  ctx.strokeStyle = COLORS.cloudRing;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cloud.x, cloud.y, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawPebble(ctx, p) {
   // Short fading trail behind it so fast pebbles read as motion.
   const trail = ctx.createLinearGradient(p.x, p.y, p.x - p.dirX * 22, p.y - p.dirY * 22);
@@ -363,6 +703,18 @@ export function drawPebble(ctx, p) {
 }
 
 // Range circle centred on (x, y).
+// The next level's range while the upgrade menu is open (M1e §4.3): faint, dashed, no fill.
+export function drawNextRange(ctx, x, y, radius) {
+  ctx.save();
+  ctx.strokeStyle = COLORS.nextRangeEdge;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 8]);
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawRange(ctx, x, y, radius) {
   ctx.save();
   ctx.fillStyle = COLORS.rangeFill;
@@ -388,12 +740,13 @@ export function drawProgressBar(ctx, x, y, fraction) {
 }
 
 // Rising, fading text such as "+2 Pits". t: 0 → 1 over its lifetime.
-export function drawFloatingText(ctx, text, x, y, t) {
+// small: Squirrel pickups (M1d §1.4), which come in quick bursts and must not drown each other out.
+export function drawFloatingText(ctx, text, x, y, t, small = false) {
   ctx.save();
   ctx.globalAlpha = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
-  ctx.font = 'bold 22px Georgia, serif';
+  ctx.font = small ? 'bold 15px Georgia, serif' : 'bold 22px Georgia, serif';
   ctx.textAlign = 'center';
-  ctx.lineWidth = 4;
+  ctx.lineWidth = small ? 3 : 4;
   ctx.strokeStyle = COLORS.floatOutline;
   ctx.strokeText(text, x, y);
   ctx.fillStyle = COLORS.floatText;
@@ -598,22 +951,110 @@ function drawWing(ctx, flap, color) {
 }
 
 // Vulture HP bar and its duration indicator: a ring that shrinks as time runs out (§15.2).
-export function drawVultureStatus(ctx, v) {
-  const r = C.VULTURE_RADIUS;
-  const lift = v.state !== 'LANDED' ? C.VULTURE_FLIGHT_HEIGHT : 0;
-  const frac = Math.max(0, v.remaining / C.VULTURE_DURATION);
+// Summon status (§15.2, M1d §2.5): duration ring on the ground and an HP bar at hpY.
+function drawSummonStatus(ctx, x, y, r, hpY, durationFrac, hpFrac) {
+  const frac = Math.max(0, durationFrac);
   ctx.save();
   ctx.strokeStyle = COLORS.durationBack;
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.ellipse(v.x, v.y + r * 0.4, r + 8, (r + 8) * 0.55, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y + r * 0.4, r + 8, (r + 8) * 0.55, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.strokeStyle = COLORS.duration;
   ctx.beginPath();
-  ctx.ellipse(v.x, v.y + r * 0.4, r + 8, (r + 8) * 0.55, 0, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+  ctx.ellipse(x, y + r * 0.4, r + 8, (r + 8) * 0.55, 0, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
   ctx.stroke();
   ctx.restore();
-  drawHpBar(ctx, v.x, v.y - lift - r * 3.6, 28, v.hp / C.VULTURE_HP);
+  drawHpBar(ctx, x, hpY, 28, hpFrac);
+}
+
+export function drawVultureStatus(ctx, v) {
+  const r = C.VULTURE_RADIUS;
+  const lift = v.state !== 'LANDED' ? C.VULTURE_FLIGHT_HEIGHT : 0;
+  drawSummonStatus(ctx, v.x, v.y, r, v.y - lift - r * 3.6, v.remaining / C.VULTURE_DURATION, v.hp / C.VULTURE_HP);
+}
+
+// Visual size of the Squirrel sprite relative to SQUIRREL_RADIUS (drawing only).
+const SQUIRREL_DRAW_SCALE = 1.35;
+
+// Squirrel (M1d §2.5): small side-view placeholder, brown body and a large bushy tail.
+// Running: hops (driven by distance run). Waiting: tail sways. t: seconds; hit: bitten flash.
+export function drawSquirrel(ctx, s, t, hit, ghost = false) {
+  const r = C.SQUIRREL_RADIUS;
+  const k = (r / 12) * SQUIRREL_DRAW_SCALE; // drawn at radius 12, facing right
+  const moving = s.state === 'MOVING';
+  const hop = moving ? Math.abs(Math.sin(s.stride * 0.12)) * 5 : 0;
+  const sway = moving ? -0.15 : Math.sin(t * 3 + s.id) * 0.12;
+  drawShadow(ctx, s.x, s.y + r * 0.4, r * 1.1 * SQUIRREL_DRAW_SCALE, r * 0.3 * SQUIRREL_DRAW_SCALE);
+
+  ctx.save();
+  if (ghost) ctx.globalAlpha = 0.5;
+  ctx.translate(s.x, s.y + r * 0.4 - hop);
+  ctx.scale(s.facing * k, k);
+
+  // Tail behind the body: two overlapping puffs, curling up and over the back.
+  ctx.save();
+  ctx.translate(-8, -6);
+  ctx.rotate(sway);
+  ctx.fillStyle = COLORS.squirrelTail;
+  ctx.beginPath();
+  ctx.ellipse(-6, -12, 8, 14, -0.35, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = COLORS.squirrelTailTip;
+  ctx.beginPath();
+  ctx.ellipse(-1, -27, 7.5, 6.5, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  const body = hit ? COLORS.squirrelHit : COLORS.squirrel;
+  ctx.fillStyle = body;
+  ctx.beginPath(); // feet
+  ctx.ellipse(-4, -1, 4, 2.2, 0, 0, Math.PI * 2);
+  ctx.ellipse(6, -1, 3.5, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath(); // body
+  ctx.ellipse(0, -9, 10, 8, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath(); // head and ear
+  ctx.arc(9, -17, 6, 0, Math.PI * 2);
+  ctx.moveTo(6, -21);
+  ctx.lineTo(8, -28);
+  ctx.lineTo(11, -21);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = COLORS.squirrelBelly;
+  ctx.beginPath();
+  ctx.ellipse(4, -7, 4.5, 5, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1a1410';
+  ctx.beginPath();
+  ctx.arc(11, -18, 1.4, 0, Math.PI * 2);
+  ctx.arc(15, -16, 1, 0, Math.PI * 2); // nose
+  ctx.fill();
+  ctx.restore();
+}
+
+export function drawSquirrelStatus(ctx, s) {
+  const r = C.SQUIRREL_RADIUS;
+  drawSummonStatus(ctx, s.x, s.y, r, s.y - r * 4.2, s.remaining / C.SQUIRREL_DURATION, s.hp / C.SQUIRREL_HP);
+}
+
+// Placement ghost (M1d §2.1): the same shape, translucent; with SQUIRREL_BLOCKS_WOLVES it also
+// shows the block radius, like the Vulture's ghost.
+export function drawSquirrelGhost(ctx, p, t) {
+  if (C.SQUIRREL_BLOCKS_WOLVES) {
+    ctx.save();
+    ctx.strokeStyle = COLORS.duration;
+    ctx.fillStyle = 'rgba(232, 197, 71, 0.12)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, C.SQUIRREL_BLOCK_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+  drawSquirrel(ctx, { x: p.x, y: p.y, state: 'WAITING', facing: 1, id: 0, stride: 0 }, t, false, true);
 }
 
 // Placement ghost under the cursor (§15.1): translucent Vulture plus its block radius.

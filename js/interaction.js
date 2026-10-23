@@ -8,9 +8,10 @@ import { GameState, ActionState } from './states.js';
 import { pick } from './picking.js';
 import {
   startSearch, startBuild, startUpgrade, cancelAction, isBuildingSlot, isUpgradingSlot,
-  startSummonPlacement, exitSummonPlacement, placeVulture, startTravel, isTravelling,
+  startSummonPlacement, exitSummonPlacement, placeSummon, startTravel, isTravelling, SUMMONS,
 } from './systems/actionSystem.js';
 import { isStepMode, canVisit } from './systems/stepSystem.js';
+import { TURRET_TYPE_KEYS } from './entities/turret.js';
 import { startCombat } from './game.js';
 
 export function createInteraction(game, view) {
@@ -20,18 +21,23 @@ export function createInteraction(game, view) {
 
   function onLeftClick(world) {
     if (game.state !== GameState.PREP && game.state !== GameState.COMBAT) return;
-    // Summon placement (§15.1): a left-click anywhere on the battlefield places the Vulture.
+    // Summon placement (§15.1): a left-click anywhere on the battlefield places the chosen summon.
     if (game.action.state === ActionState.SUMMON_PLACEMENT) {
-      placeVulture(game, world); // ignored on the HUD strip
+      placeSummon(game, world); // ignored on the HUD strip
       return;
     }
     const hit = pick(game, world);
     const isPrep = game.state === GameState.PREP;
 
-    // Step-mode Prep (M1b §5.3): no menus. Clicking a valid, affordable marker travels there
-    // and acts on arrival; anything else does nothing. Input is ignored while travelling.
+    // Step-mode Prep (M1b §5.3, M1f §5.2). Clicking a valid, affordable feature travels there and
+    // searches on arrival. Clicking a valid, affordable slot opens the build menu (with the travel
+    // cost); choosing a turret there travels and builds. Anything else closes the menu at no
+    // cost. Input is ignored while travelling.
     if (isPrep && isStepMode(game)) {
-      if (hit) startTravel(game, hit);
+      if (isTravelling(game)) return;
+      if (hit?.kind === 'slot' && canVisit(game, hit)) view.menu = { kind: 'build', index: hit.index };
+      else if (hit?.kind === 'feature' && startTravel(game, hit)) closeMenu();
+      else closeMenu();
       return;
     }
 
@@ -60,6 +66,7 @@ export function createInteraction(game, view) {
   }
 
   function onEscape() {
+    if (game.state === GameState.ENDING) return; // M1e §1.2: input disabled while the battle ends
     if (view.menu) {
       closeMenu();
       return;
@@ -68,12 +75,20 @@ export function createInteraction(game, view) {
     cancelAction(game);
   }
 
-  function onMenuAction() {
+  // option: which of the menu's options was clicked (the Druid menu has one per summon).
+  function onMenuAction(option = 0) {
     const menu = view.menu;
     if (!menu) return;
-    if (menu.kind === 'build' && startBuild(game, menu.index)) closeMenu();
+    if (menu.kind === 'build') {
+      // One card per turret type (M1f §5.2): build it, or in step mode travel there to build it.
+      const type = TURRET_TYPE_KEYS[option];
+      const started = isStepMode(game)
+        ? startTravel(game, { kind: 'slot', index: menu.index }, type)
+        : startBuild(game, menu.index, type);
+      if (started) closeMenu();
+    }
     if (menu.kind === 'upgrade' && startUpgrade(game, menu.index)) closeMenu();
-    if (menu.kind === 'summon' && startSummonPlacement(game)) closeMenu();
+    if (menu.kind === 'summon' && startSummonPlacement(game, Object.keys(SUMMONS)[option])) closeMenu();
   }
 
   // Start Combat / Start Battle button. Ignored mid-travel so a paid move always lands.

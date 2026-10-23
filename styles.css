@@ -257,9 +257,14 @@ html, body {
   font-size: 24px;
 }
 
-.res svg {
-  width: 28px;
-  height: 28px;
+/* Icon size is set from RESOURCE_ICON_SIZE in js/ui.js. */
+.res-icon {
+  display: flex;
+}
+
+.res-icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 /* ---------- Summon placement mode indicator ---------- */
@@ -291,7 +296,7 @@ html, body {
 }
 
 #tooltip .tip-title,
-#menu-title {
+#menu .menu-title {
   font-weight: bold;
   font-size: 22px;
   color: #f3e7c0;
@@ -306,17 +311,113 @@ html, body {
   font-style: italic;
 }
 
+/* An optional header line (step-mode travel cost, M1f §5.2) above the options, which sit side
+   by side (one per summon or turret type). */
 #menu {
-  min-width: 190px;
   pointer-events: auto;
 }
 
-#menu-cost {
-  margin: 2px 0 10px;
+#menu-header {
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #4a5e36;
+  font-size: 18px;
   color: #d8d2b8;
 }
 
-#menu-action {
+#menu-header.warn {
+  color: #ee7a62;
+}
+
+#menu-options {
+  display: flex;
+  gap: 18px;
+}
+
+/* Each option is a card, clickable as a whole (M1f §2); an image, when it has one, sits left. */
+.menu-option {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: 240px;
+  margin: -6px;
+  padding: 6px;
+  border-radius: 6px;
+}
+
+.menu-option + .menu-option {
+  margin-left: 4px;
+  border-left: 1px solid #4a5e36;
+  border-radius: 0 6px 6px 0;
+}
+
+.menu-option.clickable {
+  cursor: pointer;
+}
+
+.menu-option.clickable:hover {
+  background: rgba(127, 165, 90, 0.18);
+}
+
+.menu-option.disabled .menu-portrait {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+
+.menu-option.disabled .menu-title {
+  color: #a9a58f;
+}
+
+.menu-portrait {
+  flex: none;
+  margin-top: 2px;
+}
+
+.menu-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.menu-cost {
+  margin: 4px 0 10px;
+  color: #d8d2b8;
+}
+
+/* ---------- Cost rows (M1f §3): one row per resource; red with "have N" when short ---------- */
+.cost-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: 'Consolas', monospace;
+  font-size: 18px;
+  color: #d8d2b8;
+}
+
+.cost-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cost-row.short {
+  color: #ee7a62;
+}
+
+.cost-icon {
+  display: flex;
+  flex: none;
+}
+
+.cost-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+#tooltip .cost-rows {
+  margin: 4px 0 2px;
+}
+
+.menu-action {
   width: 100%;
   font-size: 20px;
   padding: 6px 0;
@@ -326,22 +427,18 @@ html, body {
   border-radius: 6px;
 }
 
-#menu-action:hover:not(:disabled) {
+.menu-action:hover:not(:disabled) {
   background: #4b6e34;
 }
 
-#menu.unavailable #menu-cost {
-  color: #e0806a;
-}
-
-#menu-action:disabled {
+.menu-action:disabled {
   background: #3a3a34;
   color: #8a887c;
   border-color: #5a5a50;
   cursor: not-allowed;
 }
 
-#menu-detail {
+.menu-detail {
   margin: -4px 0 10px;
   font-size: 16px;
   line-height: 1.35;
@@ -349,17 +446,17 @@ html, body {
   white-space: pre-line;
 }
 
-#menu-detail:empty {
+.menu-detail:empty {
   display: none;
 }
 
-#menu-reason {
+.menu-reason {
   margin-top: 6px;
   font-size: 16px;
   color: #e0806a;
 }
 
-#menu-reason:empty {
+.menu-reason:empty {
   display: none;
 }
 

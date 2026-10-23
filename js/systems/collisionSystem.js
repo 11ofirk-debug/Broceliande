@@ -1,16 +1,13 @@
-// Wolf–wolf collision (spec §12.4): wolves are circles of WOLF_RADIUS that must never
-// overlap. Movement systems propose a position and ask here whether it is free.
+// Enemy–enemy collision (spec §12.4): enemies are circles of their own radius that must
+// never overlap. Movement systems propose a position and ask here whether it is free.
 // The check is in world space, so it also covers lanes converging near the Druid.
 
-import * as C from '../config.js';
-
-const MIN_GAP = C.WOLF_RADIUS * 2;
-
-// Returns the first other wolf a wolf at (x, y) would overlap, or null.
-export function findBlocker(wolves, self, x, y) {
-  for (const other of wolves) {
+// Returns the first other enemy that a circle of `radius` at (x, y) would overlap, or null.
+// self: the enemy being moved (skipped), or null when testing a spawn point.
+export function findBlocker(enemies, self, x, y, radius) {
+  for (const other of enemies) {
     if (other === self) continue;
-    if (Math.hypot(other.x - x, other.y - y) < MIN_GAP) return other;
+    if (Math.hypot(other.x - x, other.y - y) < radius + other.radius) return other;
   }
   return null;
 }

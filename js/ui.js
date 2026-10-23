@@ -6,10 +6,15 @@ import * as C from './config.js';
 import { GameState, ActionState } from './states.js';
 import { laneStats, expectedResources, candidateProblems } from './scene.js';
 import { routeBand } from './layout.js';
-import { canAfford, formatCost } from './resources.js';
-import { canStartBuild, upgradeAvailability, summonAvailability, druidDisplayPos, isTravelling } from './systems/actionSystem.js';
+import { RESOURCE_ICON_SVG } from './icons.js';
+import { costRowsElement, costRowsKey } from './costRows.js';
+import { portraitCanvas } from './render/portraits.js';
+import { canAfford } from './resources.js';
+import { canStartBuild, upgradeAvailability, summonAvailability, druidDisplayPos, isTravelling, SUMMONS } from './systems/actionSystem.js';
 import { turretOnSlot } from './systems/buildSystem.js';
-import { isStepMode, stepCost, canVisit, anyVisitable, routePreview, calibrationFigures } from './systems/stepSystem.js';
+import { buildCost, levelStats, levelRange, nextLevelStats, maxLevel, turretType, TURRET_TYPE_KEYS } from './entities/turret.js';
+import { isStepMode, stepCost, canVisit, anyVisitable, routePreview, calibrationFigures, affordableTurretTypes } from './systems/stepSystem.js';
+import { enemyTotals, WAVE_COUNTS } from './game.js';
 
 const RESOURCE_LABELS = { pits: 'Peach Pits', reeds: 'Reeds', feathers: 'Feathers' };
 const POPUP_GAP = 16; // px between a world object and its tooltip/menu
@@ -27,7 +32,7 @@ function formatTime(seconds) {
 
 // Static layout lines for the debug panel: lane lengths/travel times and expected resources.
 function layoutDebugLines(scene) {
-  const lines = ['', `Lanes (unopposed, WOLF_SPEED; target ×${C.LANE_LENGTH_FACTOR.toFixed(2)}):`];
+  const lines = ['', `Lanes (unopposed, wolf speed; target ×${C.LANE_LENGTH_FACTOR.toFixed(2)}):`];
   for (const lane of scene.lanes) {
     const st = laneStats(lane);
     lines.push(`  ${lane.name.padEnd(12)}${Math.round(st.length)} px  ${st.travelTime.toFixed(1)} s  ×${st.factor.toFixed(2)}`);
@@ -40,6 +45,54 @@ function layoutDebugLines(scene) {
   lines.push(`  Pits ${res.pits}  Reeds ${res.reeds}  Feathers ${res.feathers}`);
   lines.push(`  Search time ${res.searchTime.toFixed(1)} s`);
   return lines;
+}
+
+// Per-type enemy figures (M1e §6): wolves and Bears separately.
+function enemyDebugLines(game) {
+  return Object.entries(game.enemyCounts).map(([type, c]) => {
+    const name = C.ENEMY_TYPES[type].plural;
+    return `${`${name}:`.padEnd(9)} spawned ${c.spawned}/${WAVE_COUNTS[type]}  alive ${c.alive}  killed ${c.killed}`;
+  });
+}
+
+// Druid melee timer (M1e §6): counting / ready (waiting for an attacker) / paused while busy.
+function druidMeleeLine(game) {
+  const t = `${game.druidMeleeTimer.toFixed(2)} / ${C.DRUID_MELEE_INTERVAL} s`;
+  if (game.state !== GameState.COMBAT) return `Druid melee: ${t}  (Combat only)`;
+  if (game.action.state !== ActionState.IDLE) return `Druid melee: ${t}  paused — ${game.action.state}`;
+  const s = game.druidStrike;
+  // M1f §4: the strike in progress (wind-up / swing / recover), else counting or ready.
+  const status = s
+    ? `striking: ${s.impactAt !== null ? 'recover' : s.elapsed < C.STRIKE_WINDUP_TIME ? 'wind-up' : 'swing'}`
+    : game.druidMeleeTimer >= C.DRUID_MELEE_INTERVAL ? 'READY' : 'counting';
+  const target = game.druidMeleeTargetId === null ? 'no attacker' : `target #${game.druidMeleeTargetId}`;
+  return `Druid melee: ${t}  ${status}, ${target}`;
+}
+
+// Turret figures for this encounter (M1f §7): active clouds, and damage dealt by turret type
+// and, for each type, by impacts vs clouds. Damage counts only HP actually removed.
+function turretDebugLines(game) {
+  const s = game.damageStats;
+  const lines = [`Clouds active: ${game.clouds.length}   Turrets: ${TURRET_TYPE_KEYS.map((t) => `${turretType(t).name} ${game.turrets.filter((x) => x.type === t).length}`).join(', ')}`];
+  for (const type of TURRET_TYPE_KEYS) {
+    const impact = s[`${type}:impact`] ?? 0;
+    const cloud = s[`${type}:cloud`] ?? 0;
+    const split = turretType(type).attack === 'cloud' ? `  (impacts ${impact}, clouds ${cloud})` : '';
+    lines.push(`  damage ${turretType(type).name.padEnd(16)} ${impact + cloud}${split}`);
+  }
+  return lines;
+}
+
+// Enemy drop figures for this encounter (M1d §3).
+function dropDebugLines(game) {
+  const { dropped, collected } = game.dropStats;
+  const sum = (o) => o.pits + o.reeds + o.feathers;
+  const per = (o) => `Pits ${o.pits}  Reeds ${o.reeds}  Feathers ${o.feathers}`;
+  return [
+    `Drops (×${game.dropMult}, X toggles): dropped ${sum(dropped)}  collected ${sum(collected)}  on field ${game.drops.length}`,
+    `  dropped:   ${per(dropped)}`,
+    `  collected: ${per(collected)}`,
+  ];
 }
 
 // This run's layout lines for the debug panel (M1c §6.3, M1b §8). Recomputed each frame;
@@ -103,20 +156,35 @@ export function createUI(scene, callbacks) {
     restart: document.getElementById('btn-restart'),
     tooltip: document.getElementById('tooltip'),
     menu: document.getElementById('menu'),
-    menuTitle: document.getElementById('menu-title'),
-    menuCost: document.getElementById('menu-cost'),
-    menuDetail: document.getElementById('menu-detail'),
-    menuAction: document.getElementById('menu-action'),
-    menuReason: document.getElementById('menu-reason'),
+    menuHeader: document.getElementById('menu-header'),
+    menuOptions: document.getElementById('menu-options'),
     modeBanner: document.getElementById('mode-banner'),
     debugPanel: document.getElementById('debug-panel'),
   };
 
   el.hud.style.height = `${C.HUD_STRIP_HEIGHT}px`;
+  // Resource icons from the shared definition (M1d §1.3), also used for drops on the canvas.
+  for (const icon of document.querySelectorAll('.res-icon')) {
+    icon.innerHTML = RESOURCE_ICON_SVG[icon.dataset.resource];
+    icon.style.width = `${C.RESOURCE_ICON_SIZE}px`;
+    icon.style.height = `${C.RESOURCE_ICON_SIZE}px`;
+  }
   el.stepsBar.style.setProperty('--blink-period', `${1 / C.STEP_BAR_BLINK_HZ}s`);
   el.startCombat.addEventListener('click', () => callbacks.onStartCombat());
   el.restart.addEventListener('click', () => callbacks.onRestart());
-  el.menuAction.addEventListener('click', () => callbacks.onMenuAction());
+  // Menu option buttons are created per menu (see updateMenu); clicks report the option index.
+  // The whole option card is the click target (M1f §2), button or not.
+  el.menu.addEventListener('click', (e) => {
+    const card = e.target.closest('.menu-option');
+    if (card && !card.classList.contains('disabled')) callbacks.onMenuAction(Number(card.dataset.option));
+  });
+  // Which option card the pointer is over (build menu range preview, M1f §5.2).
+  let menuHoverIndex = null;
+  el.menu.addEventListener('mouseover', (e) => {
+    const card = e.target.closest('.menu-option');
+    menuHoverIndex = card ? Number(card.dataset.option) : null;
+  });
+  el.menu.addEventListener('mouseleave', () => { menuHoverIndex = null; });
 
   let lastState = null;
   let tooltipKey = null;
@@ -131,8 +199,10 @@ export function createUI(scene, callbacks) {
     updateHud(el, game);
     updateStepBar(el, game, view);
     tooltipKey = updateTooltip(el, game, view, tooltipKey);
-    menuKey = updateMenu(el, game, view, menuKey);
-    el.modeBanner.hidden = game.action.state !== ActionState.SUMMON_PLACEMENT;
+    menuKey = updateMenu(el, game, view, menuKey, menuHoverIndex);
+    const placing = game.action.state === ActionState.SUMMON_PLACEMENT;
+    el.modeBanner.hidden = !placing;
+    if (placing) setText(el.modeBanner, `Placing ${SUMMONS[game.action.target].name} — click the battlefield to place · Esc / right-click to cancel`);
     updateEndOverlay(el, game);
     updateDebugPanel(el, game, clock, view, layoutLines, scene);
   }
@@ -142,16 +212,19 @@ export function createUI(scene, callbacks) {
 
 function updateHud(el, game) {
   const isPrep = game.state === GameState.PREP;
-  const isCombat = game.state === GameState.COMBAT;
+  // ENDING (M1e §1) still reads as Combat in the HUD, frozen, until the result overlay appears.
+  const isCombat = game.state === GameState.COMBAT || game.state === GameState.ENDING;
 
-  setText(el.phase, game.state);
+  setText(el.phase, game.state === GameState.ENDING ? GameState.COMBAT : game.state);
   if (isPrep) {
     // Countdown shows 00:25 at the start and 00:00 only at the moment Combat begins.
     setText(el.timer, formatTime(Math.ceil(game.prepRemaining)));
   } else {
     setText(el.timer, formatTime(game.combatTime));
   }
-  setText(el.wolves, isCombat ? `Wolves: ${C.WAVE_TOTAL - game.wolvesKilled} / ${C.WAVE_TOTAL}` : '');
+  // M1e §3.6: all enemy types combined.
+  const totals = enemyTotals(game);
+  setText(el.wolves, isCombat ? `Enemies: ${totals.remaining} / ${totals.total}` : '');
   el.startCombat.hidden = !isPrep;
   setText(el.startCombat, isStepMode(game) ? 'Start Battle' : 'Start Combat');
   // Nothing left to click: prompt the player to start (M1b §5.6).
@@ -205,13 +278,16 @@ function tooltipContent(game, hover) {
     if (travelLine) lines.push(travelLine);
     return { title: type.name, lines, anchor: { x: feature.x, y: feature.y, halfWidth: C.LOCATION_RADIUS } };
   }
-  // Empty slots only have a tooltip in step mode, which has no build menu (M1b §5.3).
+  // Empty slots have a tooltip in step mode (M1f §5.2): the travel cost and which turrets can be
+  // built there with current resources. The costs themselves are in the build menu.
   if (hover.kind === 'slot' && stepMode) {
     const slot = game.slots[hover.index];
-    const lines = [['', formatCost(C.TURRET_COST)]];
+    const lines = [];
     if (travelLine) lines.push(travelLine);
-    if (!canAfford(game.resources, C.TURRET_COST)) lines.push(['tip-warn', 'Not enough resources']);
-    return { title: 'Pebble Sprinkler', lines, anchor: { x: slot.x, y: slot.y, halfWidth: C.LOCATION_RADIUS } };
+    const buildable = affordableTurretTypes(game);
+    if (buildable.length === 0) lines.push(['tip-warn', 'Not enough resources for any turret']);
+    else lines.push(['tip-muted', 'Can build:'], ...buildable.map((type) => ['', `· ${turretType(type).name}`]));
+    return { title: 'Turret slot', lines, anchor: { x: slot.x, y: slot.y, halfWidth: C.LOCATION_RADIUS } };
   }
   return null;
 }
@@ -219,7 +295,7 @@ function tooltipContent(game, hover) {
 // Hover tooltip, PREP only. Rebuilt only when its content changes.
 function updateTooltip(el, game, view, prevKey) {
   const content = tooltipContent(game, view.hover);
-  const key = content ? JSON.stringify(content) : null;
+  const key = content ? JSON.stringify(content) + (content.cost ? costRowsKey(content.cost, game.resources) : '') : null;
   if (key === prevKey) return key;
 
   el.tooltip.hidden = !content;
@@ -230,6 +306,7 @@ function updateTooltip(el, game, view, prevKey) {
   title.className = 'tip-title';
   title.textContent = content.title;
   el.tooltip.append(title);
+  if (content.cost) el.tooltip.append(costRowsElement(content.cost, game.resources));
   for (const [cls, text] of content.lines) {
     const line = document.createElement('div');
     line.className = cls;
@@ -241,65 +318,156 @@ function updateTooltip(el, game, view, prevKey) {
   return key;
 }
 
-// "Damage 3 → 5 · Every 0.75 → 0.6 s · Range 220 → 264": what the upgrade buys.
-const UPGRADE_DETAIL = `Damage ${C.TURRET_DAMAGE} → ${C.UPGRADED_DAMAGE}\n`
-  + `Every ${C.TURRET_FIRE_INTERVAL} → ${C.UPGRADED_FIRE_INTERVAL} s\n`
-  + `Range ${C.TURRET_RANGE} → ${Math.round(C.TURRET_RANGE * C.UPGRADED_RANGE_MULT)}\n`
-  + `Takes ${C.UPGRADE_TIME} s — turret stops firing`;
+// "Damage 3 → 5 · Every 0.75 → 0.6 s · Range 220 → 264": what the upgrade to `level` buys.
+function upgradeDetail(type, level) {
+  const from = levelStats(type, level - 1);
+  const to = levelStats(type, level);
+  return `Damage ${from.damage} → ${to.damage}\n`
+    + `Every ${from.fireInterval} → ${to.fireInterval} s\n`
+    + `Range ${Math.round(levelRange(type, level - 1))} → ${Math.round(levelRange(type, level))}\n`
+    + `Takes ${to.time} s — turret stops firing`;
+}
 
-// Contextual menu (§9.2, §11.1, §16.2): build menu in Prep, turret menu in Combat.
-// Greyed out with its cost and a reason when it cannot be confirmed.
-function updateMenu(el, game, view, prevKey) {
+// What a turret type does, for its build card (M1f §5.2).
+function turretSummary(type) {
+  const t = turretType(type);
+  const l1 = t.levels[0];
+  if (t.attack === 'cloud') {
+    return `Poison cloud: ${l1.damage} on impact, then ${t.cloud.tickDamage} every ${t.cloud.tickInterval} s to all inside\n`
+      + `Every ${l1.fireInterval} s · range ${Math.round(levelRange(type, 1))}`;
+  }
+  return `${l1.damage} damage every ${l1.fireInterval} s · range ${Math.round(levelRange(type, 1))}`;
+}
+
+// Build menu (§9.2, M1f §5.2): one card per turret type. In step mode it also needs the steps
+// to get there; choosing a turret travels there and builds on arrival.
+function buildOptions(game, menu) {
+  const stepMode = isStepMode(game);
+  const steps = stepMode ? stepCost(game, { kind: 'slot', index: menu.index }) : 0;
+  return TURRET_TYPE_KEYS.map((type) => {
+    const affordable = canAfford(game.resources, buildCost(type));
+    const enoughSteps = !stepMode || steps <= game.stepsRemaining;
+    const disabled = stepMode
+      ? !affordable || !enoughSteps || game.action.state !== ActionState.IDLE
+      : !canStartBuild(game, menu.index, type);
+    const reason = !affordable ? 'Not enough resources' : !enoughSteps ? 'Not enough steps' : '';
+    return {
+      title: turretType(type).name, portrait: type, cost: buildCost(type), costText: null,
+      detail: turretSummary(type), action: 'Build', disabled, reason, turretType: type,
+    };
+  });
+}
+
+// Header line above a menu's options, or null: the travel cost of a step-mode build (M1f §5.2).
+function menuHeader(game, menu) {
+  if (menu.kind !== 'build' || !isStepMode(game)) return null;
+  const steps = stepCost(game, { kind: 'slot', index: menu.index });
+  return { text: `Travel: ${steps} ${steps === 1 ? 'step' : 'steps'}`, warn: steps > game.stepsRemaining };
+}
+
+const SUMMON_DETAIL = {
+  vulture: `Lasts ${C.VULTURE_DURATION} s · flies to the wolf nearest to it`,
+  squirrel: `Lasts ${C.SQUIRREL_DURATION} s · collects the nearest drop`
+    + (C.SQUIRREL_BLOCKS_WOLVES ? ' · blocks wolves while waiting' : ''),
+};
+
+// The options a menu shows, each { title, portrait, cost, costText, detail, action, disabled, reason }.
+// portrait: entity image key (portraits.js) or null. cost: shown as cost rows (M1f §3); or
+// costText instead (e.g. "Max level"). action: button label, or null for none. Every option
+// card is clickable as a whole while not disabled (M1f §2).
+function menuOptions(game, menu) {
+  if (menu.kind === 'build') return buildOptions(game, menu);
+  if (menu.kind === 'summon') {
+    // Druid menu (§15.1, M1d §2.1, M1f §2): one card per summon with its image; greyed out with a
+    // reason if the Druid is not idle, it is at its own cap, or it is unaffordable.
+    return Object.entries(SUMMONS).map(([kind, s]) => {
+      const { available, reason } = summonAvailability(game, kind);
+      return {
+        title: `Summon ${s.name}`, portrait: kind, cost: s.cost, costText: null,
+        detail: `Active: ${s.active(game).length} / ${s.max}\n${SUMMON_DETAIL[kind]}`,
+        action: null, disabled: !available, reason,
+      };
+    });
+  }
+  // Turret menu (§11.1, M1e §4.3, M1f §5.1): the next level's cost and gains; at the top level
+  // "Max level", or "No upgrades available" for a type with only one level; no option either way.
+  const turret = turretOnSlot(game, menu.index);
+  if (!turret) return [];
+  const name = turretType(turret.type).name;
+  const next = nextLevelStats(turret);
+  if (!next) {
+    const costText = maxLevel(turret.type) === 1 ? 'No upgrades available' : 'Max level';
+    return [{ title: `${name} · level ${turret.level}`, portrait: null, cost: null, costText, detail: '', action: null, disabled: true, reason: '' }];
+  }
+  const { available, reason } = upgradeAvailability(game, menu.index);
+  return [{
+    title: `${name}: upgrade to level ${turret.level + 1}`, portrait: null, cost: next.cost, costText: null,
+    detail: upgradeDetail(turret.type, turret.level + 1), action: 'Upgrade', disabled: !available, reason,
+  }];
+}
+
+function createMenuOption(index, option) {
+  const card = document.createElement('div');
+  card.className = 'menu-option';
+  card.dataset.option = String(index);
+  if (option.portrait) card.append(portraitCanvas(option.portrait));
+  const body = document.createElement('div');
+  body.className = 'menu-body';
+  for (const part of ['title', 'cost', 'detail']) {
+    const div = document.createElement('div');
+    div.className = `menu-${part}`;
+    body.append(div);
+  }
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'menu-action';
+  const reason = document.createElement('div');
+  reason.className = 'menu-reason';
+  body.append(button, reason);
+  card.append(body);
+  return card;
+}
+
+// Contextual menu (§9.2, §11.1, §15.1, §16.2): build menu in Prep; turret and Druid menus in
+// Combat. Each option is greyed out with its cost and a reason when it cannot be confirmed.
+function updateMenu(el, game, view, prevKey, hoverIndex) {
   const menu = view.menu;
   el.menu.hidden = !menu;
+  view.menuHoverType = null;
   if (!menu) return null;
 
-  if (menu.kind === 'build') {
-    const affordable = canAfford(game.resources, C.TURRET_COST);
-    setText(el.menuTitle, 'Pebble Sprinkler');
-    setText(el.menuCost, formatCost(C.TURRET_COST));
-    setText(el.menuDetail, '');
-    setText(el.menuAction, 'Build');
-    setText(el.menuReason, affordable ? '' : 'Not enough resources');
-    el.menuAction.hidden = false;
-    el.menuAction.disabled = !canStartBuild(game, menu.index);
-    el.menu.classList.toggle('unavailable', !affordable);
-  } else if (menu.kind === 'summon') {
-    // Druid menu (§15.1): greyed out with a reason if not idle, at the Vulture cap, or short of Feathers.
-    const { available, reason } = summonAvailability(game);
-    setText(el.menuTitle, 'Summon Vulture');
-    setText(el.menuCost, formatCost(C.VULTURE_COST));
-    setText(el.menuDetail, `Active: ${game.vultures.length} / ${C.MAX_VULTURES}
-Lasts ${C.VULTURE_DURATION} s · flies to the wolf nearest to it`);
-    setText(el.menuAction, 'Summon');
-    setText(el.menuReason, reason);
-    el.menuAction.hidden = false;
-    el.menuAction.disabled = !available;
-    el.menu.classList.toggle('unavailable', !canAfford(game.resources, C.VULTURE_COST));
-  } else if (menu.kind === 'upgrade') {
-    const turret = turretOnSlot(game, menu.index);
-    const { available, reason } = upgradeAvailability(game, menu.index);
-    if (turret?.upgraded) {
-      // Already upgraded: shows "Upgraded" with no option (§11.1).
-      setText(el.menuTitle, 'Pebble Sprinkler');
-      setText(el.menuCost, 'Upgraded');
-      setText(el.menuDetail, '');
-      setText(el.menuReason, '');
-      el.menuAction.hidden = true;
-      el.menu.classList.remove('unavailable');
-    } else {
-      setText(el.menuTitle, 'Upgrade');
-      setText(el.menuCost, formatCost(C.UPGRADE_COST));
-      setText(el.menuDetail, UPGRADE_DETAIL);
-      setText(el.menuAction, 'Upgrade');
-      setText(el.menuReason, reason);
-      el.menuAction.hidden = false;
-      el.menuAction.disabled = !available;
-      el.menu.classList.toggle('unavailable', !canAfford(game.resources, C.UPGRADE_COST));
-    }
+  const options = menuOptions(game, menu);
+  if (menu.kind === 'build' && hoverIndex !== null) view.menuHoverType = options[hoverIndex]?.turretType ?? null;
+  const header = menuHeader(game, menu);
+  el.menuHeader.hidden = !header;
+  if (header) {
+    setText(el.menuHeader, header.text);
+    el.menuHeader.classList.toggle('warn', header.warn);
   }
-
   const key = `${menu.kind}:${menu.index}`;
+  if (key !== prevKey || el.menuOptions.children.length !== options.length) {
+    el.menuOptions.replaceChildren(...options.map((o, i) => createMenuOption(i, o)));
+  }
+  options.forEach((o, i) => {
+    const node = el.menuOptions.children[i];
+    setText(node.querySelector('.menu-title'), o.title);
+    // Cost rows are rebuilt only when what they show changes.
+    const costBox = node.querySelector('.menu-cost');
+    const costKey = o.cost ? costRowsKey(o.cost, game.resources) : `text:${o.costText}`;
+    if (costBox.dataset.key !== costKey) {
+      costBox.dataset.key = costKey;
+      costBox.replaceChildren(o.cost ? costRowsElement(o.cost, game.resources) : document.createTextNode(o.costText ?? ''));
+    }
+    setText(node.querySelector('.menu-detail'), o.detail);
+    setText(node.querySelector('.menu-reason'), o.reason);
+    const button = node.querySelector('.menu-action');
+    setText(button, o.action ?? '');
+    button.hidden = !o.action;
+    button.disabled = o.disabled;
+    node.classList.toggle('disabled', o.disabled);
+    node.classList.toggle('clickable', !o.disabled);
+  });
+
   if (key !== prevKey) {
     if (menu.kind === 'summon') {
       const d = druidDisplayPos(game);
@@ -318,7 +486,8 @@ function updateEndOverlay(el, game) {
   if (!ended) return;
   setText(el.endTitle, game.state);
   el.endOverlay.dataset.result = game.state;
-  setText(el.endStats, `Combat time ${formatTime(game.combatTime)}  ·  Wolves killed ${game.wolvesKilled} / ${C.WAVE_TOTAL}`);
+  const totals = enemyTotals(game);
+  setText(el.endStats, `Combat time ${formatTime(game.combatTime)}  ·  Enemies killed ${totals.killed} / ${totals.total}`);
 }
 
 function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
@@ -326,7 +495,8 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
   if (!view.debug) return;
   const speed = clock.paused ? `PAUSED (×${clock.speed})` : `×${clock.speed}`;
   const a = game.action;
-  const target = a.state === ActionState.TRAVELLING ? `→ ${a.target.kind} #${a.target.index}` : `#${a.target}`;
+  const target = a.state === ActionState.TRAVELLING ? `→ ${a.target.kind} #${a.target.index}`
+    : a.state === ActionState.SUMMON_PLACEMENT ? a.target : `#${a.target}`;
   const action = a.target === null ? a.state : `${a.state} ${target} ${a.elapsed.toFixed(1)}/${a.duration.toFixed(1)} s`;
   const stepLines = [];
   if (isStepMode(game)) {
@@ -348,9 +518,12 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
     `FPS:    ${Math.round(view.fps)}`,
     '',
     `Druid HP: ${game.druidHp} / ${C.DRUID_HP}`,
-    `Wolves:   spawned ${game.wolvesSpawned}  alive ${game.wolvesAlive}  killed ${game.wolvesKilled}`,
+    druidMeleeLine(game),
+    ...enemyDebugLines(game),
     `Resources: Pits ${game.resources.pits}  Reeds ${game.resources.reeds}  Feathers ${game.resources.feathers}`,
-    `Turrets: ${game.turrets.length}  Pebbles in flight: ${game.projectiles.length}  Vultures: ${game.vultures.length}/${C.MAX_VULTURES}`,
+    `Turrets: ${game.turrets.length}  Pebbles in flight: ${game.projectiles.length}  Vultures: ${game.vultures.length}/${C.MAX_VULTURES}  Squirrels: ${game.squirrels.length}/${C.MAX_SQUIRRELS}${C.SQUIRREL_BLOCKS_WOLVES ? ' (block wolves)' : ''}`,
+    ...dropDebugLines(game),
+    ...turretDebugLines(game),
     ...layoutLines,
     ...runDebugLines(game, scene),
   ].join('\n'));

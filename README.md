@@ -25,8 +25,10 @@ Then open http://localhost:8000 in Chrome.
 | `L` | Restart with a new seed and layout, even if `DEBUG_SEED` is set — see `docs/M1C_LAYOUT_ADDENDUM.md` |
 | `M` | Toggle Prep mode (steps / timed) and restart — see `docs/M1B_STEPS_ADDENDUM.md` |
 | `U` | Undo the last step-mode Prep move (restores steps, position, resources, marker) |
-| `K` | Kill all living wolves (extra, not in the spec; handy for checking Victory) |
+| `K` | Kill all living enemies (extra, not in the spec; handy for checking Victory) |
+| `B` | Spawn a Bear at the start of a random lane (Combat only) — see `docs/M1E_ADDENDUM.md` |
 | `G` | Grant +10 of each resource |
+| `X` | Toggle wolf drop chances between ×1 and ×`DEBUG_DROP_MULT` (×10) — see `docs/M1D_DROPS_SQUIRREL_ADDENDUM.md` |
 | `Esc` / right-click | Close menu, otherwise cancel the current action |
 
 All tuning values and coordinates live in `js/config.js`.
