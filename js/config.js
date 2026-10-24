@@ -27,6 +27,10 @@ export const STEP_PX = 25;                 // TUNING — px of straight-line tra
 export const STEP_BUDGET = 96;             // TUNING — steps available in step-mode Prep (~2,250 px)
 export const TRAVEL_TWEEN_TIME = 0.35;     // TUNING — s, Druid's travel animation to a marker
 export const STEP_BAR_BLINK_HZ = 3;        // TUNING — red blink rate of the step bar on an unaffordable hover (§5.2)
+// M1g §2: footstep route preview (UI time, visual only).
+export const FOOTPRINT_SIDE_OFFSET = 5;    // TUNING — px each footprint sits left / right of the route line
+export const FOOTPRINT_REVEAL_TIME = 0.5;  // TUNING — s for the trail to appear from the Druid to the target, whatever the distance
+export const FOOTPRINT_FADE_TIME = 0.06;   // s each footprint takes to fade in
 export const CALIBRATION_SLOT_COUNT = 5;   // debug panel: "all features + N nearest slots" greedy figure (§8)
 export const CALIBRATION_TARGET_RATIO = 1.4; // that figure should be about this × STEP_BUDGET (§9 budget intent)
 
@@ -324,7 +328,7 @@ export const WAVE = {
 export const SQUIRREL_COST = { pits: 1, reeds: 0, feathers: 0 }; // TUNING
 export const SQUIRREL_HP = 15;              // TUNING
 export const SQUIRREL_DURATION = 12;        // TUNING — s
-export const SQUIRREL_SPEED = 140;          // TUNING — px/s, straight line, ignores terrain
+export const SQUIRREL_SPEED = 110;          // TUNING — px/s, straight line, ignores terrain
 export const MAX_SQUIRRELS = 3;             // TUNING — separate from MAX_VULTURES
 export const SQUIRREL_RADIUS = 12;          // TUNING
 export const SQUIRREL_PICKUP_RANGE = 14;    // TUNING — px, collects a drop within this distance
@@ -336,6 +340,45 @@ export const MENU_PORTRAIT_SIZE = 40;     // px, creature / turret images in men
 export const MENU_COST_ICON_SIZE = 18;    // px, resource icons in cost rows (M1f §3)
 export const DROP_ICON_SCALE = 0.7;       // drop icons on the ground, relative to RESOURCE_ICON_SIZE
 export const DROP_SPACING = 16;           // TUNING — px between items dropped by one wolf
+// M1g §1: drops pop out of the death point and arc to their resting spot (simulation time).
+export const DROP_POP_HEIGHT = 70;        // TUNING — px the arc rises above the straight line from death point to resting spot
+export const DROP_POP_TIME = 0.35;        // TUNING — s in the air; Squirrels can only target an item once it has landed
+export const DROP_POP_STAGGER = 0.2;      // TUNING — s between the launches of one enemy's items
+export const DROP_SETTLE_TIME = 0.08;     // s of squash-and-settle on landing (visual only)
+export const DROP_SINGLE_OFFSET = [6, 12]; // px along the lane a lone item lands from the death point, so it still arcs
+
+// ---------------------------------------------------------------------------
+// Sound (M1g §3) — synthesised in js/audio.js, triggered by gameplay events. Never affects the simulation.
+// ---------------------------------------------------------------------------
+export const MASTER_VOLUME = 0.5;         // TUNING — 0..1
+export const SOUND_PITCH_JITTER = 0.05;   // TUNING — each play is pitched up or down by up to this fraction
+// Per sound: volume (0..1, times MASTER_VOLUME), pitch (multiplier on the sound's base pitch),
+// minGap (s; a play within this of the previous one is skipped), maxVoices (skip if this many
+// are still sounding), enabled.
+export const SOUNDS = {
+  sprinklerFire: { volume: 0.25, pitch: 1, minGap: 0.06, maxVoices: 3, enabled: true }, // TUNING — plays often, keep subtle
+  toaderFire:    { volume: 0.6,  pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING
+  cloudBurst:    { volume: 0.4,  pitch: 1, minGap: 0.1,  maxVoices: 3, enabled: true }, // TUNING
+  wolfBite:      { volume: 0.5,  pitch: 1, minGap: 0.08, maxVoices: 3, enabled: true }, // TUNING — on the Druid or a summon
+  bearAttack:    { volume: 0.8,  pitch: 1, minGap: 0.12, maxVoices: 2, enabled: true }, // TUNING
+  druidWhoosh:   { volume: 0.4,  pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING — Druid strike swing
+  druidThud:     { volume: 0.6,  pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING — Druid strike impact
+  vulturePeck:   { volume: 0.4,  pitch: 1, minGap: 0.06, maxVoices: 3, enabled: true }, // TUNING
+  wolfDie:       { volume: 0.5,  pitch: 1, minGap: 0.08, maxVoices: 3, enabled: true }, // TUNING
+  bearDie:       { volume: 0.8,  pitch: 1, minGap: 0.2,  maxVoices: 2, enabled: true }, // TUNING
+  resourceChime: { volume: 0.45, pitch: 1, minGap: 0.05, maxVoices: 4, enabled: true }, // TUNING — one per collection event
+  searchRustle:  { volume: 0.5,  pitch: 1, minGap: 0.1,  maxVoices: 1, enabled: true }, // TUNING
+  build:         { volume: 0.6,  pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING — two wooden knocks
+  upgradeTick:   { volume: 0.3,  pitch: 1, minGap: 0.05, maxVoices: 2, enabled: true }, // TUNING — ratchet while upgrading
+  upgradeDone:   { volume: 0.55, pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING
+  summon:        { volume: 0.5,  pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING
+};
+export const SOUND_RESOURCE_FREQ = { pits: 440, reeds: 660, feathers: 990 }; // TUNING — Hz, chime pitch per resource (low / mid / high)
+export const SOUND_CHIME_STAGGER = 0.07;  // s between chimes when one search finds several resources
+export const SOUND_SUMMON_FREQ = { vulture: 330, squirrel: 880 }; // TUNING — Hz, shimmer base pitch per summon
+export const SOUND_UPGRADE_TICK_INTERVAL = 0.14; // TUNING — s of simulation time between ratchet ticks while upgrading
+export const SOUND_STATS_WINDOW = 5;      // s, debug panel: sounds played / skipped over this much real time (M1g §5)
+export const SOUND_MUTE_KEY = 'broceliande.muted'; // localStorage key for the mute state
 
 // ---------------------------------------------------------------------------
 // 17.9 Debug

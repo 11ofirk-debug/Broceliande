@@ -9,6 +9,7 @@ import { createProjectile } from '../entities/projectile.js';
 import { ActionState } from '../states.js';
 import { dropLoot } from './dropSystem.js';
 import { createCloud, isInsideCloud } from './cloudSystem.js';
+import { events } from '../events.js';
 
 // ---------------------------------------------------------------------------
 // Turrets (§10.2)
@@ -66,6 +67,7 @@ export function updateTurrets(game, dt) {
     if (turret.cooldown > 0) continue;
     game.projectiles.push(createProjectile(game.nextEntityId++, turretMuzzle(turret), target.id, turretDamage(turret),
       cloud ? 'pellet' : 'pebble', turret.type));
+    events.emit('turretFired', { type: turret.type, x: turret.x, y: turret.y });
     turret.lastFireTime = game.combatTime;
     turret.cooldown += turretFireInterval(turret); // carry the remainder so the rate is exact
   }
@@ -158,6 +160,7 @@ export function updateMelee(game, dt) {
       enemy.lastBiteTime = game.combatTime;
       game.druidHp = Math.max(0, game.druidHp - t.damage);
       game.druidLastHitTime = game.combatTime;
+      events.emit('enemyAttacked', { type: enemy.type, target: 'druid' });
     }
   }
 }
@@ -171,5 +174,6 @@ export function killEnemy(game, enemy) {
   for (const s of enemy.slots) game.meleeSlots[s].enemyId = null;
   game.enemyCounts[enemy.type].alive--;
   game.enemyCounts[enemy.type].killed++;
+  events.emit('enemyDied', { type: enemy.type, x: enemy.x, y: enemy.y });
   dropLoot(game, enemy);
 }

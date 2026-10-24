@@ -178,6 +178,43 @@ html, body {
 
 .hud-right {
   justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Mute toggle (M1g §3.6): speaker with waves when on, with a cross when muted. */
+#btn-mute {
+  background: none;
+  border: none;
+  padding: 4px;
+  line-height: 0;
+}
+
+#btn-mute svg {
+  fill: none;
+  stroke: #e9e4d0;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#btn-mute .speaker {
+  fill: #e9e4d0;
+}
+
+#btn-mute:hover svg {
+  stroke: #fff;
+}
+
+#btn-mute .cross,
+#btn-mute.muted .waves {
+  display: none;
+}
+
+#btn-mute.muted .cross {
+  display: inline;
+  stroke: #e8a064;
 }
 
 #btn-start-combat {

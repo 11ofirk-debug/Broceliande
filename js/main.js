@@ -11,6 +11,7 @@ import { pick } from './picking.js';
 import { ActionState } from './states.js';
 import { undoLastMove } from './systems/actionSystem.js';
 import { toggleDropMult } from './systems/dropSystem.js';
+import { initAudio, toggleMute } from './audio.js';
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('game-canvas');
@@ -53,11 +54,14 @@ function restart(options) {
   interaction.closeMenu();
 }
 
+initAudio(); // M1g §3: subscribes to gameplay events; starts on the first click or key press
+
 const renderer = createRenderer(canvas, scene);
 const ui = createUI(scene, {
   onStartCombat: () => interaction.onStartCombat(),
   onRestart: restart,
   onMenuAction: (option) => interaction.onMenuAction(option),
+  onToggleMute: toggleMute,
 });
 
 const input = createInput(stage, canvas, () => scale, {
@@ -84,6 +88,7 @@ const input = createInput(stage, canvas, () => scale, {
       case 'k': killAllEnemies(game); break; // extra debug key (not in §18.1): kill all living enemies
       case 'b': spawnDebugBear(game); break;  // M1e §6: spawn a Bear at the start of a random lane (Combat only)
       case 'g': grantResources(game); break;
+      case 'v': toggleMute(); break;                    // M1g §3.6: mute / unmute sound
       case 'x': toggleDropMult(game); break;            // M1d §3: enemy drop chances ×1 / ×DEBUG_DROP_MULT
       case 'Escape': interaction.onEscape(); break;
       default: break;

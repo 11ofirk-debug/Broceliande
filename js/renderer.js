@@ -13,6 +13,7 @@ import {
 import { turretRange, levelRange, maxLevel, turretType } from './entities/turret.js';
 import { druidDisplayPos, actionTargetPos, isTimedAction, isUpgradingSlot } from './systems/actionSystem.js';
 import { isStepMode, routePreview } from './systems/stepSystem.js';
+import { footprintLayout, drawFootsteps } from './render/footsteps.js';
 import { animationTime } from './game.js';
 
 const HIT_FLASH_TIME = 0.15; // s of hit flash on the Druid (bite) or an enemy (pebble); visual only
@@ -24,9 +25,6 @@ const COLORS = {
   hudBackdrop: '#10160e',
   marker: '#ffe066',
   trail: 'rgba(245, 232, 190, 0.32)',   // route so far (M1b §5.5)
-  preview: 'rgba(250, 240, 205, 0.95)', // route preview (M1b §5.2.2)
-  previewBad: 'rgba(235, 85, 58, 0.95)', // preview when unaffordable (§5.2.4)
-  labelBg: 'rgba(16, 22, 14, 0.85)',
 };
 
 export function createRenderer(canvas, scene) {
@@ -97,8 +95,7 @@ export function createRenderer(canvas, scene) {
     // Nothing can hurt the Druid in Prep, so his world HP bar only appears from Combat on.
     if (!isPrep) drawDruidHpBar(ctx, druidPos.x, druidPos.y, game.druidHp);
     drawActionProgress(ctx, game, druidPos);
-    const preview = routePreview(game, hover);
-    if (preview) drawRoutePreview(ctx, preview);
+    drawFootstepPreview(ctx, game, hover);
     for (const t of game.floatingTexts) {
       drawFloatingText(ctx, t.text, t.x, t.y - (t.age / C.FLOATING_TEXT_TIME) * C.FLOATING_TEXT_RISE, t.age / C.FLOATING_TEXT_TIME, t.small);
     }
@@ -177,38 +174,23 @@ function drawRouteTrail(ctx, route) {
   ctx.restore();
 }
 
-// Dashed line from the Druid's position to the hovered marker, with the step cost at its
-// midpoint; red when the marker costs more than what's left (M1b §5.2.2, §5.2.4).
-function drawRoutePreview(ctx, { from, to, cost, affordable }) {
-  const color = affordable ? COLORS.preview : COLORS.previewBad;
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-  ctx.setLineDash([12, 10]);
-  ctx.beginPath();
-  ctx.moveTo(from.x, from.y);
-  ctx.lineTo(to.x, to.y);
-  ctx.stroke();
-  ctx.setLineDash([]);
+// Footstep route preview (M1g §2): which trail is showing and when it started (real time, so
+// it still animates while debug-paused). Moving within the same marker keeps the trail; a new
+// marker, or the Druid having moved, starts a new one.
+let footsteps = { key: null, start: 0 };
 
-  const text = `${cost} ${cost === 1 ? 'step' : 'steps'}`;
-  const mx = (from.x + to.x) / 2;
-  const my = (from.y + to.y) / 2;
-  ctx.font = 'bold 20px Georgia, serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const w = ctx.measureText(text).width + 16;
-  ctx.fillStyle = COLORS.labelBg;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.roundRect(mx - w / 2, my - 15, w, 30, 6);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = color;
-  ctx.fillText(text, mx, my + 1);
-  ctx.restore();
+function drawFootstepPreview(ctx, game, hover) {
+  const preview = routePreview(game, hover);
+  if (!preview) {
+    footsteps.key = null;
+    return;
+  }
+  const key = `${hover.kind}:${hover.index}:${preview.from.x},${preview.from.y}`;
+  const now = performance.now() / 1000;
+  if (key !== footsteps.key) footsteps = { key, start: now };
+  const fromMarker = preview.from.x !== C.DRUID_POS.x || preview.from.y !== C.DRUID_POS.y;
+  const prints = footprintLayout(preview.from, preview.to, preview.cost, fromMarker);
+  drawFootsteps(ctx, prints, now - footsteps.start, preview.cost, preview.affordable);
 }
 
 const DEFEAT_FALL_TIME = 0.4; // s for the defeated Druid to tip over (visual only)

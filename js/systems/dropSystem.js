@@ -67,15 +67,38 @@ function rowPositions(lane, anchor, n) {
 
 // Called when an enemy dies. Each unit becomes its own item (§1.2), in a short row along the
 // lane centred on the death point.
+// Items pop out of the death point and arc to their resting spot (M1g §1): (x, y) is where the
+// item comes to rest; (fromX, fromY) where it was launched from. They launch DROP_POP_STAGGER
+// apart in the order rolled, and only count as on the ground (for Squirrels) once landed.
 export function dropLoot(game, enemy) {
   const units = rollDrops(game, enemyType(enemy).drops);
   if (units.length === 0) return;
-  const positions = rowPositions(enemy.lane, laneAnchor(enemy.lane, enemy), units.length);
+  const anchor = laneAnchor(enemy.lane, enemy);
+  if (units.length === 1) {
+    // A lone item lands a few px along the lane, so it still visibly arcs (seeded).
+    const shift = game.rng.range(C.DROP_SINGLE_OFFSET[0], C.DROP_SINGLE_OFFSET[1]) * (game.rng.next() < 0.5 ? -1 : 1);
+    anchor.s = Math.max(0, Math.min(enemy.lane.path.length, anchor.s + shift));
+  }
+  const positions = rowPositions(enemy.lane, anchor, units.length);
   units.forEach((resource, i) => {
     const p = positions[i];
-    game.drops.push({ id: game.nextEntityId++, resource, x: p.x, y: p.y, lane: enemy.lane.id, claimedBy: null });
+    game.drops.push({
+      id: game.nextEntityId++, resource, x: p.x, y: p.y, lane: enemy.lane.id, claimedBy: null,
+      fromX: enemy.x, fromY: enemy.y, delay: i * C.DROP_POP_STAGGER, age: 0,
+    });
     game.dropStats.dropped[resource]++;
   });
+}
+
+// Whether a drop has finished its pop and lies on the ground (M1g §1.3).
+export function isLanded(drop) {
+  return drop.age >= drop.delay + C.DROP_POP_TIME;
+}
+
+// Drops age in simulation time during Combat only, so they respect pause and speed and freeze
+// in the air during ENDING (M1g §1.3).
+export function updateDrops(game, dt) {
+  for (const drop of game.drops) drop.age += dt;
 }
 
 // Debug key X (§3): drop chances ×1 ↔ ×DEBUG_DROP_MULT. Kept across restarts.

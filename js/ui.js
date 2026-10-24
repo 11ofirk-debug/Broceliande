@@ -15,6 +15,7 @@ import { turretOnSlot } from './systems/buildSystem.js';
 import { buildCost, levelStats, levelRange, nextLevelStats, maxLevel, turretType, TURRET_TYPE_KEYS } from './entities/turret.js';
 import { isStepMode, stepCost, canVisit, anyVisitable, routePreview, calibrationFigures, affordableTurretTypes } from './systems/stepSystem.js';
 import { enemyTotals, WAVE_COUNTS } from './game.js';
+import { isMuted, soundStats, audioStatus } from './audio.js';
 
 const RESOURCE_LABELS = { pits: 'Peach Pits', reeds: 'Reeds', feathers: 'Feathers' };
 const POPUP_GAP = 16; // px between a world object and its tooltip/menu
@@ -95,6 +96,17 @@ function dropDebugLines(game) {
   ];
 }
 
+// Sounds played / skipped by minGap or maxVoices over the last few seconds (M1g §5).
+function soundDebugLines() {
+  const stats = soundStats();
+  const lines = ['', `Sound: ${audioStatus()}  (V mutes)  last ${C.SOUND_STATS_WINDOW} s — played / skipped gap / skipped cap`];
+  for (const [name, s] of Object.entries(stats)) {
+    lines.push(`  ${name.padEnd(14)} ${String(s.played).padStart(3)} / ${String(s.gap).padStart(3)} / ${String(s.cap).padStart(3)}`);
+  }
+  if (lines.length === 2) lines.push('  (none)');
+  return lines;
+}
+
 // This run's layout lines for the debug panel (M1c §6.3, M1b §8). Recomputed each frame;
 // the layout only changes on restart.
 function runDebugLines(game, scene) {
@@ -150,6 +162,7 @@ export function createUI(scene, callbacks) {
       feathers: document.getElementById('res-feathers'),
     },
     startCombat: document.getElementById('btn-start-combat'),
+    mute: document.getElementById('btn-mute'),
     endOverlay: document.getElementById('end-overlay'),
     endTitle: document.getElementById('end-title'),
     endStats: document.getElementById('end-stats'),
@@ -172,6 +185,10 @@ export function createUI(scene, callbacks) {
   el.stepsBar.style.setProperty('--blink-period', `${1 / C.STEP_BAR_BLINK_HZ}s`);
   el.startCombat.addEventListener('click', () => callbacks.onStartCombat());
   el.restart.addEventListener('click', () => callbacks.onRestart());
+  el.mute.addEventListener('click', () => {
+    callbacks.onToggleMute();
+    el.mute.blur(); // so Space / Enter later don't toggle it again
+  });
   // Menu option buttons are created per menu (see updateMenu); clicks report the option index.
   // The whole option card is the click target (M1f §2), button or not.
   el.menu.addEventListener('click', (e) => {
@@ -226,6 +243,11 @@ function updateHud(el, game) {
   const totals = enemyTotals(game);
   setText(el.wolves, isCombat ? `Enemies: ${totals.remaining} / ${totals.total}` : '');
   el.startCombat.hidden = !isPrep;
+  const muted = isMuted();
+  if (el.mute.classList.contains('muted') !== muted) {
+    el.mute.classList.toggle('muted', muted);
+    el.mute.title = muted ? 'Sound muted (V to unmute)' : 'Sound on (V to mute)';
+  }
   setText(el.startCombat, isStepMode(game) ? 'Start Battle' : 'Start Combat');
   // Nothing left to click: prompt the player to start (M1b §5.6).
   el.startCombat.classList.toggle('pulse', isPrep && isStepMode(game) && !isTravelling(game) && !anyVisitable(game));
@@ -524,6 +546,7 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
     `Turrets: ${game.turrets.length}  Pebbles in flight: ${game.projectiles.length}  Vultures: ${game.vultures.length}/${C.MAX_VULTURES}  Squirrels: ${game.squirrels.length}/${C.MAX_SQUIRRELS}${C.SQUIRREL_BLOCKS_WOLVES ? ' (block wolves)' : ''}`,
     ...dropDebugLines(game),
     ...turretDebugLines(game),
+    ...soundDebugLines(),
     ...layoutLines,
     ...runDebugLines(game, scene),
   ].join('\n'));

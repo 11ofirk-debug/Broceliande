@@ -6,6 +6,7 @@
 
 import { turretType } from '../entities/turret.js';
 import { damageEnemy } from './combatSystem.js';
+import { events } from '../events.js';
 
 const TICK_EPSILON = 1e-9; // s, so 0.8 s of 1/60 s steps ticks on time
 
@@ -15,6 +16,7 @@ function cloudSpec(cloud) {
 
 export function createCloud(game, x, y, source) {
   game.clouds.push({ id: game.nextEntityId++, x, y, source, age: 0, ticks: 0 });
+  events.emit('cloudBurst', { x, y });
 }
 
 function overlaps(cloud, enemy) {

@@ -10,6 +10,7 @@ import { ActionState } from '../states.js';
 import { EnemyState } from '../entities/enemy.js';
 import { damageEnemy } from './combatSystem.js';
 import { addFloatingText } from '../effects.js';
+import { events } from '../events.js';
 
 const TIMER_EPSILON = 1e-9; // s
 export const STRIKE_LEAD = C.STRIKE_WINDUP_TIME + C.STRIKE_SWING_TIME; // s from strike start to impact
@@ -44,6 +45,11 @@ function startStrike(game, target, fromReady) {
   game.druidStrike = { elapsed: 0, targetId: target.id, dirX: dx / len, dirY: dy / len, fromReady, impactAt: null };
 }
 
+// s until this strike's impact lands.
+function timeToImpact(game, strike) {
+  return strike.fromReady ? STRIKE_LEAD - strike.elapsed : C.DRUID_MELEE_INTERVAL - game.druidMeleeTimer;
+}
+
 function impactDue(game, strike) {
   return strike.fromReady
     ? strike.elapsed >= STRIKE_LEAD - TIMER_EPSILON
@@ -70,6 +76,7 @@ function impact(game) {
   game.sparks.push({ x: target.x, y: target.y - target.radius * 0.8, age: 0 });
   target.knockDir = { x: strike.dirX, y: strike.dirY };
   target.lastKnockTime = game.combatTime; // visual knock-back only; position is not touched
+  events.emit('druidImpact', { x: target.x, y: target.y });
   addFloatingText(game, `-${C.DRUID_MELEE_DAMAGE}`, target.x, target.y - target.radius * 2, true);
   damageEnemy(game, target, C.DRUID_MELEE_DAMAGE);
 }
@@ -93,6 +100,11 @@ export function updateDruidMelee(game, dt) {
   const strike = game.druidStrike;
   if (strike) {
     strike.elapsed += dt;
+    // Sound cue (M1g §3.4): the whoosh starts with the swing, so the thud falls on the impact.
+    if (strike.impactAt === null && !strike.swung && timeToImpact(game, strike) <= C.STRIKE_SWING_TIME + TIMER_EPSILON) {
+      strike.swung = true;
+      events.emit('druidSwing', {});
+    }
     if (strike.impactAt === null && impactDue(game, strike)) impact(game);
     if (strike.impactAt !== null && strike.elapsed >= strike.impactAt + C.STRIKE_RECOVER_TIME - TIMER_EPSILON) game.druidStrike = null;
   }

@@ -8,7 +8,7 @@ import { updateMelee, killEnemy, updateTurrets, updateProjectiles } from './syst
 import { createIdleAction, updateAction, enforceActionAllowed } from './systems/actionSystem.js';
 import { createFeatures } from './entities/searchableFeature.js';
 import { generateLayout } from './layout.js';
-import { emptyDropStats } from './systems/dropSystem.js';
+import { emptyDropStats, updateDrops } from './systems/dropSystem.js';
 import { emptyResources, add } from './resources.js';
 import { updateEffects } from './effects.js';
 import { updateVultures, updateBlocking, expireVultures } from './systems/vultureSystem.js';
@@ -259,6 +259,7 @@ export function updateGame(game, dt) {
       updateProjectiles(game, dt);
       updateClouds(game, dt);
       updateVultures(game, dt);
+      updateDrops(game, dt);         // drop pop flight (M1g §1); before Squirrels so a just-landed item can be claimed
       updateSquirrels(game, dt);
       updateMelee(game, dt);
       expireVultures(game, dt);

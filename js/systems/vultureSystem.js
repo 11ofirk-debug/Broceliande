@@ -6,6 +6,7 @@ import { VultureState } from '../entities/vulture.js';
 import { damageEnemy } from './combatSystem.js';
 import { enemyType } from '../entities/enemy.js';
 import { blockingSquirrels } from './squirrelSystem.js';
+import { events } from '../events.js';
 
 // Geometric tolerance (px) so a Vulture landing exactly at melee range does not flicker
 // between landed and flying from rounding error (which would reset its attack timer).
@@ -64,6 +65,7 @@ export function updateVultures(game, dt) {
       if (v.attackTimer >= C.VULTURE_ATTACK_INTERVAL) {
         v.attackTimer -= C.VULTURE_ATTACK_INTERVAL;
         v.lastPeckTime = game.combatTime;
+        events.emit('vulturePecked', { x: v.x, y: v.y });
         damageEnemy(game, target, C.VULTURE_DAMAGE); // if it dies, next step picks a new target
       }
     }
@@ -104,6 +106,7 @@ export function updateBlocking(game, dt) {
       enemy.lastBiteTime = game.combatTime;
       blocker.hp -= t.damage;
       blocker.lastHitTime = game.combatTime;
+      events.emit('enemyAttacked', { type: enemy.type, target: 'summon' });
     }
   }
 }

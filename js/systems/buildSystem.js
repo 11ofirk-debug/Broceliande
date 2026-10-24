@@ -3,6 +3,7 @@
 
 import { canAfford, deduct } from '../resources.js';
 import { createTurret, buildCost, nextLevelStats } from '../entities/turret.js';
+import { events } from '../events.js';
 
 export function turretOnSlot(game, slotIndex) {
   return game.turrets.find((t) => t.slotIndex === slotIndex) ?? null;
@@ -19,6 +20,7 @@ export function completeBuild(game, slotIndex, type) {
   }
   deduct(game.resources, cost);
   game.turrets.push(createTurret(game.nextEntityId++, slotIndex, game.slots[slotIndex], type));
+  events.emit('turretBuilt', { slotIndex, type });
 }
 
 // Upgrade completion: deduct the next level's cost, then go up one level. Fails with no
@@ -33,4 +35,5 @@ export function completeUpgrade(game, slotIndex) {
   }
   deduct(game.resources, next.cost);
   turret.level++;
+  events.emit('upgradeCompleted', { slotIndex, level: turret.level });
 }

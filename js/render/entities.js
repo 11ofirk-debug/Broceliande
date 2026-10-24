@@ -104,13 +104,35 @@ const DROP_BOB_PX = 1.5;
 const DROP_BOB_PERIOD = 2.4;   // s
 const DROP_GLOW_ALPHA = [0.16, 0.34];
 
-// A dropped resource item on the ground: the shared HUD icon at DROP_ICON_SCALE (M1d §1.3).
-// t: seconds (wall clock, for the idle effect only).
+// A dropped resource item: the shared HUD icon at DROP_ICON_SCALE (M1d §1.3).
+// M1g §1: before its launch it is not drawn; in the air it follows a parabola from the death
+// point to its resting spot, DROP_POP_HEIGHT above the straight line, with a ground shadow that
+// shrinks as it rises; on landing it squashes and settles, then rests with the idle bob and glow.
+// t: seconds (wall clock, for the idle effect only); the flight uses the drop's simulation age.
 export function drawDrop(ctx, drop, t) {
   const size = C.RESOURCE_ICON_SIZE * C.DROP_ICON_SCALE;
-  const phase = Math.sin((t / DROP_BOB_PERIOD + drop.id * 0.37) * Math.PI * 2);
-  const glow = DROP_GLOW_ALPHA[0] + (DROP_GLOW_ALPHA[1] - DROP_GLOW_ALPHA[0]) * (phase + 1) / 2;
+  const img = resourceIconImage(drop.resource);
+  const flight = drop.age - drop.delay;
+  if (flight < 0) return; // not launched yet
+
   ctx.save();
+  if (flight < C.DROP_POP_TIME) {
+    const p = flight / C.DROP_POP_TIME;
+    const gx = drop.fromX + (drop.x - drop.fromX) * p;
+    const gy = drop.fromY + (drop.y - drop.fromY) * p;
+    const h = 4 * C.DROP_POP_HEIGHT * p * (1 - p);
+    const shrink = 1 - 0.45 * (h / C.DROP_POP_HEIGHT);
+    drawShadow(ctx, gx, gy + size * 0.42, size * 0.32 * shrink, size * 0.1 * shrink);
+    if (img.complete) ctx.drawImage(img, gx - size / 2, gy - size / 2 - h, size, size);
+    ctx.restore();
+    return;
+  }
+
+  // Squash on touchdown, settling back to shape over DROP_SETTLE_TIME.
+  const settle = Math.min(1, (flight - C.DROP_POP_TIME) / C.DROP_SETTLE_TIME);
+  const squash = 0.28 * (1 - settle);
+  const phase = settle < 1 ? 0 : Math.sin((t / DROP_BOB_PERIOD + drop.id * 0.37) * Math.PI * 2);
+  const glow = (DROP_GLOW_ALPHA[0] + (DROP_GLOW_ALPHA[1] - DROP_GLOW_ALPHA[0]) * (phase + 1) / 2) * settle;
   const g = ctx.createRadialGradient(drop.x, drop.y, 0, drop.x, drop.y, size * 0.6);
   g.addColorStop(0, `rgba(255, 240, 190, ${glow})`);
   g.addColorStop(1, 'rgba(255, 240, 190, 0)');
@@ -119,8 +141,12 @@ export function drawDrop(ctx, drop, t) {
   ctx.arc(drop.x, drop.y, size * 0.6, 0, Math.PI * 2);
   ctx.fill();
   drawShadow(ctx, drop.x, drop.y + size * 0.42, size * 0.32, size * 0.1);
-  const img = resourceIconImage(drop.resource);
-  if (img.complete) ctx.drawImage(img, drop.x - size / 2, drop.y - size / 2 - phase * DROP_BOB_PX, size, size);
+  if (img.complete) {
+    const w = size * (1 + squash * 0.6);
+    const h = size * (1 - squash);
+    const bottom = drop.y + size / 2 - phase * DROP_BOB_PX; // squash anchored at the bottom
+    ctx.drawImage(img, drop.x - w / 2, bottom - h, w, h);
+  }
   ctx.restore();
 }
 

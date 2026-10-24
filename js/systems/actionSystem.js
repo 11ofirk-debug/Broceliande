@@ -11,6 +11,7 @@ import { createVulture } from '../entities/vulture.js';
 import { createSquirrel } from '../entities/squirrel.js';
 import { canVisit, stepCost, markerPos } from './stepSystem.js';
 import { buildCost, buildTime, nextLevelStats } from '../entities/turret.js';
+import { events } from '../events.js';
 
 // Timed actions show a progress bar and can be cancelled. TRAVELLING is neither:
 // its steps are already spent and input is ignored until it lands (M1b §5.3).
@@ -40,7 +41,9 @@ export function startSearch(game, featureIndex) {
   if (feature.exhausted) return false;
   const a = game.action;
   if (a.state === ActionState.SEARCHING && a.target === featureIndex) return false;
-  return setAction(game, ActionState.SEARCHING, featureIndex, searchTime(feature));
+  if (!setAction(game, ActionState.SEARCHING, featureIndex, searchTime(feature))) return false;
+  events.emit('searchStarted', { featureIndex });
+  return true;
 }
 
 // Whether a slot can take a build order for a turret type now (used by the build menu too).
@@ -109,8 +112,12 @@ export function undoLastMove(game) {
 function completeTravel(game, marker, turretType) {
   game.druidPos = markerPos(game, marker);
   game.route.push(game.druidPos);
-  if (marker.kind === 'feature') completeSearch(game, marker.index);
-  else completeBuild(game, marker.index, turretType);
+  if (marker.kind === 'feature') {
+    events.emit('searchStarted', { featureIndex: marker.index }); // step mode: rustle and chimes both on arrival
+    completeSearch(game, marker.index);
+  } else {
+    completeBuild(game, marker.index, turretType);
+  }
 }
 
 // Upgrade menu state for a turret (§11.1, M1e §4.3): { available, reason } for the next level. Only
@@ -137,8 +144,8 @@ export function startUpgrade(game, slotIndex) {
 
 // The two summons (§15, M1d §2), in Druid-menu order. Each has its own cost and its own cap.
 export const SUMMONS = {
-  vulture: { name: 'Vulture', plural: 'Vultures', cost: C.VULTURE_COST, max: C.MAX_VULTURES, active: (g) => g.vultures, create: createVulture },
-  squirrel: { name: 'Squirrel', plural: 'Squirrels', cost: C.SQUIRREL_COST, max: C.MAX_SQUIRRELS, active: (g) => g.squirrels, create: createSquirrel },
+  vulture: { kind: 'vulture', name: 'Vulture', plural: 'Vultures', cost: C.VULTURE_COST, max: C.MAX_VULTURES, active: (g) => g.vultures, create: createVulture },
+  squirrel: { kind: 'squirrel', name: 'Squirrel', plural: 'Squirrels', cost: C.SQUIRREL_COST, max: C.MAX_SQUIRRELS, active: (g) => g.squirrels, create: createSquirrel },
 };
 
 // "Not enough Feathers" / "Not enough Pits, Feathers": the resources the cost is short of.
@@ -181,6 +188,7 @@ export function placeSummon(game, p) {
   if (s.active(game).length >= s.max || !canAfford(game.resources, s.cost)) return false;
   deduct(game.resources, s.cost);
   s.active(game).push(s.create(game.nextEntityId++, p.x, p.y));
+  events.emit('summonPlaced', { kind: s.kind, x: p.x, y: p.y });
   return true;
 }
 
@@ -209,7 +217,15 @@ export function updateAction(game, dt) {
   }
   if (!isTimedAction(a)) return;
   a.elapsed += dt;
-  if (a.elapsed < a.duration) return;
+  if (a.elapsed < a.duration) {
+    // Ratchet ticks while upgrading (M1g §3.4), in simulation time, so they stop on cancel or pause.
+    const ticks = Math.floor(a.elapsed / C.SOUND_UPGRADE_TICK_INTERVAL);
+    if (a.state === ActionState.UPGRADING && ticks > (a.ticks ?? 0)) {
+      a.ticks = ticks;
+      events.emit('upgradeTick', { slotIndex: a.target });
+    }
+    return;
+  }
 
   if (a.state === ActionState.SEARCHING) completeSearch(game, a.target);
   else if (a.state === ActionState.BUILDING) completeBuild(game, a.target, a.turretType);

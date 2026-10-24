@@ -5,12 +5,14 @@ import * as C from '../config.js';
 import { SquirrelState } from '../entities/squirrel.js';
 import { add, resourceName } from '../resources.js';
 import { addFloatingText } from '../effects.js';
+import { isLanded } from './dropSystem.js';
+import { events } from '../events.js';
 
 function nearestUnclaimedDrop(game, s) {
   let best = null;
   let bestDist = Infinity;
   for (const drop of game.drops) {
-    if (drop.claimedBy !== null) continue;
+    if (drop.claimedBy !== null || !isLanded(drop)) continue; // only landed items (M1g §1.3)
     const d = Math.hypot(drop.x - s.x, drop.y - s.y);
     if (d < bestDist) {
       bestDist = d;
@@ -35,6 +37,7 @@ function collect(game, s, drop) {
   game.dropStats.collected[drop.resource]++;
   game.drops = game.drops.filter((d) => d !== drop);
   addFloatingText(game, `+1 ${resourceName(drop.resource, 1)}`, drop.x, drop.y - 14, true);
+  events.emit('resourcesGained', { resources: [drop.resource] });
   s.targetId = null;
 }
 
