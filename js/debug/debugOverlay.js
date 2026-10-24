@@ -8,6 +8,7 @@ import { GameState } from '../states.js';
 import { isStepMode, isVisitTarget, stepCost } from '../systems/stepSystem.js';
 import { candidateProblems } from '../scene.js';
 import { turretMuzzle } from '../entities/turret.js';
+import { doubleStandPos } from '../systems/doubleSystem.js';
 
 const COLOR = 'rgba(120, 220, 255, 0.9)';
 const EDGE_COLOR = 'rgba(120, 220, 255, 0.45)';
@@ -16,6 +17,8 @@ const ENEMY_COLOR = 'rgba(255, 150, 90, 0.95)';
 const TARGET_COLOR = 'rgba(255, 235, 120, 0.9)';
 const VULTURE_COLOR = 'rgba(255, 140, 220, 0.9)';
 const SQUIRREL_COLOR = 'rgba(170, 255, 140, 0.95)';
+const DOUBLE_COLOR = 'rgba(230, 190, 120, 0.95)'; // Bough Double jobs (M1i §4)
+const STRIKE_COLOR = 'rgba(255, 120, 80, 0.95)'; // Squirrel counter-attack target (M1h §4)
 const MELEE_COLOR = 'rgba(255, 255, 255, 0.95)';
 const CLOUD_COLOR = 'rgba(210, 150, 255, 0.95)';
 const LABEL_BG = 'rgba(0, 0, 0, 0.55)';
@@ -62,6 +65,7 @@ export function drawDebugOverlay(ctx, game, scene) {
   drawVultureTargets(ctx, game);
   drawSquirrelTargets(ctx, game);
   drawCloudsAndPellets(ctx, game);
+  drawDoubleJobs(ctx, game);
   ctx.font = '11px monospace';
   ctx.fillStyle = TARGET_COLOR;
   for (const p of game.projectiles) ctx.fillText(`#${p.id}`, p.x + 7, p.y - 6);
@@ -237,6 +241,20 @@ function drawSquirrelTargets(ctx, game) {
       ctx.stroke();
       ctx.setLineDash([]);
     }
+    // M1h §4: counter-attack target (the attacker it will strike), with time to the next strike.
+    const foe = game.enemies.find((e) => e.id === s.strikeTargetId);
+    if (foe) {
+      ctx.save();
+      ctx.strokeStyle = STRIKE_COLOR;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(foe.x, foe.y);
+      ctx.stroke();
+      ctx.restore();
+      label(ctx, `strike #${foe.id} in ${(C.SQUIRREL_ATTACK_INTERVAL - s.strikeTimer).toFixed(1)}s`, s.x + 16, s.y + 20, STRIKE_COLOR);
+    }
     label(ctx, `S#${s.id} ${s.state.toLowerCase()} ${s.remaining.toFixed(1)}s${target ? ` → #${target.id}` : ''}`, s.x + 16, s.y + 4, SQUIRREL_COLOR);
   }
 }
@@ -247,7 +265,7 @@ function drawSquirrelTargets(ctx, game) {
 function drawCloudsAndPellets(ctx, game) {
   ctx.lineWidth = 1.5;
   for (const c of game.clouds) {
-    const spec = C.TURRET_TYPES[c.source].cloud;
+    const spec = c.spec; // the stats it was created with (M1h §2.3)
     ctx.strokeStyle = CLOUD_COLOR;
     ctx.beginPath();
     ctx.arc(c.x, c.y, spec.radius, 0, Math.PI * 2);
@@ -257,7 +275,7 @@ function drawCloudsAndPellets(ctx, game) {
     ctx.arc(c.x, c.y, spec.radius + C.ENEMY_TYPES.wolf.radius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
-    label(ctx, `C#${c.id} ${(spec.duration - c.age).toFixed(1)}s ticks ${c.ticks}`, c.x - 30, c.y + spec.radius + 30, CLOUD_COLOR);
+    label(ctx, `C#${c.id} L${c.level} r${spec.radius} ${(spec.duration - c.age).toFixed(1)}s ticks ${c.ticks}`, c.x - 30, c.y + spec.radius + 30, CLOUD_COLOR);
   }
   for (const p of game.projectiles) {
     if (p.kind !== 'pellet') continue;
@@ -330,5 +348,22 @@ function drawDruid(ctx, game) {
     ctx.lineTo(target.x, target.y);
     ctx.stroke();
     ctx.lineWidth = 1.5;
+  }
+}
+
+// M1i §4: each Bough Double's line to its target, with its job and the job time left (or the wisp).
+function drawDoubleJobs(ctx, game) {
+  ctx.lineWidth = 1.5;
+  for (const d of game.doubles) {
+    const slot = game.slots[d.slotIndex];
+    const p = doubleStandPos(game, d);
+    ctx.strokeStyle = DOUBLE_COLOR;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(slot.x, slot.y);
+    ctx.stroke();
+    const what = d.job === 'build' ? `build ${d.turretType}` : `upgrade → L${d.toLevel}`;
+    const time = d.state === 'WISP' ? 'wisp' : `${Math.max(0, d.duration - d.elapsed).toFixed(1)}s left`;
+    label(ctx, `D#${d.id} ${what} ${time}`, p.x - 60, p.y + 34, DOUBLE_COLOR);
   }
 }

@@ -6,9 +6,9 @@ import * as C from '../config.js';
 import { EnemyState, enemyType, remainingDistance } from '../entities/enemy.js';
 import { turretType, turretRange, turretDamage, turretFireInterval, turretMuzzle } from '../entities/turret.js';
 import { createProjectile } from '../entities/projectile.js';
-import { ActionState } from '../states.js';
 import { dropLoot } from './dropSystem.js';
 import { createCloud, isInsideCloud } from './cloudSystem.js';
+import { isBeingUpgraded } from './doubleSystem.js';
 import { events } from '../events.js';
 
 // ---------------------------------------------------------------------------
@@ -42,15 +42,12 @@ function turnToward(turret, target, dt) {
   turret.angle += Math.max(-maxTurn, Math.min(maxTurn, diff));
 }
 
-function isUpgrading(game, turret) {
-  return game.action.state === ActionState.UPGRADING && game.action.target === turret.slotIndex;
-}
 
 export function updateTurrets(game, dt) {
   for (const turret of game.turrets) {
     turret.cooldown -= dt;
-    // No firing while being upgraded (§11.2). It stays ready, so a cancel resumes firing immediately.
-    if (isUpgrading(game, turret)) {
+    // No firing while a Bough Double upgrades it (§11.2, M1i §2.5). It stays ready, so a cancel resumes firing immediately.
+    if (isBeingUpgraded(game, turret.slotIndex)) {
       turret.cooldown = Math.max(0, turret.cooldown);
       turret.targetId = null;
       continue;
@@ -66,7 +63,7 @@ export function updateTurrets(game, dt) {
     turnToward(turret, target, dt);
     if (turret.cooldown > 0) continue;
     game.projectiles.push(createProjectile(game.nextEntityId++, turretMuzzle(turret), target.id, turretDamage(turret),
-      cloud ? 'pellet' : 'pebble', turret.type));
+      cloud ? 'pellet' : 'pebble', turret.type, turret.level));
     events.emit('turretFired', { type: turret.type, x: turret.x, y: turret.y });
     turret.lastFireTime = game.combatTime;
     turret.cooldown += turretFireInterval(turret); // carry the remainder so the rate is exact
@@ -116,10 +113,10 @@ export function updateProjectiles(game, dt) {
     if (dist <= step) {
       if (pellet) {
         // Impact: damage the target if it is still alive, and a cloud bursts on the ground there.
-        if (target) damageEnemy(game, target, p.damage, `${p.source}:impact`);
-        createCloud(game, p.lastX, p.lastY, p.source);
+        if (target) damageEnemy(game, target, p.damage, `${p.source}:impact:${p.level}`);
+        createCloud(game, p.lastX, p.lastY, p.source, p.level);
       } else {
-        damageEnemy(game, target, p.damage, `${p.source}:impact`);
+        damageEnemy(game, target, p.damage, `${p.source}:impact:${p.level}`);
       }
       continue;
     }
@@ -132,8 +129,9 @@ export function updateProjectiles(game, dt) {
   game.projectiles = remaining;
 }
 
-// source: what dealt it, '<turretType>:impact' or '<turretType>:cloud', for the debug panel's
-// damage figures (M1f §7). Only damage actually taken is counted (no overkill).
+// source: what dealt it, '<turretType>:impact:<level>', '<turretType>:cloud:<level>' or
+// 'squirrel', for the debug panel's damage figures (M1f §7, M1h §4). Only damage actually taken
+// is counted (no overkill).
 export function damageEnemy(game, enemy, damage, source = null) {
   if (source) recordDamage(game, source, Math.min(damage, Math.max(0, enemy.hp)));
   enemy.hp -= damage;

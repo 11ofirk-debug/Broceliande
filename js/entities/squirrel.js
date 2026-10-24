@@ -21,6 +21,8 @@ export function createSquirrel(id, x, y) {
     targetId: null,               // id of the claimed drop
     remaining: C.SQUIRREL_DURATION, // s left before it expires
     lastHitTime: -Infinity,       // combat time it was last bitten (hit flash)
+    strikeTimer: 0,               // M1h §3: s counted while something attacks it; strikes back at SQUIRREL_ATTACK_INTERVAL
+    strikeTargetId: null,         // attacker it would strike now (lowest HP), for the debug overlay
     facing: 1,
     stride: 0,                    // distance run, drives the hop animation
   };

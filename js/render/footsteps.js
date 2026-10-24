@@ -1,40 +1,22 @@
-// Footstep route preview (M1g §2), replacing the dashed preview line of M1b §5.2.2. Visual only.
-// One footprint per step of the travel cost, so the trail itself shows the cost.
+// Footprints in step-mode Prep, visual only: the hover route preview (M1g §2, replacing the dashed
+// preview line of M1b §5.2.2) and the committed route trail (M1h §1, replacing the solid trail line).
+// One footprint per step of the travel cost, so the trail itself shows the cost. The positions
+// come from footprintLayout in stepSystem.js.
 
 import * as C from '../config.js';
 
 const COLORS = {
   print: 'rgba(226, 200, 152, 0.85)',  // soft earthy tone
   printBad: 'rgba(235, 85, 58, 0.9)',  // unaffordable: matches the step bar's red blink
+  trail: 'rgb(226, 200, 152)',         // committed trail: the same earthy tone, at TRAIL_FOOTPRINT_ALPHA
   labelBg: 'rgba(16, 22, 14, 0.85)',
 };
 
-// Footprint positions from `from` to the hovered marker at `to`: `cost` prints evenly spaced,
-// the last on the edge of the target's footprint circle (not on the object), alternating
-// left / right of the line by FOOTPRINT_SIDE_OFFSET and facing the direction of travel.
-// fromMarker: the Druid stands on a marker (not at home), so the trail starts at that marker's
-// edge too. Returns [{ x, y, angle, side }].
-export function footprintLayout(from, to, cost, fromMarker) {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const dist = Math.hypot(dx, dy) || 1;
-  const ux = dx / dist;
-  const uy = dy / dist;
-  const start = fromMarker ? Math.min(C.LOCATION_RADIUS, dist / 2) : 0;
-  const end = Math.max(start, dist - C.LOCATION_RADIUS);
-  const angle = Math.atan2(uy, ux);
-  const prints = [];
-  for (let i = 1; i <= cost; i++) {
-    const along = start + (end - start) * (i / cost);
-    const side = i % 2 === 1 ? -1 : 1; // left, right, left, …
-    prints.push({
-      x: from.x + ux * along - uy * C.FOOTPRINT_SIDE_OFFSET * side,
-      y: from.y + uy * along + ux * C.FOOTPRINT_SIDE_OFFSET * side,
-      angle,
-      side,
-    });
+// Committed legs (M1h §1.2): every footprint at once, fainter than the preview, never red.
+export function drawTrail(ctx, legs) {
+  for (const leg of legs) {
+    for (const p of leg) drawPrint(ctx, p, COLORS.trail, C.TRAIL_FOOTPRINT_ALPHA);
   }
-  return prints;
 }
 
 // One small footprint (sole + heel), pointing along +x before rotation.

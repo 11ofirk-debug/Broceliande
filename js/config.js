@@ -24,12 +24,13 @@ export const END_DELAY = 1.5;            // s of ENDING between the last kill / 
 // ---------------------------------------------------------------------------
 export const PREP_MODE = 'steps';          // 'steps' | 'timed' — mode at page load; debug key M toggles it
 export const STEP_PX = 25;                 // TUNING — px of straight-line travel per step
-export const STEP_BUDGET = 96;             // TUNING — steps available in step-mode Prep (~2,250 px)
+export const STEP_BUDGET = 102;             // TUNING — steps available in step-mode Prep (~2,250 px)
 export const TRAVEL_TWEEN_TIME = 0.35;     // TUNING — s, Druid's travel animation to a marker
 export const STEP_BAR_BLINK_HZ = 3;        // TUNING — red blink rate of the step bar on an unaffordable hover (§5.2)
 // M1g §2: footstep route preview (UI time, visual only).
 export const FOOTPRINT_SIDE_OFFSET = 5;    // TUNING — px each footprint sits left / right of the route line
 export const FOOTPRINT_REVEAL_TIME = 0.5;  // TUNING — s for the trail to appear from the Druid to the target, whatever the distance
+export const TRAIL_FOOTPRINT_ALPHA = 0.45; // TUNING — committed route-trail footprints (M1h §1), fainter than the preview
 export const FOOTPRINT_FADE_TIME = 0.06;   // s each footprint takes to fade in
 export const CALIBRATION_SLOT_COUNT = 5;   // debug panel: "all features + N nearest slots" greedy figure (§8)
 export const CALIBRATION_TARGET_RATIO = 1.4; // that figure should be about this × STEP_BUDGET (§9 budget intent)
@@ -37,14 +38,14 @@ export const CALIBRATION_TARGET_RATIO = 1.4; // that figure should be about this
 // ---------------------------------------------------------------------------
 // 17.2 Druid
 // ---------------------------------------------------------------------------
-export const DRUID_HP = 80;
+export const DRUID_HP = 86;
 export const DRUID_POS = { x: 1010, y: 600 };           // TUNING — off-centre
 export const DRUID_RADIUS = 28;                          // TUNING
 export const DRUID_MELEE_RADIUS = 52;                    // TUNING
 export const DRUID_MELEE_SLOTS = 6;                      // TUNING — max simultaneous biters
 export const DRUID_ACTION_OFFSET = { x: -58, y: 20 };    // TUNING — Druid position beside a target (just outside LOCATION_RADIUS)
 export const DRUID_MELEE_DAMAGE = 1;                    // M1e §2: Druid strikes the weakest attacker in his melee slots
-export const DRUID_MELEE_INTERVAL = 1.8;                 // s between strike impacts, counted only while he is idle in Combat
+export const DRUID_MELEE_INTERVAL = 1.6;                 // s between strike impacts, counted only while he is idle in Combat
 // M1f §4: each strike is wind-up → swing + lunge → impact (damage lands here) → recover.
 export const STRIKE_WINDUP_TIME = 0.12;                  // s, staff rotates back away from the target
 export const STRIKE_SWING_TIME = 0.10;                   // s, staff swings through while the Druid lunges
@@ -57,14 +58,16 @@ export const STRIKE_LUNGE_PX = 10;                       // px the Druid lunges 
 // independently on death; amounts are uniform inclusive integers.
 // ---------------------------------------------------------------------------
 export const WOLF_DROPS = [
-  { resource: 'feathers', chance: 0.05, min: 1, max: 2 },
+  { resource: 'feathers', chance: 0.06, min: 1, max: 2 },
   { resource: 'pits',     chance: 0.08, min: 1, max: 2 },
-  { resource: 'reeds',    chance: 0.02, min: 1, max: 1 },
+  { resource: 'reeds',    chance: 0.04, min: 1, max: 1 },
+  { resource: 'boughs',   chance: 0.03, min: 1, max: 2 }, // TUNING — added on request after M1i (which had no enemy Boughs)
 ];
 export const BEAR_DROPS = [               // TUNING
   { resource: 'feathers', chance: 0.35, min: 1, max: 2 },
   { resource: 'pits',     chance: 0.50, min: 2, max: 3 },
   { resource: 'reeds',    chance: 0.20, min: 1, max: 1 },
+  { resource: 'boughs',   chance: 0.08, min: 1, max: 3 }, // TUNING — added on request after M1i
 ];
 // hitHeight: px above the collision centre where pebbles strike the body (visual aim point).
 // meleeSlotsUsed: adjacent Druid melee slots the enemy occupies while attacking him.
@@ -74,8 +77,8 @@ export const ENEMY_TYPES = {
     hp: 17,              // TUNING — 6 base pebbles, 4 upgraded, 3 Vulture pecks
     speed: 82,           // TUNING — px/s, aim for 25–30 s lane traversal
     radius: 16,          // TUNING
-    damage: 3,
-    attackInterval: 1.2, // s
+    damage: 2,
+    attackInterval: 1.4, // s
     meleeSlotsUsed: 1,
     hitHeight: 10,
     drops: WOLF_DROPS,
@@ -130,19 +133,21 @@ export const TURRET_TYPES = {
   toader: {
     name: 'Poison Toader',
     attack: 'cloud',
-    range: 340,                          // px
+    range: 260,                          // px, level 1; later levels via rangeMult (285, 310 px)
     muzzleHeight: 20,                    // px above the slot pad where pellets leave (the mouth)
-    // damage: impact damage to the direct target. Build time matches the Sprinkler's (2.3 s).
+    // M1h §2.1. damage: impact damage to the direct target. cloud: the cloud a pellet fired at
+    // this level leaves — radius (px; hits enemies whose body overlaps it), duration (s),
+    // tickInterval (s; first tick one interval after the burst) and tickDamage (to every enemy
+    // inside, per tick). Ticks per cloud: 5 / 7 / 11. A cloud keeps the stats it was created with.
     levels: [
-      { damage: 2, fireInterval: 3.5, rangeMult: 1.0, cost: { pits: 0, reeds: 2, feathers: 0 }, time: 2.3 }, // 1 only — upgrades later
+      { damage: 2, fireInterval: 3.5, rangeMult: 1.0,       cost: { pits: 0, reeds: 2, feathers: 0 }, time: 2.5, // 1 (built)
+        cloud: { radius: 50, duration: 4.2, tickInterval: 0.8,  tickDamage: 1 } },
+      { damage: 3, fireInterval: 3.0, rangeMult: 285 / 260, cost: { pits: 3, reeds: 1, feathers: 0 }, time: 3.0, // 2 (upgrade) — TUNING
+        cloud: { radius: 60, duration: 5.0, tickInterval: 0.65, tickDamage: 1 } },
+      { damage: 4, fireInterval: 2.6, rangeMult: 310 / 260, cost: { pits: 5, reeds: 1, feathers: 1 }, time: 4.0, // 3 (upgrade) — TUNING
+        cloud: { radius: 70, duration: 5.6, tickInterval: 0.5,  tickDamage: 1 } },
     ],
     pelletSpeed: 450,                    // TUNING — px/s
-    cloud: {
-      radius: 70,                        // TUNING — px; hits enemies whose body overlaps it
-      duration: 5.2,                     // s
-      tickInterval: 0.6,                 // s; first tick 0.8 s after the burst (5 ticks in 4.2 s)
-      tickDamage: 1,                     // to every enemy in the cloud, per tick
-    },
   },
 };
 export const CLOUD_GROW_TIME = 0.3;       // s, a cloud grows from pellet size to full radius (visual only)
@@ -217,9 +222,9 @@ export const TURRET_BASE_OFFSET = 18;     // px the slot pad sits below its loca
 // ---------------------------------------------------------------------------
 // yields: resource → [min, max] inclusive integers. All ranges TUNING.
 export const FEATURE_TYPES = {
-  tree:      { name: 'Tree',       searchTime: 1.2, yields: { pits: [2, 4] } },
+  tree:      { name: 'Tree',       searchTime: 1.2, yields: { pits: [2, 4], boughs: [1, 2] } },   // boughs: M1i §1.2
   reedPatch: { name: 'Reed Patch', searchTime: 1.4, yields: { reeds: [2, 3] } },
-  shrub:     { name: 'Shrub',      searchTime: 1.7, yields: { feathers: [2, 3] } },
+  shrub:     { name: 'Shrub',      searchTime: 1.7, yields: { feathers: [2, 3], boughs: [0, 1] } }, // boughs: M1i §1.2
   ruins:     { name: 'Ruins',      searchTime: 1.8, yields: { pits: [2, 3], feathers: [1, 3] } },
   pond:      { name: 'Pond',       searchTime: 2.0, yields: { pits: [2, 3], reeds: [1, 3] } },
 };
@@ -332,8 +337,24 @@ export const SQUIRREL_SPEED = 110;          // TUNING — px/s, straight line, i
 export const MAX_SQUIRRELS = 3;             // TUNING — separate from MAX_VULTURES
 export const SQUIRREL_RADIUS = 12;          // TUNING
 export const SQUIRREL_PICKUP_RANGE = 14;    // TUNING — px, collects a drop within this distance
-export const SQUIRREL_BLOCKS_WOLVES = false; // §2.4: true = a waiting Squirrel blocks and is bitten like a landed Vulture
-export const SQUIRREL_BLOCK_RADIUS = 36;    // TUNING — px, used only when SQUIRREL_BLOCKS_WOLVES (same as VULTURE_BLOCK_RADIUS)
+export const SQUIRREL_BLOCKS_WOLVES = true; // M1d §2.4: true = a waiting Squirrel blocks and is bitten like a landed Vulture. M1h §3.3: true by default (needed for the counter-attack)
+export const SQUIRREL_DAMAGE = 1;           // M1h §3: counter-attack on one of the enemies attacking it
+export const SQUIRREL_ATTACK_INTERVAL = 2.1; // s, counted only while it is being attacked
+export const SQUIRREL_BLOCK_RADIUS = 36;   // TUNING — px, used only when SQUIRREL_BLOCKS_WOLVES (same as VULTURE_BLOCK_RADIUS)
+
+// Bough Double (M1i §2): a summon that does one build or upgrade job at a turret slot in
+// Combat, then disappears. Its full cost (the job's cost plus BOUGH_DOUBLE_COST) is paid at
+// once; cancelling refunds it all. It appears beside its target at DRUID_ACTION_OFFSET.
+export const BOUGH_DOUBLE_COST = { boughs: 1 }; // TUNING
+export const MAX_BOUGH_DOUBLES = 2;         // TUNING — working at the same time
+export const DOUBLE_TINT = '#7a5530';       // monochrome brown version of the Druid's drawing
+export const DOUBLE_ALPHA = 0.6;
+export const DOUBLE_WISP_TIME = 0.25;       // s, the wisp's flight from the Druid to the target; the job starts on arrival
+export const DOUBLE_CRAFT_SWING_INTERVAL = 0.45; // s between staff swings (each one a craft hit)
+export const DOUBLE_APPEAR_TIME = 0.2;      // s to fade and scale in (visual only)
+export const DOUBLE_FADE_TIME = 0.3;        // s to fade out on completion or cancel (visual only)
+export const DOUBLE_BOB_PX = 2;             // px of gentle bob while crafting (visual only)
+export const DOUBLE_CHIP_TIME = 0.45;       // s a wood chip flies before vanishing (visual only)
 
 export const RESOURCE_ICON_SIZE = 28;     // px, resource icons in the HUD panel
 export const MENU_PORTRAIT_SIZE = 40;     // px, creature / turret images in menus (M1f §2)
@@ -364,19 +385,21 @@ export const SOUNDS = {
   druidWhoosh:   { volume: 0.4,  pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING — Druid strike swing
   druidThud:     { volume: 0.6,  pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING — Druid strike impact
   vulturePeck:   { volume: 0.4,  pitch: 1, minGap: 0.06, maxVoices: 3, enabled: true }, // TUNING
+  squirrelScratch: { volume: 0.4, pitch: 1, minGap: 0.06, maxVoices: 3, enabled: true }, // TUNING — Squirrel counter-attack (M1h §3.4)
   wolfDie:       { volume: 0.5,  pitch: 1, minGap: 0.08, maxVoices: 3, enabled: true }, // TUNING
   bearDie:       { volume: 0.8,  pitch: 1, minGap: 0.2,  maxVoices: 2, enabled: true }, // TUNING
   resourceChime: { volume: 0.45, pitch: 1, minGap: 0.05, maxVoices: 4, enabled: true }, // TUNING — one per collection event
   searchRustle:  { volume: 0.5,  pitch: 1, minGap: 0.1,  maxVoices: 1, enabled: true }, // TUNING
   build:         { volume: 0.6,  pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING — two wooden knocks
-  upgradeTick:   { volume: 0.3,  pitch: 1, minGap: 0.05, maxVoices: 2, enabled: true }, // TUNING — ratchet while upgrading
+  doubleAppears: { volume: 0.5,  pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING — Bough Double arrives (M1i §2.8)
+  doubleCraftHit: { volume: 0.25, pitch: 1, minGap: 0.08, maxVoices: 1, enabled: true }, // TUNING — one per crafting swing; replaces the upgrade ratchet
+  doubleCancelled: { volume: 0.5, pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING
   upgradeDone:   { volume: 0.55, pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING
   summon:        { volume: 0.5,  pitch: 1, minGap: 0.1,  maxVoices: 2, enabled: true }, // TUNING
 };
-export const SOUND_RESOURCE_FREQ = { pits: 440, reeds: 660, feathers: 990 }; // TUNING — Hz, chime pitch per resource (low / mid / high)
+export const SOUND_RESOURCE_FREQ = { pits: 440, reeds: 660, feathers: 990, boughs: 300 }; // TUNING — Hz, chime pitch per resource (Boughs lowest and woody, M1i §1.3)
 export const SOUND_CHIME_STAGGER = 0.07;  // s between chimes when one search finds several resources
 export const SOUND_SUMMON_FREQ = { vulture: 330, squirrel: 880 }; // TUNING — Hz, shimmer base pitch per summon
-export const SOUND_UPGRADE_TICK_INTERVAL = 0.14; // TUNING — s of simulation time between ratchet ticks while upgrading
 export const SOUND_STATS_WINDOW = 5;      // s, debug panel: sounds played / skipped over this much real time (M1g §5)
 export const SOUND_MUTE_KEY = 'broceliande.muted'; // localStorage key for the mute state
 

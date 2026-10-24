@@ -21,6 +21,7 @@ export function completeSearch(game, featureIndex) {
   if (feature.exhausted) return;
   const gained = rollYield(game.rng, feature.type);
   add(game.resources, gained);
+  game.doubleStats.boughsGained += gained.boughs ?? 0; // M1i §4 debug figure
   feature.exhausted = true;
 
   const found = RESOURCE_KEYS.filter((k) => gained[k] > 0);

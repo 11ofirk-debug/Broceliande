@@ -79,6 +79,8 @@ const COLORS = {
   toaderPipeCap: '#a173c4',
   toaderMouth: '#3b1d4f',
   toaderMouthLine: '#2b4a22',
+  toaderLevelRing: '#a173c4',      // level ring (M1h §2.4): purple …
+  toaderLevelRingInner: '#9cdb6a', // … with a green inner line
   pellet: '#8f4fc4',
   pelletLight: '#d6b3f0',
   cloudCore: 'rgba(150, 90, 190, 0.55)',
@@ -184,7 +186,14 @@ export const DRUID_REST_POSE = { staffAngle: 0, lungeX: 0, lungeY: 0, facing: 1 
 // defeat: 0 standing … 1 fallen; a defeated Druid tips over onto his back and greys out (M1e §1.2).
 // pose (M1f §4): staffAngle in rad around his hand (+ swings the top toward where he faces),
 // lunge offset in px, facing ±1 (mirrors him so the staff side faces his target).
-export function drawDruid(ctx, x, y, hurt, defeat = 0, pose = DRUID_REST_POSE) {
+// look (optional, M1i §2.7): { tint, alpha, scale } draws the Druid as a monochrome, translucent
+// double of himself (the Bough Double): the same drawing, recoloured to `tint` keeping its light
+// and shade, at `alpha`, scaled about his feet by `scale`.
+export function drawDruid(ctx, x, y, hurt, defeat = 0, pose = DRUID_REST_POSE, look = null) {
+  if (look) {
+    drawTintedDruid(ctx, x, y, pose, look);
+    return;
+  }
   const r = C.DRUID_RADIUS;
   const feet = y + r * 0.6;
   drawShadow(ctx, x, feet, r * 0.9, r * 0.3);
@@ -206,17 +215,166 @@ export function drawDruid(ctx, x, y, hurt, defeat = 0, pose = DRUID_REST_POSE) {
   ctx.restore();
 }
 
+// The tinted Druid is drawn on scratch canvases: his normal drawing (also kept as the outline
+// mask), then the tint laid over it with the 'color' blend (tint hue, the drawing's brightness),
+// then cut back to his outline in one step.
+const TINT_CANVAS_SIZE = 220; // px, room for the Druid and his staff at any pose
+let tintCanvas = null;
+let maskCanvas = null;
+
+function scratchCanvas() {
+  const c = document.createElement('canvas');
+  c.width = TINT_CANVAS_SIZE;
+  c.height = TINT_CANVAS_SIZE;
+  return c;
+}
+
+function drawTintedDruid(ctx, x, y, pose, look) {
+  tintCanvas ??= scratchCanvas();
+  maskCanvas ??= scratchCanvas();
+  const ox = TINT_CANVAS_SIZE / 2;
+  const oy = TINT_CANVAS_SIZE * 0.6;
+  const m = maskCanvas.getContext('2d');
+  m.clearRect(0, 0, TINT_CANVAS_SIZE, TINT_CANVAS_SIZE);
+  drawDruid(m, ox, oy, false, 0, pose);
+  const t = tintCanvas.getContext('2d');
+  t.globalCompositeOperation = 'source-over';
+  t.clearRect(0, 0, TINT_CANVAS_SIZE, TINT_CANVAS_SIZE);
+  t.drawImage(maskCanvas, 0, 0);
+  t.globalCompositeOperation = 'color';
+  t.fillStyle = look.tint;
+  t.fillRect(0, 0, TINT_CANVAS_SIZE, TINT_CANVAS_SIZE);
+  t.globalCompositeOperation = 'destination-in';
+  t.drawImage(maskCanvas, 0, 0);
+  t.globalCompositeOperation = 'source-over';
+
+  const s = look.scale ?? 1;
+  const feet = C.DRUID_RADIUS * 0.6;
+  ctx.save();
+  ctx.globalAlpha *= look.alpha;
+  ctx.translate(x, y + feet);
+  ctx.scale(s, s);
+  ctx.drawImage(tintCanvas, -ox, -oy - feet);
+  ctx.restore();
+}
+
+// Bough Double effects (M1i §2.4, §2.7), all visual only.
+const DOUBLE_COLORS = {
+  wispCore: 'rgba(214, 232, 150, 0.95)',
+  wispGlow: 'rgba(122, 150, 64, 0.0)',
+  puff: 'rgba(150, 160, 90, ALPHA)',
+  chip: '#a0703c',
+  chipDark: '#6e4a2a',
+  leaf: ['#6fa13a', '#8a6a3a', '#7fb446'],
+  targetRing: 'rgba(214, 232, 150, ALPHA)',
+  dim: 'rgba(6, 10, 4, 0.42)',
+};
+const withAlpha = (c, a) => c.replace('ALPHA', a.toFixed(3));
+
+// The wisp flying from the Druid to the target: a glowing green-brown orb with a short trail.
+// t: 0 … 1 of its flight.
+export function drawDoubleWisp(ctx, from, to, t) {
+  ctx.save();
+  for (let i = 4; i >= 0; i--) {
+    const k = Math.max(0, t - i * 0.06);
+    const e = k * k * (3 - 2 * k);
+    const x = from.x + (to.x - from.x) * e;
+    const y = from.y + (to.y - from.y) * e - Math.sin(k * Math.PI) * 30; // a slight arc
+    const r = (i === 0 ? 9 : 7 - i) ;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.2);
+    g.addColorStop(0, DOUBLE_COLORS.wispCore);
+    g.addColorStop(1, DOUBLE_COLORS.wispGlow);
+    ctx.globalAlpha = i === 0 ? 1 : 0.5 - i * 0.08;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Small green-brown puff where a Double appears. t: 0 … 1.
+export function drawDoublePuff(ctx, x, y, t) {
+  ctx.save();
+  ctx.strokeStyle = withAlpha(DOUBLE_COLORS.puff, 0.8 * (1 - t));
+  ctx.fillStyle = withAlpha(DOUBLE_COLORS.puff, 0.35 * (1 - t));
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(x, y, 14 + 24 * t, (14 + 24 * t) * 0.55, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+// A wood chip from a crafting swing, flying in a short arc and spinning. t: 0 … 1.
+export function drawChip(ctx, c, age) {
+  const x = c.x + c.vx * age;
+  const y = c.y + c.vy * age + 0.5 * 420 * age * age;
+  ctx.save();
+  ctx.globalAlpha = 1 - (age / C.DOUBLE_CHIP_TIME) ** 2;
+  ctx.translate(x, y);
+  ctx.rotate(age * 14 + c.vx * 0.05);
+  ctx.fillStyle = DOUBLE_COLORS.chip;
+  ctx.fillRect(-4.5, -2, 9, 4);
+  ctx.fillStyle = DOUBLE_COLORS.chipDark;
+  ctx.fillRect(-4.5, 1, 9, 1);
+  ctx.restore();
+}
+
+// A Double fading out after its job, shedding a few leaf / moss particles. t: 0 … 1.
+export function drawDoubleFade(ctx, f, t) {
+  drawDruid(ctx, f.x, f.y, false, 0, DRUID_REST_POSE, { tint: C.DOUBLE_TINT, alpha: C.DOUBLE_ALPHA * (1 - t), scale: 1 + 0.08 * t });
+  ctx.save();
+  for (let i = 0; i < 6; i++) {
+    const a = -Math.PI / 2 + (i - 2.5) * 0.55;
+    const d = 10 + 34 * t;
+    ctx.globalAlpha = 1 - t;
+    ctx.fillStyle = DOUBLE_COLORS.leaf[i % 3];
+    ctx.beginPath();
+    ctx.ellipse(f.x + Math.cos(a) * d, f.y - C.DRUID_RADIUS * 0.8 + Math.sin(a) * d * 0.8 + 20 * t * t, 3.5, 2, a + t * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Targeting mode (M1i §2.4 step 2): everything dimmed except the valid targets' footprints, which
+// get a pulsing ring (brighter on the hovered one). targets: slot positions. t: s, for the pulse.
+export function drawDoubleTargeting(ctx, targets, hovered, t) {
+  const R = C.LOCATION_RADIUS + 6;
+  ctx.save();
+  ctx.fillStyle = DOUBLE_COLORS.dim;
+  ctx.beginPath();
+  ctx.rect(0, C.HUD_STRIP_HEIGHT, C.STAGE_WIDTH, C.STAGE_HEIGHT - C.HUD_STRIP_HEIGHT);
+  for (const p of targets) {
+    ctx.moveTo(p.x + R, p.y);
+    ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
+  }
+  ctx.fill('evenodd');
+  const pulse = 0.5 + 0.5 * Math.sin(t * 5);
+  for (const p of targets) {
+    const hot = p === hovered;
+    ctx.strokeStyle = withAlpha(DOUBLE_COLORS.targetRing, hot ? 1 : 0.45 + 0.35 * pulse);
+    ctx.lineWidth = hot ? 4 : 2.5;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, R - 2 + (hot ? 0 : pulse * 2), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // Druid strike swoosh (M1e §2.4, M1f §4): a bright, broad crescent sweeping across the
 // target's direction, with a soft glow, fading out. t: 0 … 1 over DRUID_SWIPE_TIME.
 export function drawSwipe(ctx, s, t) {
   const angle = Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
   const reach = Math.hypot(s.x2 - s.x1, s.y2 - s.y1) * 0.9;
   const sweep = -0.5 + t * 1.0; // the arc sweeps across the target direction
-  const cy = s.y1 - C.DRUID_RADIUS * 0.4;
+  // s.small: a Squirrel's counter-attack (M1h §3.2), a thinner swipe from a smaller body.
+  const cy = s.y1 - (s.small ? C.SQUIRREL_RADIUS : C.DRUID_RADIUS) * 0.4;
+  const strokes = s.small ? [[7, COLORS.swipeGlow], [3, COLORS.swipe]] : [[16, COLORS.swipeGlow], [8, COLORS.swipe]];
   ctx.save();
   ctx.globalAlpha = 1 - t * t;
   ctx.lineCap = 'round';
-  for (const [width, color] of [[16, COLORS.swipeGlow], [8, COLORS.swipe]]) {
+  for (const [width, color] of strokes) {
     ctx.strokeStyle = color;
     ctx.lineWidth = width;
     ctx.beginPath();
@@ -583,25 +741,44 @@ export function toaderMouthOpen(turret, t) {
   return age >= 0 && age < TOADER_MOUTH_TIME ? 1 - age / TOADER_MOUTH_TIME : 0;
 }
 
+// Levels (M1h §2.4), like the Sprinkler's: level 2 a single ring round the pad, level 3 a double
+// ring, a slightly larger toad and a third pipe. The rings are purple with a green inner line.
+const TOADER_L3_SCALE = 1.1;
+
 export function drawToader(ctx, turret, upgrading, mouthOpen = 0) {
   const { x, y } = slotBase(turret);
   ctx.save();
+  if (turret.level >= 2) {
+    const rings = turret.level >= 3 ? [C.TURRET_SLOT_RADIUS - 2, C.TURRET_SLOT_RADIUS + 3] : [C.TURRET_SLOT_RADIUS - 2];
+    for (const r of rings) {
+      for (const [width, color] of [[3.5, COLORS.toaderLevelRing], [1.5, COLORS.toaderLevelRingInner]]) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        ctx.ellipse(x, y, r, r * 0.7, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
   if (upgrading) ctx.globalAlpha = 0.5;
   drawShadow(ctx, x, y, 24, 8);
   ctx.translate(x, y);
+  if (turret.level >= 3) ctx.scale(TOADER_L3_SCALE, TOADER_L3_SCALE);
 
-  // Pipes on its back, behind the body.
+  // Pipes on its back, behind the body (a third, central one at level 3).
+  const pipes = [[-12, -20, -19, -34], [11, -22, 16, -33]];
+  if (turret.level >= 3) pipes.push([0, -24, -1, -39]);
   ctx.strokeStyle = COLORS.toaderPipe;
   ctx.lineCap = 'round';
   ctx.lineWidth = 5;
   ctx.beginPath();
-  ctx.moveTo(-12, -20);
-  ctx.lineTo(-19, -34);
-  ctx.moveTo(11, -22);
-  ctx.lineTo(16, -33);
+  for (const [x1, y1, x2, y2] of pipes) {
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+  }
   ctx.stroke();
   ctx.fillStyle = COLORS.toaderPipeCap;
-  for (const [px, py] of [[-19, -34], [16, -33]]) {
+  for (const [, , px, py] of pipes) {
     ctx.beginPath();
     ctx.ellipse(px, py, 4.5, 3, 0, 0, Math.PI * 2);
     ctx.fill();

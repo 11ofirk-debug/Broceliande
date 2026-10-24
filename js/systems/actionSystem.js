@@ -6,16 +6,17 @@ import * as C from '../config.js';
 import { GameState, ActionState, ACTION_ALLOWED_IN } from '../states.js';
 import { canAfford, deduct, RESOURCE_KEYS, resourceName } from '../resources.js';
 import { searchTime, completeSearch } from './searchSystem.js';
-import { turretOnSlot, completeBuild, completeUpgrade } from './buildSystem.js';
+import { turretOnSlot, completeBuild } from './buildSystem.js';
 import { createVulture } from '../entities/vulture.js';
 import { createSquirrel } from '../entities/squirrel.js';
-import { canVisit, stepCost, markerPos } from './stepSystem.js';
-import { buildCost, buildTime, nextLevelStats } from '../entities/turret.js';
+import { canVisit, stepCost, markerPos, legFootprints } from './stepSystem.js';
+import { buildCost, buildTime } from '../entities/turret.js';
+import { doubleAvailability } from './doubleSystem.js';
 import { events } from '../events.js';
 
 // Timed actions show a progress bar and can be cancelled. TRAVELLING is neither:
 // its steps are already spent and input is ignored until it lands (M1b §5.3).
-const TIMED = [ActionState.SEARCHING, ActionState.BUILDING, ActionState.UPGRADING];
+const TIMED = [ActionState.SEARCHING, ActionState.BUILDING]; // Prep only; Combat jobs are Bough Doubles' (M1i §2)
 
 export function createIdleAction() {
   return { state: ActionState.IDLE, target: null, elapsed: 0, duration: 0 };
@@ -78,7 +79,9 @@ export function startTravel(game, marker, turretType = null) {
   if (game.action.state !== ActionState.IDLE || !canVisit(game, marker)) return false;
   if (marker.kind === 'slot' && !(turretType && canAfford(game.resources, buildCost(turretType)))) return false;
   const cost = stepCost(game, marker);
+  const leg = legFootprints(game, marker); // the footprints just previewed, from where he stands now
   if (!setAction(game, ActionState.TRAVELLING, { kind: marker.kind, index: marker.index }, C.TRAVEL_TWEEN_TIME)) return false;
+  game.trail.push(leg); // M1h §1.2: committed now, so the whole leg stays on the ground at once
   game.action.from = game.druidPos;
   game.action.turretType = turretType;
   // Debug undo (M1b §8): what this move is about to change.
@@ -102,7 +105,7 @@ export function undoLastMove(game) {
   game.stepsRemaining = move.stepsRemaining;
   game.druidPos = move.druidPos;
   game.resources = move.resources;
-  game.route.pop();
+  game.trail.pop();
   if (move.marker.kind === 'feature') game.features[move.marker.index].exhausted = false;
   else game.turrets = game.turrets.filter((t) => t.slotIndex !== move.marker.index);
   return true;
@@ -111,7 +114,6 @@ export function undoLastMove(game) {
 // Arrival: the Druid now stands at the marker, which is the origin of the next cost (§4).
 function completeTravel(game, marker, turretType) {
   game.druidPos = markerPos(game, marker);
-  game.route.push(game.druidPos);
   if (marker.kind === 'feature') {
     events.emit('searchStarted', { featureIndex: marker.index }); // step mode: rustle and chimes both on arrival
     completeSearch(game, marker.index);
@@ -120,32 +122,13 @@ function completeTravel(game, marker, turretType) {
   }
 }
 
-// Upgrade menu state for a turret (§11.1, M1e §4.3): { available, reason } for the next level. Only
-// one upgrade at a time: while any turret is upgrading, every Upgrade button is disabled.
-export function upgradeAvailability(game, slotIndex) {
-  const turret = turretOnSlot(game, slotIndex);
-  if (game.state !== GameState.COMBAT || !turret) return { available: false, reason: '' };
-  const next = nextLevelStats(turret);
-  if (!next) return { available: false, reason: 'Max level' };
-  if (game.action.state === ActionState.UPGRADING) return { available: false, reason: 'Another upgrade in progress' };
-  if (!canAfford(game.resources, next.cost)) return { available: false, reason: 'Not enough resources' };
-  return { available: true, reason: '' };
-}
-
-export function isUpgradingSlot(game, slotIndex) {
-  return game.action.state === ActionState.UPGRADING && game.action.target === slotIndex;
-}
-
-// Confirming Upgrade in the turret menu. Cost is deducted only on completion.
-export function startUpgrade(game, slotIndex) {
-  if (!upgradeAvailability(game, slotIndex).available) return false;
-  return setAction(game, ActionState.UPGRADING, slotIndex, nextLevelStats(turretOnSlot(game, slotIndex)).time);
-}
-
-// The two summons (§15, M1d §2), in Druid-menu order. Each has its own cost and its own cap.
+// The summons (§15, M1d §2, M1i §2.4), in Druid-menu order. Each has its own cost and its own
+// cap. The Bough Double is `targeted`: instead of being placed anywhere, it is pointed at a
+// turret slot and does a job there (doubleSystem.js); its cost is the Bough, and the job's.
 export const SUMMONS = {
   vulture: { kind: 'vulture', name: 'Vulture', plural: 'Vultures', cost: C.VULTURE_COST, max: C.MAX_VULTURES, active: (g) => g.vultures, create: createVulture },
   squirrel: { kind: 'squirrel', name: 'Squirrel', plural: 'Squirrels', cost: C.SQUIRREL_COST, max: C.MAX_SQUIRRELS, active: (g) => g.squirrels, create: createSquirrel },
+  double: { kind: 'double', name: 'Bough Double', plural: 'Bough Doubles', cost: C.BOUGH_DOUBLE_COST, max: C.MAX_BOUGH_DOUBLES, active: (g) => g.doubles, targeted: true },
 };
 
 // "Not enough Feathers" / "Not enough Pits, Feathers": the resources the cost is short of.
@@ -160,6 +143,7 @@ export function summonAvailability(game, kind) {
   const s = SUMMONS[kind];
   if (game.state !== GameState.COMBAT) return { available: false, reason: '' };
   if (game.action.state !== ActionState.IDLE) return { available: false, reason: 'Druid is busy' };
+  if (s.targeted) return doubleAvailability(game);
   if (s.active(game).length >= s.max) return { available: false, reason: `${s.max} ${s.max === 1 ? s.name : s.plural} already active` };
   if (!canAfford(game.resources, s.cost)) return { available: false, reason: shortfallReason(game.resources, s.cost) };
   return { available: true, reason: '' };
@@ -184,6 +168,7 @@ export function placeSummon(game, p) {
   if (game.action.state !== ActionState.SUMMON_PLACEMENT) return false;
   if (p.y < C.HUD_STRIP_HEIGHT) return false;
   const s = SUMMONS[game.action.target];
+  if (s.targeted) return false; // a Bough Double starts a job on a target instead (startDoubleJob)
   game.action = createIdleAction();
   if (s.active(game).length >= s.max || !canAfford(game.resources, s.cost)) return false;
   deduct(game.resources, s.cost);
@@ -217,27 +202,19 @@ export function updateAction(game, dt) {
   }
   if (!isTimedAction(a)) return;
   a.elapsed += dt;
-  if (a.elapsed < a.duration) {
-    // Ratchet ticks while upgrading (M1g §3.4), in simulation time, so they stop on cancel or pause.
-    const ticks = Math.floor(a.elapsed / C.SOUND_UPGRADE_TICK_INTERVAL);
-    if (a.state === ActionState.UPGRADING && ticks > (a.ticks ?? 0)) {
-      a.ticks = ticks;
-      events.emit('upgradeTick', { slotIndex: a.target });
-    }
-    return;
-  }
+  if (a.elapsed < a.duration) return;
 
   if (a.state === ActionState.SEARCHING) completeSearch(game, a.target);
   else if (a.state === ActionState.BUILDING) completeBuild(game, a.target, a.turretType);
-  else if (a.state === ActionState.UPGRADING) completeUpgrade(game, a.target);
   game.action = createIdleAction();
 }
 
-// World position of the action's target object, or null when idle.
+// World position of the action's target object, or null when idle. Prep only: in Combat the
+// Druid stays at his main position (M1i §2.2).
 export function actionTargetPos(game) {
   const a = game.action;
   if (a.state === ActionState.SEARCHING) return game.features[a.target];
-  if (a.state === ActionState.BUILDING || a.state === ActionState.UPGRADING) return game.slots[a.target];
+  if (a.state === ActionState.BUILDING) return game.slots[a.target];
   return null;
 }
 

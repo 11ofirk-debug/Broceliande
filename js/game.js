@@ -9,14 +9,15 @@ import { createIdleAction, updateAction, enforceActionAllowed } from './systems/
 import { createFeatures } from './entities/searchableFeature.js';
 import { generateLayout } from './layout.js';
 import { emptyDropStats, updateDrops } from './systems/dropSystem.js';
-import { emptyResources, add } from './resources.js';
+import { emptyResources, add, RESOURCE_KEYS } from './resources.js';
 import { updateEffects } from './effects.js';
 import { updateVultures, updateBlocking, expireVultures } from './systems/vultureSystem.js';
-import { updateSquirrels, expireSquirrels } from './systems/squirrelSystem.js';
+import { updateSquirrels, updateSquirrelStrikes, expireSquirrels } from './systems/squirrelSystem.js';
 import { isStepMode } from './systems/stepSystem.js';
 import { GameState, PrepMode, ActionState } from './states.js';
 import { updateDruidMelee } from './systems/druidMeleeSystem.js';
 import { updateClouds } from './systems/cloudSystem.js';
+import { updateDoubles } from './systems/doubleSystem.js';
 
 export { GameState };
 
@@ -58,7 +59,7 @@ export function createGame(scene) {
     prepRemaining: 0,  // s, counts down during timed PREP
     stepsRemaining: 0, // step-mode PREP budget (M1b §4)
     druidPos: C.DRUID_POS, // where the Druid logically stands; only leaves home in step-mode Prep
-    route: [],             // step-mode Prep: DRUID_POS then every visited marker centre (M1b §5.5)
+    trail: [],             // step-mode Prep: committed legs, each the list of its footprints (M1h §1)
     moveHistory: [],       // step-mode Prep: per-move snapshots for the debug undo (M1b §8)
     combatTime: 0,     // s, counts up during COMBAT
     pendingResult: null, // ENDING (M1e §1): VICTORY or DEFEAT, shown when endRemaining reaches 0
@@ -82,6 +83,10 @@ export function createGame(scene) {
     damageStats: {},   // damage dealt this encounter by source, e.g. "sprinkler:impact", "toader:cloud" (M1f §7)
     vultures: [],
     squirrels: [],                // Squirrel summons (M1d §2)
+    doubles: [],                  // Bough Doubles at work (M1i §2), each with its job
+    doubleFades: [],              // Doubles fading out after a job { x, y, facing, age } (visual only)
+    chips: [],                    // wood chips from crafting swings { x, y, vx, vy, age } (visual only)
+    doubleStats: emptyDoubleStats(), // this encounter's Bough figures and Double jobs (M1i §4)
     drops: [],                   // wolf drop items on the field (M1d §1): { id, resource, x, y, lane }
     dropStats: emptyDropStats(), // this encounter's dropped / collected units per resource
     dropMult: 1,                 // debug X: drop chance multiplier; kept across restarts
@@ -115,7 +120,7 @@ export function startEncounter(game, { newSeed = false } = {}) {
   game.prepRemaining = C.PREP_DURATION;
   game.stepsRemaining = C.STEP_BUDGET;
   game.druidPos = C.DRUID_POS;
-  game.route = [C.DRUID_POS];
+  game.trail = [];
   game.moveHistory = [];
   game.combatTime = 0;
   game.pendingResult = null;
@@ -137,6 +142,10 @@ export function startEncounter(game, { newSeed = false } = {}) {
   game.damageStats = {};
   game.vultures = [];
   game.squirrels = [];
+  game.doubles = [];
+  game.doubleFades = [];
+  game.chips = [];
+  game.doubleStats = emptyDoubleStats();
   game.drops = [];
   game.dropStats = emptyDropStats();
   game.action = createIdleAction();
@@ -154,7 +163,7 @@ export function startCombat(game) {
   if (game.state !== GameState.PREP) return;
   game.prepRemaining = 0;
   game.druidPos = C.DRUID_POS; // step mode: the Druid snaps home and the trail is cleared (M1b §5.6)
-  game.route = [];
+  game.trail = [];
   game.moveHistory = [];
   game.druidMeleeTimer = 0; // M1e §2.2: the melee timer starts from zero when Combat begins
   game.druidStrike = null;
@@ -198,6 +207,11 @@ function checkEndConditions(game) {
 // Expected number of each enemy type in the wave (M1e §3.6).
 export const WAVE_COUNTS = { wolf: C.WAVE_TOTAL, bear: C.BEAR_COUNT };
 
+// M1i §4: Boughs gained (searches and debug G) and spent (net of refunds); Double jobs done.
+function emptyDoubleStats() {
+  return { boughsGained: 0, boughsSpent: 0, completed: 0, cancelled: 0 };
+}
+
 function emptyEnemyCounts() {
   return Object.fromEntries(Object.keys(C.ENEMY_TYPES).map((type) => [type, { spawned: 0, alive: 0, killed: 0 }]));
 }
@@ -237,7 +251,8 @@ export function spawnDebugBear(game) {
 // Debug key G: +DEBUG_GRANT_AMOUNT of each resource.
 export function grantResources(game) {
   const n = C.DEBUG_GRANT_AMOUNT;
-  add(game.resources, { pits: n, reeds: n, feathers: n });
+  add(game.resources, Object.fromEntries(RESOURCE_KEYS.map((k) => [k, n]))); // every resource, Boughs too (M1i §1.3)
+  game.doubleStats.boughsGained += n;
 }
 
 // One fixed simulation step. VICTORY / DEFEAT / START: simulation is stopped.
@@ -254,6 +269,7 @@ export function updateGame(game, dt) {
       game.combatTime += dt;
       updateSpawning(game);
       updateBlocking(game, dt);      // wolves held by landed Vultures (and, if enabled, waiting Squirrels) stop and bite them
+      updateSquirrelStrikes(game, dt); // M1h §3: a Squirrel being attacked strikes back
       updateEnemyMovement(game, dt);
       updateTurrets(game, dt);
       updateProjectiles(game, dt);
@@ -261,6 +277,7 @@ export function updateGame(game, dt) {
       updateVultures(game, dt);
       updateDrops(game, dt);         // drop pop flight (M1g §1); before Squirrels so a just-landed item can be claimed
       updateSquirrels(game, dt);
+      updateDoubles(game, dt);       // Bough Double jobs (M1i §2)
       updateMelee(game, dt);
       expireVultures(game, dt);
       expireSquirrels(game, dt);

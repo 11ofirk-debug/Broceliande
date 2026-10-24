@@ -1,15 +1,17 @@
-// Resource helpers (spec §8.1). An amount/cost is { pits, reeds, feathers }.
+// Resource helpers (spec §8.1, M1i §1). An amount/cost is { pits, reeds, feathers, boughs };
+// a missing key counts as 0. RESOURCE_KEYS is the display order everywhere (HUD, tooltips, cost rows).
 
-export const RESOURCE_KEYS = ['pits', 'reeds', 'feathers'];
+export const RESOURCE_KEYS = ['pits', 'reeds', 'feathers', 'boughs'];
 
 const NAMES = {
   pits: ['Pit', 'Pits'],
   reeds: ['Reed', 'Reeds'],
   feathers: ['Feather', 'Feathers'],
+  boughs: ['Bough', 'Boughs'], // Mossy Bough (M1i §1.1)
 };
 
 export function emptyResources() {
-  return { pits: 0, reeds: 0, feathers: 0 };
+  return Object.fromEntries(RESOURCE_KEYS.map((k) => [k, 0]));
 }
 
 export function resourceName(key, n) {
@@ -21,11 +23,11 @@ export function canAfford(resources, cost) {
 }
 
 export function deduct(resources, cost) {
-  for (const k of RESOURCE_KEYS) resources[k] -= cost[k] ?? 0;
+  for (const k of RESOURCE_KEYS) resources[k] = (resources[k] ?? 0) - (cost[k] ?? 0);
 }
 
 export function add(resources, amount) {
-  for (const k of RESOURCE_KEYS) resources[k] += amount[k] ?? 0;
+  for (const k of RESOURCE_KEYS) resources[k] = (resources[k] ?? 0) + (amount[k] ?? 0);
 }
 
 // "2 Pits · 1 Reed" — zero entries are skipped.

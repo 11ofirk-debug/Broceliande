@@ -16,13 +16,14 @@ export const PrepMode = Object.freeze({
 });
 
 // Druid action state, separate from the game state.
-// Step-mode Prep uses only IDLE and TRAVELLING (M1b §5.7).
+// Step-mode Prep uses only IDLE and TRAVELLING (M1b §5.7). In Combat the Druid is only IDLE or
+// SUMMON_PLACEMENT and never leaves his main position (M1i §2.2): Bough Doubles do the building
+// and upgrading, and SUMMON_PLACEMENT with target 'double' is their targeting mode.
 export const ActionState = Object.freeze({
   IDLE: 'IDLE',
   SEARCHING: 'SEARCHING',
   BUILDING: 'BUILDING',
   TRAVELLING: 'TRAVELLING',
-  UPGRADING: 'UPGRADING',
   SUMMON_PLACEMENT: 'SUMMON_PLACEMENT',
 });
 
@@ -32,6 +33,5 @@ export const ACTION_ALLOWED_IN = Object.freeze({
   [ActionState.SEARCHING]: [GameState.PREP],
   [ActionState.BUILDING]: [GameState.PREP],
   [ActionState.TRAVELLING]: [GameState.PREP],
-  [ActionState.UPGRADING]: [GameState.COMBAT],
   [ActionState.SUMMON_PLACEMENT]: [GameState.COMBAT],
 });

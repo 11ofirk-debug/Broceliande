@@ -9,15 +9,19 @@ import { routeBand } from './layout.js';
 import { RESOURCE_ICON_SVG } from './icons.js';
 import { costRowsElement, costRowsKey } from './costRows.js';
 import { portraitCanvas } from './render/portraits.js';
-import { canAfford } from './resources.js';
-import { canStartBuild, upgradeAvailability, summonAvailability, druidDisplayPos, isTravelling, SUMMONS } from './systems/actionSystem.js';
+import { canAfford, RESOURCE_KEYS, resourceName, formatCost } from './resources.js';
+import { canStartBuild, summonAvailability, druidDisplayPos, isTravelling, SUMMONS } from './systems/actionSystem.js';
+import { isDoubleTargeting, isDoubleTarget, doubleOnSlot, doubleJob } from './systems/doubleSystem.js';
+import { DoubleState } from './entities/boughDouble.js';
 import { turretOnSlot } from './systems/buildSystem.js';
 import { buildCost, levelStats, levelRange, nextLevelStats, maxLevel, turretType, TURRET_TYPE_KEYS } from './entities/turret.js';
 import { isStepMode, stepCost, canVisit, anyVisitable, routePreview, calibrationFigures, affordableTurretTypes } from './systems/stepSystem.js';
 import { enemyTotals, WAVE_COUNTS } from './game.js';
 import { isMuted, soundStats, audioStatus } from './audio.js';
 
-const RESOURCE_LABELS = { pits: 'Peach Pits', reeds: 'Reeds', feathers: 'Feathers' };
+const RESOURCE_LABELS = { pits: 'Peach Pits', reeds: 'Reeds', feathers: 'Feathers', boughs: 'Mossy Boughs' };
+// "Pits 3  Reeds 0  Feathers 2  Boughs 1": every resource, in display order (debug panel).
+const resourceLine = (o) => RESOURCE_KEYS.map((k) => `${resourceName(k, 2)} ${o[k] ?? 0}`).join('  ');
 const POPUP_GAP = 16; // px between a world object and its tooltip/menu
 
 function setText(el, text) {
@@ -43,7 +47,7 @@ function layoutDebugLines(scene) {
   lines.push('', `Candidates: ${scene.candidates.length}, ${failing.length ? `failing validation: #${failing.join(' #')}` : 'all valid'}`);
   const res = expectedResources();
   lines.push('', 'Search all features (avg):');
-  lines.push(`  Pits ${res.pits}  Reeds ${res.reeds}  Feathers ${res.feathers}`);
+  lines.push(`  ${resourceLine(res)}`);
   lines.push(`  Search time ${res.searchTime.toFixed(1)} s`);
   return lines;
 }
@@ -75,25 +79,43 @@ function druidMeleeLine(game) {
 function turretDebugLines(game) {
   const s = game.damageStats;
   const lines = [`Clouds active: ${game.clouds.length}   Turrets: ${TURRET_TYPE_KEYS.map((t) => `${turretType(t).name} ${game.turrets.filter((x) => x.type === t).length}`).join(', ')}`];
+  // Damage keys carry the level that dealt it, e.g. "toader:cloud:2" (M1h §4).
+  const sum = (type, kind, level = null) => Object.entries(s)
+    .filter(([k]) => k.startsWith(`${type}:${kind}:`) && (level === null || k.endsWith(`:${level}`)))
+    .reduce((a, [, v]) => a + v, 0);
   for (const type of TURRET_TYPE_KEYS) {
-    const impact = s[`${type}:impact`] ?? 0;
-    const cloud = s[`${type}:cloud`] ?? 0;
+    const impact = sum(type, 'impact');
+    const cloud = sum(type, 'cloud');
     const split = turretType(type).attack === 'cloud' ? `  (impacts ${impact}, clouds ${cloud})` : '';
     lines.push(`  damage ${turretType(type).name.padEnd(16)} ${impact + cloud}${split}`);
+    if (turretType(type).attack === 'cloud') {
+      // Toader by level (M1h §4): impact + cloud damage from shots fired at each level.
+      const byLevel = Array.from({ length: maxLevel(type) }, (_, i) => i + 1)
+        .map((l) => `L${l} ${sum(type, 'impact', l) + sum(type, 'cloud', l)} (${sum(type, 'impact', l)} + ${sum(type, 'cloud', l)})`);
+      lines.push(`    by level: ${byLevel.join('  ')}`);
+    }
   }
+  lines.push(`  damage ${'Squirrels'.padEnd(16)} ${s.squirrel ?? 0}`); // M1h §4: counter-attacks
   return lines;
 }
 
 // Enemy drop figures for this encounter (M1d §3).
 function dropDebugLines(game) {
   const { dropped, collected } = game.dropStats;
-  const sum = (o) => o.pits + o.reeds + o.feathers;
-  const per = (o) => `Pits ${o.pits}  Reeds ${o.reeds}  Feathers ${o.feathers}`;
+  const sum = (o) => RESOURCE_KEYS.reduce((a, k) => a + o[k], 0);
+  const per = resourceLine;
   return [
     `Drops (×${game.dropMult}, X toggles): dropped ${sum(dropped)}  collected ${sum(collected)}  on field ${game.drops.length}`,
     `  dropped:   ${per(dropped)}`,
     `  collected: ${per(collected)}`,
   ];
+}
+
+// Bough figures and Double jobs this encounter (M1i §4).
+function doubleDebugLines(game) {
+  const s = game.doubleStats;
+  return [`Boughs: gained ${s.boughsGained}  spent ${s.boughsSpent}   Doubles active ${game.doubles.length}/${C.MAX_BOUGH_DOUBLES}  `
+    + `jobs completed ${s.completed}  cancelled ${s.cancelled}`];
 }
 
 // Sounds played / skipped by minGap or maxVoices over the last few seconds (M1g §5).
@@ -160,6 +182,7 @@ export function createUI(scene, callbacks) {
       pits: document.getElementById('res-pits'),
       reeds: document.getElementById('res-reeds'),
       feathers: document.getElementById('res-feathers'),
+      boughs: document.getElementById('res-boughs'),
     },
     startCombat: document.getElementById('btn-start-combat'),
     mute: document.getElementById('btn-mute'),
@@ -219,7 +242,11 @@ export function createUI(scene, callbacks) {
     menuKey = updateMenu(el, game, view, menuKey, menuHoverIndex);
     const placing = game.action.state === ActionState.SUMMON_PLACEMENT;
     el.modeBanner.hidden = !placing;
-    if (placing) setText(el.modeBanner, `Placing ${SUMMONS[game.action.target].name} — click the battlefield to place · Esc / right-click to cancel`);
+    if (placing) {
+      setText(el.modeBanner, isDoubleTargeting(game)
+        ? 'Bough Double — click a highlighted slot or turret · Esc / right-click to cancel'
+        : `Placing ${SUMMONS[game.action.target].name} — click the battlefield to place · Esc / right-click to cancel`);
+    }
     updateEndOverlay(el, game);
     updateDebugPanel(el, game, clock, view, layoutLines, scene);
   }
@@ -284,6 +311,7 @@ function updateStepBar(el, game, view) {
 // Tooltip content for the hovered object in Prep, or null (§8.4; step mode M1b §5.2.1).
 // { title, lines: [[className, text]], anchor: { x, y, halfWidth } }.
 function tooltipContent(game, hover) {
+  if (game.state === GameState.COMBAT) return combatTooltip(game, hover);
   if (game.state !== GameState.PREP || !hover) return null;
   const stepMode = isStepMode(game);
   // Travel cost changes as the Druid moves; hidden mid-travel, when it has no origin yet.
@@ -295,7 +323,7 @@ function tooltipContent(game, hover) {
     const type = C.FEATURE_TYPES[feature.type];
     const lines = feature.exhausted
       ? [['tip-muted', 'Searched']]
-      : Object.entries(type.yields).map(([res, [min, max]]) => ['', `${RESOURCE_LABELS[res]}: ${min}–${max}`]);
+      : RESOURCE_KEYS.filter((k) => type.yields[k]).map((k) => ['', `${RESOURCE_LABELS[k]}: ${type.yields[k][0]}–${type.yields[k][1]}`]);
     if (!feature.exhausted && !stepMode) lines.push(['', `Search: ${type.searchTime.toFixed(1)} sec`]);
     if (travelLine) lines.push(travelLine);
     return { title: type.name, lines, anchor: { x: feature.x, y: feature.y, halfWidth: C.LOCATION_RADIUS } };
@@ -314,7 +342,35 @@ function tooltipContent(game, hover) {
   return null;
 }
 
-// Hover tooltip, PREP only. Rebuilt only when its content changes.
+// Combat tooltips for turret slots (M1i §2.4). While targeting a Bough Double: the job on a valid
+// target with its full cost rows (resources + Bough; red rows where short), or why a target is
+// not valid. Otherwise: the hint on an empty slot, and the job on a slot a Double is building on.
+function combatTooltip(game, hover) {
+  if (!hover || (hover.kind !== 'slot' && hover.kind !== 'turret')) return null;
+  const slot = game.slots[hover.index];
+  const anchor = { x: slot.x, y: slot.y, halfWidth: C.LOCATION_RADIUS };
+  const d = doubleOnSlot(game, hover.index);
+  if (isDoubleTargeting(game)) {
+    if (d) return { title: 'Bough Double at work', lines: [['tip-muted', 'One Double per target']], anchor };
+    if (!isDoubleTarget(game, hover.index)) return { title: 'Max level', lines: [['tip-muted', 'Nothing to upgrade']], anchor };
+    if (hover.kind === 'slot') {
+      return { title: 'Build', cost: C.BOUGH_DOUBLE_COST, lines: [['tip-muted', 'Choose turret on click']], anchor };
+    }
+    const job = doubleJob(game, hover.index);
+    const lines = upgradeDetail(job.turretType, job.toLevel).split('\n').map((text) => ['', text]); // gains and time
+    if (!canAfford(game.resources, job.cost)) lines.push(['tip-warn', 'Not enough resources']);
+    return { title: `Upgrade to Level ${job.toLevel}`, cost: job.cost, lines, anchor };
+  }
+  if (hover.kind === 'slot' && !d) {
+    return { title: 'Turret slot', lines: [['tip-muted', 'Summon a Bough Double from the Druid to build here.']], anchor };
+  }
+  if (hover.kind === 'slot') {
+    return { title: `Bough Double building ${turretType(d.turretType).name}`, lines: [['tip-muted', 'Click for the job · Cancel job refunds it']], anchor };
+  }
+  return null;
+}
+
+// Hover tooltip (Prep; turret slots in Combat). Rebuilt only when its content changes.
 function updateTooltip(el, game, view, prevKey) {
   const content = tooltipContent(game, view.hover);
   const key = content ? JSON.stringify(content) + (content.cost ? costRowsKey(content.cost, game.resources) : '') : null;
@@ -341,12 +397,18 @@ function updateTooltip(el, game, view, prevKey) {
 }
 
 // "Damage 3 → 5 · Every 0.75 → 0.6 s · Range 220 → 264": what the upgrade to `level` buys.
+// For a cloud turret (M1h §2) also the cloud's radius, duration and tick interval.
 function upgradeDetail(type, level) {
   const from = levelStats(type, level - 1);
   const to = levelStats(type, level);
-  return `Damage ${from.damage} → ${to.damage}\n`
+  const cloud = from.cloud && to.cloud
+    ? `Cloud ${from.cloud.radius} → ${to.cloud.radius} px, ${from.cloud.duration} → ${to.cloud.duration} s, `
+      + `tick every ${from.cloud.tickInterval} → ${to.cloud.tickInterval} s\n`
+    : '';
+  return `${from.cloud ? 'Impact' : 'Damage'} ${from.damage} → ${to.damage}\n`
     + `Every ${from.fireInterval} → ${to.fireInterval} s\n`
     + `Range ${Math.round(levelRange(type, level - 1))} → ${Math.round(levelRange(type, level))}\n`
+    + cloud
     + `Takes ${to.time} s — turret stops firing`;
 }
 
@@ -355,7 +417,7 @@ function turretSummary(type) {
   const t = turretType(type);
   const l1 = t.levels[0];
   if (t.attack === 'cloud') {
-    return `Poison cloud: ${l1.damage} on impact, then ${t.cloud.tickDamage} every ${t.cloud.tickInterval} s to all inside\n`
+    return `Poison cloud: ${l1.damage} on impact, then ${l1.cloud.tickDamage} every ${l1.cloud.tickInterval} s to all inside\n`
       + `Every ${l1.fireInterval} s · range ${Math.round(levelRange(type, 1))}`;
   }
   return `${l1.damage} damage every ${l1.fireInterval} s · range ${Math.round(levelRange(type, 1))}`;
@@ -382,6 +444,7 @@ function buildOptions(game, menu) {
 
 // Header line above a menu's options, or null: the travel cost of a step-mode build (M1f §5.2).
 function menuHeader(game, menu) {
+  if (menu.kind === 'doubleBuild') return { text: 'Bough Double: choose a turret to build', warn: false }; // M1i §2.4
   if (menu.kind !== 'build' || !isStepMode(game)) return null;
   const steps = stepCost(game, { kind: 'slot', index: menu.index });
   return { text: `Travel: ${steps} ${steps === 1 ? 'step' : 'steps'}`, warn: steps > game.stepsRemaining };
@@ -391,7 +454,60 @@ const SUMMON_DETAIL = {
   vulture: `Lasts ${C.VULTURE_DURATION} s · flies to the wolf nearest to it`,
   squirrel: `Lasts ${C.SQUIRREL_DURATION} s · collects the nearest drop`
     + (C.SQUIRREL_BLOCKS_WOLVES ? ' · blocks wolves while waiting' : ''),
+  double: 'Builds or upgrades one turret, then vanishes · plus that job\'s cost',
 };
+
+// Turret choice for a Bough Double's build job (M1i §2.4 step 3): one card per turret type, its
+// cost rows including the Bough.
+function doubleBuildOptions(game, menu) {
+  return TURRET_TYPE_KEYS.map((type) => {
+    const job = doubleJob(game, menu.index, type);
+    const affordable = canAfford(game.resources, job.cost);
+    return {
+      title: turretType(type).name, portrait: type, cost: job.cost, costText: null,
+      detail: `${turretSummary(type)}\nBuild time ${job.time} s`, action: 'Build',
+      disabled: !affordable, reason: affordable ? '' : 'Not enough resources', turretType: type,
+    };
+  });
+}
+
+// "Damage 3 every 0.75 s · range 220": a built turret's current level (Combat info menu).
+function turretStats(turret) {
+  const s = levelStats(turret.type, turret.level);
+  const range = Math.round(levelRange(turret.type, turret.level));
+  if (s.cloud) {
+    return `Impact ${s.damage} every ${s.fireInterval} s · range ${range}\n`
+      + `Cloud ${s.cloud.radius} px, ${s.cloud.duration} s, ${s.cloud.tickDamage} every ${s.cloud.tickInterval} s`;
+  }
+  return `Damage ${s.damage} every ${s.fireInterval} s · range ${range}`;
+}
+
+// Turret menu in Combat (M1i §2.4, §2.6): type, level and stats, with no build or upgrade button
+// (Bough Doubles do that). While a Double works here, its job comes first with "Cancel job",
+// which refunds the full cost. `info` cards are shown normally but are not clickable.
+function turretMenuOptions(game, menu) {
+  const options = [];
+  const d = doubleOnSlot(game, menu.index);
+  if (d) {
+    const what = d.job === 'build' ? `building ${turretType(d.turretType).name}` : `upgrading to level ${d.toLevel}`;
+    const left = d.state === DoubleState.WISP ? 'arriving' : `${Math.max(0, d.duration - d.elapsed).toFixed(1)} s left`;
+    options.push({
+      title: `Bough Double: ${what}`, portrait: 'double', cost: null, costText: `Refund: ${formatCost(d.paid)}`,
+      detail: left, action: 'Cancel job', disabled: false, reason: '',
+    });
+  }
+  const turret = turretOnSlot(game, menu.index);
+  if (turret) {
+    options.push({
+      title: `${turretType(turret.type).name} · level ${turret.level}`, portrait: turret.type, cost: null,
+      // "No upgrades available" stays for future single-level types (M1h §2.3).
+      costText: maxLevel(turret.type) === 1 ? 'No upgrades available'
+        : turret.level >= maxLevel(turret.type) ? 'Max level' : `Upgrade with a Bough Double (level ${turret.level + 1})`,
+      detail: turretStats(turret), action: null, disabled: true, info: true, reason: '',
+    });
+  }
+  return options;
+}
 
 // The options a menu shows, each { title, portrait, cost, costText, detail, action, disabled, reason }.
 // portrait: entity image key (portraits.js) or null. cost: shown as cost rows (M1f §3); or
@@ -411,21 +527,8 @@ function menuOptions(game, menu) {
       };
     });
   }
-  // Turret menu (§11.1, M1e §4.3, M1f §5.1): the next level's cost and gains; at the top level
-  // "Max level", or "No upgrades available" for a type with only one level; no option either way.
-  const turret = turretOnSlot(game, menu.index);
-  if (!turret) return [];
-  const name = turretType(turret.type).name;
-  const next = nextLevelStats(turret);
-  if (!next) {
-    const costText = maxLevel(turret.type) === 1 ? 'No upgrades available' : 'Max level';
-    return [{ title: `${name} · level ${turret.level}`, portrait: null, cost: null, costText, detail: '', action: null, disabled: true, reason: '' }];
-  }
-  const { available, reason } = upgradeAvailability(game, menu.index);
-  return [{
-    title: `${name}: upgrade to level ${turret.level + 1}`, portrait: null, cost: next.cost, costText: null,
-    detail: upgradeDetail(turret.type, turret.level + 1), action: 'Upgrade', disabled: !available, reason,
-  }];
+  if (menu.kind === 'doubleBuild') return doubleBuildOptions(game, menu);
+  return turretMenuOptions(game, menu);
 }
 
 function createMenuOption(index, option) {
@@ -459,14 +562,19 @@ function updateMenu(el, game, view, prevKey, hoverIndex) {
   if (!menu) return null;
 
   const options = menuOptions(game, menu);
-  if (menu.kind === 'build' && hoverIndex !== null) view.menuHoverType = options[hoverIndex]?.turretType ?? null;
+  if (options.length === 0) { // e.g. a cancelled build job's slot is empty again
+    view.menu = null;
+    el.menu.hidden = true;
+    return null;
+  }
+  if ((menu.kind === 'build' || menu.kind === 'doubleBuild') && hoverIndex !== null) view.menuHoverType = options[hoverIndex]?.turretType ?? null;
   const header = menuHeader(game, menu);
   el.menuHeader.hidden = !header;
   if (header) {
     setText(el.menuHeader, header.text);
     el.menuHeader.classList.toggle('warn', header.warn);
   }
-  const key = `${menu.kind}:${menu.index}`;
+  const key = `${menu.kind}:${menu.index}:${options.map((o) => o.portrait).join()}`; // cards change when a Double's job ends
   if (key !== prevKey || el.menuOptions.children.length !== options.length) {
     el.menuOptions.replaceChildren(...options.map((o, i) => createMenuOption(i, o)));
   }
@@ -486,7 +594,7 @@ function updateMenu(el, game, view, prevKey, hoverIndex) {
     setText(button, o.action ?? '');
     button.hidden = !o.action;
     button.disabled = o.disabled;
-    node.classList.toggle('disabled', o.disabled);
+    node.classList.toggle('disabled', o.disabled && !o.info);
     node.classList.toggle('clickable', !o.disabled);
   });
 
@@ -542,9 +650,10 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
     `Druid HP: ${game.druidHp} / ${C.DRUID_HP}`,
     druidMeleeLine(game),
     ...enemyDebugLines(game),
-    `Resources: Pits ${game.resources.pits}  Reeds ${game.resources.reeds}  Feathers ${game.resources.feathers}`,
+    `Resources: ${resourceLine(game.resources)}`,
     `Turrets: ${game.turrets.length}  Pebbles in flight: ${game.projectiles.length}  Vultures: ${game.vultures.length}/${C.MAX_VULTURES}  Squirrels: ${game.squirrels.length}/${C.MAX_SQUIRRELS}${C.SQUIRREL_BLOCKS_WOLVES ? ' (block wolves)' : ''}`,
     ...dropDebugLines(game),
+    ...doubleDebugLines(game),
     ...turretDebugLines(game),
     ...soundDebugLines(),
     ...layoutLines,

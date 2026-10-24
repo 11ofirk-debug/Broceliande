@@ -126,9 +126,10 @@ function frame(now) {
   // Hover is re-picked every frame so it stays correct when objects change under a still cursor.
   view.pointer = input.mouse.inside ? { x: input.mouse.x, y: input.mouse.y } : null;
   view.hover = input.mouse.inside ? pick(game, input.mouse) : null;
-  canvas.style.cursor = game.action.state === ActionState.SUMMON_PLACEMENT
-    ? 'crosshair'
-    : isInteractive(game, view.hover) ? 'pointer' : 'default';
+  // Placement: crosshair, except over a valid Bough Double target (pointer).
+  const placing = game.action.state === ActionState.SUMMON_PLACEMENT;
+  const interactive = isInteractive(game, view.hover) && (!placing || game.action.target === 'double');
+  canvas.style.cursor = interactive ? 'pointer' : placing ? 'crosshair' : 'default';
 
   renderer.render(game, view);
   ui.update(game, clock, view);

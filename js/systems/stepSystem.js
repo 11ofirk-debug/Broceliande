@@ -82,6 +82,46 @@ export function calibrationFigures(game) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Footprints (M1g §2.1, M1h §1): one per step of a leg, shared by the hover preview and the
+// committed route trail so a committed leg keeps exactly the footprints that were previewed.
+// ---------------------------------------------------------------------------
+
+// Footprint positions from `from` to the marker at `to`: `cost` prints evenly spaced, the last
+// on the edge of the target's footprint circle (not on the object), alternating left / right of
+// the line by FOOTPRINT_SIDE_OFFSET and facing the direction of travel.
+// fromMarker: the Druid stands on a marker (not at home), so the trail starts at that marker's
+// edge too. Returns [{ x, y, angle, side }].
+export function footprintLayout(from, to, cost, fromMarker) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const ux = dx / dist;
+  const uy = dy / dist;
+  const start = fromMarker ? Math.min(C.LOCATION_RADIUS, dist / 2) : 0;
+  const end = Math.max(start, dist - C.LOCATION_RADIUS);
+  const angle = Math.atan2(uy, ux);
+  const prints = [];
+  for (let i = 1; i <= cost; i++) {
+    const along = start + (end - start) * (i / cost);
+    const side = i % 2 === 1 ? -1 : 1; // left, right, left, …
+    prints.push({
+      x: from.x + ux * along - uy * C.FOOTPRINT_SIDE_OFFSET * side,
+      y: from.y + uy * along + ux * C.FOOTPRINT_SIDE_OFFSET * side,
+      angle,
+      side,
+    });
+  }
+  return prints;
+}
+
+// The footprints of the leg from the Druid's current position to a marker.
+export function legFootprints(game, marker) {
+  const from = game.druidPos;
+  const fromMarker = from.x !== C.DRUID_POS.x || from.y !== C.DRUID_POS.y;
+  return footprintLayout(from, markerPos(game, marker), stepCost(game, marker), fromMarker);
+}
+
 // Hover preview (§5.2): for a hovered unsearched feature or empty slot in step-mode Prep,
 // { from, to, cost, affordable }, where affordable means within the step budget. Slots
 // short of resources still preview (the tooltip says why). None while travelling, since
@@ -92,5 +132,5 @@ export function routePreview(game, hover) {
   if (hover.kind === 'feature' && game.features[hover.index].exhausted) return null;
   if (hover.kind !== 'feature' && hover.kind !== 'slot') return null;
   const cost = stepCost(game, hover);
-  return { from: game.druidPos, to: markerPos(game, hover), cost, affordable: cost <= game.stepsRemaining };
+  return { from: game.druidPos, prints: legFootprints(game, hover), cost, affordable: cost <= game.stepsRemaining };
 }

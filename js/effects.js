@@ -15,4 +15,9 @@ export function updateEffects(game, dt) {
   game.swipes = game.swipes.filter((s) => s.age < C.DRUID_SWIPE_TIME);
   for (const s of game.sparks) s.age += dt;
   game.sparks = game.sparks.filter((s) => s.age < C.STRIKE_SPARK_TIME);
+  // Bough Double effects (M1i §2.7): wood chips and Doubles fading out after a job.
+  for (const c of game.chips) c.age += dt;
+  game.chips = game.chips.filter((c) => c.age < C.DOUBLE_CHIP_TIME);
+  for (const f of game.doubleFades) f.age += dt;
+  game.doubleFades = game.doubleFades.filter((f) => f.age < C.DOUBLE_FADE_TIME);
 }

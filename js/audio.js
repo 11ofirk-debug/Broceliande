@@ -85,11 +85,14 @@ function subscribe() {
   events.on('druidSwing', (e) => play('druidWhoosh', e));
   events.on('druidImpact', (e) => play('druidThud', e));
   events.on('vulturePecked', (e) => play('vulturePeck', e));
+  events.on('squirrelStrikes', (e) => play('squirrelScratch', e));
   events.on('enemyDied', (e) => play(ENEMY_DEATH_SOUND[e.type], e));
   events.on('resourcesGained', (e) => play('resourceChime', e));
   events.on('searchStarted', (e) => play('searchRustle', e));
   events.on('turretBuilt', (e) => play('build', e));
-  events.on('upgradeTick', (e) => play('upgradeTick', e));
+  events.on('doubleAppears', (e) => play('doubleAppears', e));
+  events.on('doubleCraftHit', (e) => play('doubleCraftHit', e));
+  events.on('doubleCancelled', (e) => play('doubleCancelled', e));
   events.on('upgradeCompleted', (e) => play('upgradeDone', e));
   events.on('summonPlaced', (e) => play('summon', e));
 }
@@ -200,6 +203,26 @@ function noise(t, out, { filter = 'bandpass', freq, to = freq, q = 1, dur, attac
   return delay + dur;
 }
 
+// Wood creak: a slow buzz (a train of clicks) gliding from freq to `to`, through a narrow
+// mid band so it sounds like stressed wood rather than a tone.
+function creak(t, out, freq, to, dur, gain) {
+  const osc = ctx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(freq, t);
+  osc.frequency.exponentialRampToValueAtTime(to, t + dur);
+  const band = ctx.createBiquadFilter();
+  band.type = 'bandpass';
+  band.frequency.value = 900;
+  band.Q.value = 3;
+  const env = envelope(t, 0.03, dur, gain);
+  osc.connect(band);
+  band.connect(env);
+  env.connect(out);
+  osc.start(t);
+  osc.stop(t + dur + 0.02);
+  return dur;
+}
+
 // A small bell: fundamental plus a quieter, quickly fading inharmonic partial.
 function bell(t, out, freq, delay, dur, gain) {
   tone(t, out, { freq, dur, gain, delay, attack: 0.004 });
@@ -263,6 +286,12 @@ const RECIPES = {
     return 0.02;
   },
 
+  // Short, light scratch (M1h §3.4): two quick high noise rakes, thinner and higher than the peck.
+  squirrelScratch(t, out, p) {
+    noise(t, out, { freq: 5500 * p, to: 7500 * p, q: 2.5, dur: 0.025, gain: 0.8 });
+    return noise(t, out, { freq: 6000 * p, to: 8500 * p, q: 2.5, dur: 0.03, gain: 0.6, delay: 0.035 });
+  },
+
   // Short descending yelp.
   wolfDie(t, out, p) {
     tone(t, out, { type: 'triangle', freq: 1000 * p, to: 380 * p, dur: 0.22, attack: 0.01, gain: 0.9 });
@@ -302,10 +331,20 @@ const RECIPES = {
   },
 
   // Bright chime per resource gained, pitched by resource; several resources ring in turn.
+  // Boughs (M1i §1.3) are the lowest and woody: a hollow knock rather than a bell.
   resourceChime(t, out, p, data) {
     let end = 0;
     (data.resources ?? []).forEach((res, i) => {
-      end = bell(t, out, C.SOUND_RESOURCE_FREQ[res] * p, i * C.SOUND_CHIME_STAGGER, 0.4, 0.8);
+      const freq = C.SOUND_RESOURCE_FREQ[res] * p;
+      const delay = i * C.SOUND_CHIME_STAGGER;
+      if (res === 'boughs') {
+        tone(t, out, { type: 'triangle', freq, to: freq * 0.85, dur: 0.22, gain: 0.9, delay, attack: 0.003 });
+        tone(t, out, { freq: freq * 2.4, dur: 0.07, gain: 0.3, delay, attack: 0.002 });
+        noise(t, out, { freq: freq * 4, q: 4, dur: 0.04, gain: 0.4, delay });
+        end = delay + 0.22;
+      } else {
+        end = bell(t, out, freq, delay, 0.4, 0.8);
+      }
     });
     return end;
   },
@@ -334,11 +373,23 @@ const RECIPES = {
     return 0.17;
   },
 
-  // One ratchet tick.
-  upgradeTick(t, out, p) {
-    noise(t, out, { filter: 'highpass', freq: 3000 * p, dur: 0.012, gain: 0.8 });
-    tone(t, out, { type: 'square', freq: 900 * p, dur: 0.01, gain: 0.25, attack: 0.001 });
-    return 0.015;
+  // Bough Double arrives (M1i §2.8): a soft woody creak with a low shimmer under it.
+  doubleAppears(t, out, p) {
+    creak(t, out, 40 * p, 58 * p, 0.32, 0.7);
+    [1, 1.5].forEach((k, i) => tone(t, out, { freq: 220 * k * p, to: 300 * k * p, dur: 0.4, attack: 0.08, gain: 0.18, delay: 0.05 + i * 0.05 }));
+    return 0.5;
+  },
+
+  // One crafting swing: a tiny, quiet wooden tap. Replaces the old upgrade ratchet.
+  doubleCraftHit(t, out, p) {
+    tone(t, out, { type: 'triangle', freq: 720 * p, to: 520 * p, dur: 0.035, gain: 0.7, attack: 0.002 });
+    noise(t, out, { freq: 2200 * p, q: 4, dur: 0.02, gain: 0.4 });
+    return 0.04;
+  },
+
+  // Job cancelled: a short descending creak.
+  doubleCancelled(t, out, p) {
+    return creak(t, out, 65 * p, 32 * p, 0.3, 0.7);
   },
 
   // Rising two-note chime.

@@ -5,6 +5,7 @@
 import * as C from './config.js';
 import { createLanePath } from './lanePath.js';
 import { createRng } from './rng.js';
+import { emptyResources } from './resources.js';
 
 export function createScene() {
   const lanes = C.LANES.map((lane) => ({
@@ -103,7 +104,7 @@ export function laneStats(lane) {
 
 // Average yield of searching every feature once, plus the total search time.
 export function expectedResources() {
-  const totals = { pits: 0, reeds: 0, feathers: 0, searchTime: 0 };
+  const totals = { ...emptyResources(), searchTime: 0 }; // every resource, Boughs included (M1i §1.3)
   for (const f of C.FEATURES) {
     const type = C.FEATURE_TYPES[f.type];
     for (const [res, [min, max]] of Object.entries(type.yields)) totals[res] += (min + max) / 2;

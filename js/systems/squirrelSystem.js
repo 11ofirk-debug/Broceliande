@@ -7,6 +7,9 @@ import { add, resourceName } from '../resources.js';
 import { addFloatingText } from '../effects.js';
 import { isLanded } from './dropSystem.js';
 import { events } from '../events.js';
+import { damageEnemy } from './combatSystem.js';
+
+const TIMER_EPSILON = 1e-9; // s, so 2.1 s of 1/60 s steps strikes on time
 
 function nearestUnclaimedDrop(game, s) {
   let best = null;
@@ -35,6 +38,7 @@ function retarget(game, s) {
 function collect(game, s, drop) {
   add(game.resources, { [drop.resource]: 1 });
   game.dropStats.collected[drop.resource]++;
+  if (drop.resource === 'boughs') game.doubleStats.boughsGained++; // M1i §4 debug figure
   game.drops = game.drops.filter((d) => d !== drop);
   addFloatingText(game, `+1 ${resourceName(drop.resource, 1)}`, drop.x, drop.y - 14, true);
   events.emit('resourcesGained', { resources: [drop.resource] });
@@ -62,6 +66,38 @@ export function updateSquirrels(game, dt) {
       retarget(game, s); // next nearest unclaimed drop, or wait
     }
   }
+}
+
+// Counter-attack (M1h §3): a Squirrel being attacked strikes back at the attacker with the lowest
+// HP (ties: lowest ID), once every SQUIRREL_ATTACK_INTERVAL. Its attackers are the enemies it is
+// blocking this step (set by updateBlocking just before), so it never seeks enemies out. The
+// timer counts only while it is being attacked and resets to zero when it is not.
+export function updateSquirrelStrikes(game, dt) {
+  for (const s of game.squirrels) {
+    const attackers = game.enemies.filter((e) => e.blockedBy === s.id);
+    if (attackers.length === 0) {
+      s.strikeTimer = 0;
+      s.strikeTargetId = null;
+      continue;
+    }
+    const target = attackers.reduce((a, b) => (b.hp < a.hp || (b.hp === a.hp && b.id < a.id) ? b : a));
+    s.strikeTargetId = target.id;
+    s.strikeTimer += dt;
+    if (s.strikeTimer < C.SQUIRREL_ATTACK_INTERVAL - TIMER_EPSILON) continue;
+    s.strikeTimer -= C.SQUIRREL_ATTACK_INTERVAL;
+    strike(game, s, target);
+  }
+}
+
+// One strike: a small swipe toward the target, a white flash on it and a small "-1". Damage
+// reveals its HP bar; a kill counts normally and rolls drops (damageEnemy → killEnemy).
+function strike(game, s, target) {
+  if (Math.abs(target.x - s.x) > 0.5) s.facing = Math.sign(target.x - s.x);
+  game.swipes.push({ x1: s.x, y1: s.y, x2: target.x, y2: target.y, age: 0, small: true });
+  target.lastStruckTime = game.combatTime;
+  addFloatingText(game, `-${C.SQUIRREL_DAMAGE}`, target.x, target.y - target.radius * 2, true);
+  events.emit('squirrelStrikes', { x: s.x, y: s.y });
+  damageEnemy(game, target, C.SQUIRREL_DAMAGE, 'squirrel');
 }
 
 // Blockers wolves stop for (§2.4): with SQUIRREL_BLOCKS_WOLVES, Squirrels that are not moving.

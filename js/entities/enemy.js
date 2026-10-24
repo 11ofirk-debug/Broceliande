@@ -56,6 +56,7 @@ export function createEnemy(id, type, lane, offset, rng) {
     lastHitTime: -Infinity, // combat time of the last pebble hit (hit flash)
     lastKnockTime: -Infinity, // combat time of the last Druid strike (visual knock-back, M1f §4)
     knockDir: null,        // unit direction of that knock-back
+    lastStruckTime: -Infinity, // combat time of the last Squirrel strike (white flash only, M1h §3.2)
     lastBiteTime: -Infinity, // combat time of its last bite on the Druid or a summon (lunge)
     blockedBy: null,       // id of the landed Vulture (or Squirrel) holding it up (§15.4), or null
     vultureBiteTimer: 0,   // s since it started biting that blocker / last bit it

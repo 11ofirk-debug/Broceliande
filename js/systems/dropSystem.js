@@ -4,13 +4,14 @@
 
 import * as C from '../config.js';
 import { laneWorldPos, enemyType } from '../entities/enemy.js';
+import { emptyResources } from '../resources.js';
 
 // Furthest an item's centre may sit from its lane's centreline, so everything drawn for it
 // (icon, bob and glow, which reaches 0.6 × icon size; see drawDrop) stays inside the corridor (§1.2).
 const MAX_DROP_OFFSET = C.CORRIDOR_WIDTH / 2 - C.RESOURCE_ICON_SIZE * C.DROP_ICON_SCALE * 0.6;
 
 export function emptyDropStats() {
-  return { dropped: { pits: 0, reeds: 0, feathers: 0 }, collected: { pits: 0, reeds: 0, feathers: 0 } };
+  return { dropped: emptyResources(), collected: emptyResources() };
 }
 
 // Roll each resource independently with the seeded RNG (§1.1). Chances are multiplied by the

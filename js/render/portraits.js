@@ -4,7 +4,7 @@
 // copy of that bitmap.
 
 import * as C from '../config.js';
-import { drawVulture, drawSquirrel, drawTurretSlot, drawTurret, drawToader } from './entities.js';
+import { drawVulture, drawSquirrel, drawTurretSlot, drawTurret, drawToader, drawDruid, DRUID_REST_POSE } from './entities.js';
 
 const SCRATCH = 240;   // px, scratch canvas the entity is first drawn on
 const RESOLUTION = 2;  // bitmap pixels per CSS pixel, so portraits stay sharp when the stage scales
@@ -14,6 +14,8 @@ const PAD = 1;         // px of margin inside the portrait
 const PORTRAIT_DRAW = {
   vulture: (ctx, x, y) => drawVulture(ctx, { x, y, state: 'LANDED', facing: 1, id: 0 }, 0, false, false),
   squirrel: (ctx, x, y) => drawSquirrel(ctx, { x, y, state: 'WAITING', facing: 1, id: 0, stride: 0 }, 0, false),
+  // Bough Double (M1i §2.7): the Druid's drawing, monochrome brown and translucent.
+  double: (ctx, x, y) => drawDruid(ctx, x, y, false, 0, DRUID_REST_POSE, { tint: C.DOUBLE_TINT, alpha: C.DOUBLE_ALPHA }),
   // Turrets on their slot pad, level 1 (M1f §5.2 build menu).
   sprinkler: (ctx, x, y) => {
     drawTurretSlot(ctx, { x, y }, false, false);

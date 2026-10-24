@@ -59,6 +59,11 @@ export function turretDamage(turret) {
   return levelStats(turret.type, turret.level).damage;
 }
 
+// Cloud stats of a cloud-attack type at a level (M1h §2.1), or undefined for other types.
+export function cloudStats(type, level) {
+  return levelStats(type, level).cloud;
+}
+
 export function turretFireInterval(turret) {
   return levelStats(turret.type, turret.level).fireInterval;
 }
