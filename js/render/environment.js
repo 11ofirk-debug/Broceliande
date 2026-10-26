@@ -66,10 +66,10 @@ export function drawShadow(ctx, x, y, rx, ry) {
 }
 
 // level: its palette, thornBushes (M2a §5.3) for spiky thorn bushes instead of round ones, and
-// gnarledTrees (M2b §3.3) for twisted trees.
+// gnarledTrees (M2b §3.3) for twisted trees, bareTrees (M2f §4.8) for pale leafless ones.
 export function drawDecor(ctx, item, level) {
   const palette = level.palette;
-  if (item.kind === 'tree') (level.gnarledTrees ? drawGnarledTree : drawTree)(ctx, item, palette);
+  if (item.kind === 'tree') (level.bareTrees ? drawBareTree : level.gnarledTrees ? drawGnarledTree : drawTree)(ctx, item, palette);
   else if (item.kind === 'bush') (level.thornBushes ? drawThornBush : drawBush)(ctx, item, palette);
   else if (item.kind === 'rock') drawRock(ctx, item, palette);
   else THEMED[item.kind](ctx, item, palette);
@@ -127,7 +127,148 @@ const THEMED = {
   kiln: drawKiln,
   chapelWall: drawChapelWall,
   sunkenStones: drawSunkenStones,
+  cairn: drawCairn,
+  bell: drawBell,
+  stump: drawStump,
+  weepingStone: drawWeepingStone,
+  root: drawRoot,
 };
+
+// M2f §4.8: a pale, leafless tree: a bleached trunk with bare forking branches (Bone Orchard).
+function drawBareTree(ctx, { x, y, size: s, variant }, P) {
+  drawShadow(ctx, x, y, 22 * s, 7 * s);
+  ctx.strokeStyle = P.treeDark.trunk;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 7 * s;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + (variant - 1) * 3 * s, y - 42 * s);
+  ctx.stroke();
+  ctx.strokeStyle = P.treeLight[variant];
+  for (const [ex, ey, w] of [[-26, -66, 4], [22, -72, 4], [2, -84, 3.5], [-14, -50, 3], [16, -54, 3]]) {
+    ctx.lineWidth = w * s;
+    ctx.beginPath();
+    ctx.moveTo(x + (variant - 1) * 3 * s, y - 40 * s);
+    ctx.quadraticCurveTo(x + ex * 0.4 * s, y + (ey + 16) * s, x + ex * s, y + ey * s);
+    ctx.stroke();
+  }
+}
+
+// M2f §4.6: a large moss-covered cairn of piled stones. size = half-width.
+function drawCairn(ctx, { x, y, size: w }, P) {
+  const h = w * 0.45;
+  drawShadow(ctx, x, y, w * 1.02, h * 0.2);
+  const stones = [[-0.6, 0.18, 0.36], [0, 0.2, 0.42], [0.6, 0.18, 0.36], [-0.3, 0.55, 0.34], [0.32, 0.55, 0.34], [0, 0.85, 0.3]];
+  for (const [dx, dy, r] of stones) {
+    ctx.fillStyle = P.rock.dark;
+    ctx.beginPath();
+    ctx.ellipse(x + dx * w, y - dy * h * 1.4, r * w * 0.8, r * h * 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = P.rock.base;
+    ctx.beginPath();
+    ctx.ellipse(x + dx * w - r * w * 0.12, y - dy * h * 1.4 - r * h * 0.25, r * w * 0.62, r * h * 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = P.moss; // moss over the top of each stone
+    ctx.beginPath();
+    ctx.ellipse(x + dx * w, y - dy * h * 1.4 - r * h * 0.55, r * w * 0.55, r * h * 0.45, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// M2f §4.10: a cracked bronze bell, half buried and tilted. size = half-width.
+function drawBell(ctx, { x, y, size: w }, P) {
+  const h = w * 0.9;
+  drawShadow(ctx, x, y, w * 1.1, w * 0.2);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-0.35);
+  ctx.fillStyle = P.bronze.dark;
+  ctx.beginPath();
+  ctx.moveTo(-w, 0);
+  ctx.quadraticCurveTo(-w * 0.75, -h * 0.4, -w * 0.5, -h);
+  ctx.quadraticCurveTo(0, -h * 1.2, w * 0.5, -h);
+  ctx.quadraticCurveTo(w * 0.75, -h * 0.4, w, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = P.bronze.base;
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.8, -h * 0.05);
+  ctx.quadraticCurveTo(-w * 0.6, -h * 0.45, -w * 0.38, -h * 0.95);
+  ctx.quadraticCurveTo(-w * 0.05, -h * 1.05, w * 0.1, -h * 0.95);
+  ctx.lineTo(-w * 0.2, -h * 0.05);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = P.bronze.light;
+  ctx.lineWidth = 3;
+  ctx.beginPath(); // the lip ring
+  ctx.moveTo(-w * 0.95, -h * 0.12);
+  ctx.lineTo(w * 0.95, -h * 0.12);
+  ctx.stroke();
+  ctx.strokeStyle = '#1a120a';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); // the crack
+  ctx.moveTo(w * 0.15, -h * 0.95);
+  ctx.lineTo(w * 0.05, -h * 0.6);
+  ctx.lineTo(w * 0.22, -h * 0.42);
+  ctx.lineTo(w * 0.12, -h * 0.15);
+  ctx.stroke();
+  ctx.restore();
+  // Earth heaped over its lower side.
+  ctx.fillStyle = P.vegetation.base;
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.2, y + 2, w * 1.05, w * 0.22, 0, Math.PI, Math.PI * 2);
+  ctx.fill();
+}
+
+// M2f §4.7: a burnt tree stump, black with a faint ember glow in its top.
+function drawStump(ctx, { x, y, size: s, variant }, P) {
+  drawShadow(ctx, x, y, 14 * s, 5 * s);
+  ctx.fillStyle = P.treeDark.trunk;
+  ctx.beginPath();
+  ctx.moveTo(x - 9 * s, y);
+  ctx.lineTo(x - 7 * s, y - (14 + variant * 3) * s);
+  ctx.lineTo(x - 2 * s, y - (10 + variant * 2) * s);
+  ctx.lineTo(x + 3 * s, y - (17 + variant * 2) * s);
+  ctx.lineTo(x + 8 * s, y - 12 * s);
+  ctx.lineTo(x + 10 * s, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = P.ember;
+  ctx.beginPath();
+  ctx.arc(x + 1 * s, y - 11 * s, 2.5 * s, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// M2f §4.9: a tall standing stone with dark wet streaks running down it.
+function drawWeepingStone(ctx, item, P) {
+  drawStandingStone(ctx, item, P);
+  const { x, y, size: s, variant } = item;
+  const h = (46 + variant * 6) * s;
+  ctx.strokeStyle = P.streak;
+  ctx.lineWidth = 2.5 * s;
+  ctx.lineCap = 'round';
+  for (const dx of [-6, 1, 7]) {
+    ctx.beginPath();
+    ctx.moveTo(x + dx * s, y - h * 0.8);
+    ctx.quadraticCurveTo(x + (dx + 2) * s, y - h * 0.45, x + (dx - 1) * s, y - h * 0.08);
+    ctx.stroke();
+  }
+}
+
+// M2f §4.11: a huge ancient root arching out of the ground, pointing away from the Druid.
+function drawRoot(ctx, { x, y, size: s, angle = 0 }, P) {
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle) * 0.5;
+  ctx.lineCap = 'round';
+  for (const [w, color, lift] of [[18, P.root.dark, 0], [13, P.root.base, 2], [5, P.root.light, 5]]) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = w * s;
+    ctx.beginPath();
+    ctx.moveTo(x - dx * 40 * s, y - dy * 40 * s);
+    ctx.quadraticCurveTo(x, y - (24 + lift) * s, x + dx * 40 * s, y + dy * 40 * s);
+    ctx.stroke();
+  }
+}
 
 // M2f §4.2: a shallow stream across the map, drawn before the corridors so they cross it as
 // fords. level.stream: { points: [{ x, y }, …], width }. Decoration only.
@@ -146,6 +287,42 @@ export function drawStream(ctx, scene) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+// M2f §4.7: very subtle ash flecks drifting slowly over the ground (level.ashFlecks of them). Each
+// fleck's path comes from its index and the real-time clock, so it needs no state. Visual only.
+export function drawAshFlecks(ctx, scene, t) {
+  const n = scene.level.ashFlecks;
+  if (!n) return;
+  const P = scene.level.palette;
+  ctx.save();
+  ctx.fillStyle = P.ash;
+  for (let i = 0; i < n; i++) {
+    const h1 = Math.sin(i * 12.9898) * 43758.5453;
+    const h2 = Math.sin(i * 78.233) * 12345.678;
+    const fx = h1 - Math.floor(h1);
+    const fy = h2 - Math.floor(h2);
+    const span = C.STAGE_HEIGHT - C.HUD_STRIP_HEIGHT;
+    const x = (fx * C.STAGE_WIDTH + t * (8 + fx * 10) + Math.sin(t * 0.7 + i) * 12) % C.STAGE_WIDTH;
+    const y = C.HUD_STRIP_HEIGHT + ((fy * span + t * (5 + fy * 6)) % span);
+    ctx.globalAlpha = 0.35 + 0.35 * Math.sin(t * 1.3 + i * 2.1) ** 2;
+    ctx.beginPath();
+    ctx.arc(x, y, 1.6 + fx * 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// M2f §4.11: a sickly glow at each lane entrance (palette.laneGlow = 'r, g, b'), slowly breathing.
+export function drawLaneGlow(ctx, p, rgb, t) {
+  const a = 0.28 + 0.1 * Math.sin(t * 1.2);
+  const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 120);
+  g.addColorStop(0, `rgba(${rgb}, ${a})`);
+  g.addColorStop(1, `rgba(${rgb}, 0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 120, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // M2f §4.1: a charcoal kiln, a low domed mound of earth with a faint orange glow at its vent.

@@ -3,7 +3,7 @@
 import * as C from './config.js';
 import { GameState, ActionState } from './states.js';
 import { drawDebugOverlay } from './debug/debugOverlay.js';
-import { drawFloor, drawCorridors, drawFlats, drawDecor, drawStream } from './render/environment.js';
+import { drawFloor, drawCorridors, drawFlats, drawDecor, drawStream, drawAshFlecks, drawLaneGlow } from './render/environment.js';
 import {
   drawTurretSlot, drawDruid, drawFeature, drawWolf, drawBear, drawOgre, drawEnemyHpBar, drawDruidHpBar, drawDustRing, drawLanePulse,
   drawTurret, drawToader, toaderMouthOpen, drawPellet, drawCloud, drawRange, drawProgressBar, drawFloatingText, drawPebble,
@@ -72,6 +72,8 @@ export function createRenderer(canvas) {
     drawStream(ctx, scene); // M2f §4.2: under the corridors, which cross it as fords
     drawCorridors(ctx, scene);
     drawFlats(ctx, scene);
+    // M2f §4.11: the Heartwood's sickly glow at its lane entrances.
+    if (scene.level.laneGlow) for (const lane of game.lanes) drawLaneGlow(ctx, laneEntrance(lane), scene.level.palette.laneGlow, performance.now() / 1000);
     // A mini-boss's lane entrance pulsing red as it arrives (M2c §2.6).
     for (const p of game.lanePulses) drawLanePulse(ctx, laneEntrance(game.lanes.find((l) => l.id === p.laneId)), p.age / C.BOSS_LANE_PULSE_TIME);
     game.slots.forEach((slot, i) => {
@@ -118,6 +120,7 @@ export function createRenderer(canvas) {
       })),
     ].sort((a, b) => a.y - b.y);
     for (const d of drawables) d.draw();
+    drawAshFlecks(ctx, scene, performance.now() / 1000); // M2f §4.7: ambient, over the ground and entities
     for (const p of game.projectiles) (p.kind === 'pellet' ? drawPellet : drawPebble)(ctx, p);
     for (const s of game.swipes) drawSwipe(ctx, s, s.age / C.DRUID_SWIPE_TIME);
     for (const s of game.sparks) drawSpark(ctx, s, s.age / C.STRIKE_SPARK_TIME);

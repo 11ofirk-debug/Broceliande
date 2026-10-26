@@ -266,22 +266,23 @@ function themedDecor(scene) {
     blocked.push({ x: lm.x, y: lm.y - h * 0.5, r: lm.size });
   }
 
-  // Standing stones in a ring round the Druid: one per evenly spaced angle, at the first radius
+  // Standing stones (or another kind, e.g. the Heartwood's roots) in a ring round the Druid: one per
+  // evenly spaced angle, at the first radius
   // in [min, max] (10 px steps) where it clears corridors, candidates and the stones before it;
   // left out where there is none.
   if (level.stoneRing) {
-    const { radius: [rMin, rMax], count, size } = level.stoneRing;
+    const { radius: [rMin, rMax], count, size, kind = 'standingStone' } = level.stoneRing;
     const d = level.druidPos;
-    const e = C.DECOR.extent.standingStone;
+    const e = C.DECOR.extent[kind];
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2 + rng.range(-0.08, 0.08);
       const variant = rng.int(0, 2);
       for (let r = rMin; r <= rMax; r += 10) {
         const p = { x: d.x + Math.cos(a) * r, y: d.y + Math.sin(a) * r };
         const c = { x: p.x, y: p.y - e.lift * size };
-        if (!decorFits(scene, 'standingStone', p, size)) continue;
+        if (!decorFits(scene, kind, p, size)) continue;
         if (blocked.some((b) => Math.hypot(b.x - c.x, b.y - c.y) < b.r + e.r * size)) continue;
-        items.push({ kind: 'standingStone', x: p.x, y: p.y, size, variant });
+        items.push({ kind, x: p.x, y: p.y, size, variant, angle: a }); // angle: which way a root points
         blocked.push({ x: c.x, y: c.y, r: e.r * size });
         break;
       }

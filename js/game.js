@@ -194,6 +194,7 @@ export function startEncounter(game, { newSeed = false, levelId = null, resource
   game.enemies = [];
   game.meleeSlots = createMeleeSlots(level.druidPos);
   game.spawnQueues = buildSpawnQueues(level, game.lanes, game.rng);
+  game.tolls = [...(level.tolls ?? [])].sort((a, b) => a - b); // M2f §4.10: bell tolls still to ring (s)
   game.enemyCounts = emptyEnemyCounts();
   setState(game, GameState.PREP);
 }
@@ -315,6 +316,15 @@ function hideItem(game) {
   return { featureIndex: game.rng.int(0, game.features.length - 1), itemId, found: false };
 }
 
+// Bell tolls (M2f §4.10): at each of the level's toll times in Combat, a bellToll event (heard as a
+// deep bell just before a surge). No gameplay effect.
+function updateTolls(game) {
+  while (game.tolls.length && game.tolls[0] <= game.combatTime) {
+    game.tolls.shift();
+    events.emit('bellToll', {});
+  }
+}
+
 // Equipment HP regen (M2e §2.3, Sap Pendant): druid.regenAmount HP every DRUID_REGEN_INTERVAL of
 // Combat, never above his max HP. Nothing happens without it.
 function updateDruidRegen(game, dt) {
@@ -410,6 +420,7 @@ export function updateGame(game, dt) {
     case GameState.COMBAT:
       game.combatTime += dt;
       updateSpawning(game);
+      updateTolls(game);             // M2f §4.10: a bell toll just before each surge (sound only)
       updateBlocking(game, dt);      // wolves held by landed Vultures (and, if enabled, waiting Squirrels) stop and bite them
       updateSquirrelStrikes(game, dt); // M1h §3: a Squirrel being attacked strikes back
       updateEnemyMovement(game, dt);

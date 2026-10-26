@@ -101,6 +101,7 @@ function subscribe() {
   events.on('mapNodeChosen', (e) => play('mapNodeChosen', e));
   events.on('runComplete', (e) => play('runComplete', e));
   events.on('magicFound', (e) => play('magicFound', e));
+  events.on('bellToll', (e) => play('bellToll', e));
   events.on('doubleAppears', (e) => play('doubleAppears', e));
   events.on('doubleCraftHit', (e) => play('doubleCraftHit', e));
   events.on('doubleCancelled', (e) => play('doubleCancelled', e));
@@ -381,6 +382,16 @@ const RECIPES = {
     });
     noise(t, out, { filter: 'highpass', freq: 6000 * p, dur: 0.9, attack: 0.05, gain: 0.25 });
     return 0.95;
+  },
+
+  // Bell toll (M2f §4.10): a deep bronze bell, its slightly inharmonic partials ringing out long,
+  // with a dull strike at the start.
+  bellToll(t, out, p) {
+    for (const [ratio, gain, dur] of [[1, 1, 3.2], [2.0, 0.5, 2.6], [2.4, 0.35, 2.2], [3.0, 0.25, 1.8], [4.2, 0.15, 1.2]]) {
+      tone(t, out, { type: 'sine', freq: 98 * ratio * p, dur, gain, attack: 0.004 });
+    }
+    noise(t, out, { filter: 'lowpass', freq: 900 * p, dur: 0.08, gain: 0.6 });
+    return 3.3;
   },
 
   // The Ogre (M2c §2.9). Deep, long roar: two detuned growls swelling and falling, with breath.
