@@ -140,7 +140,7 @@ function updateStuck(enemy, blocker, dt) {
   if (!slower) {
     // A free step lets the timer run down rather than reset it, so an enemy that creeps behind
     // its blocker (blocked on most steps, now and then a free one) still counts as held up.
-    enemy.stuckTimer = Math.max(0, enemy.stuckTimer - dt);
+    enemy.stuckTimer = Math.max(0, enemy.stuckTimer - dt * C.STUCK_DECAY_RATE);
     if (enemy.stuckTimer === 0) enemy.stuckOn = null;
     return;
   }

@@ -144,6 +144,7 @@ export const ENEMY_SLOT_CLAIM_DISTANCE = 70;   // TUNING — px before the lane 
 export const DRUID_APPROACH_RADIUS = 86;       // TUNING — px, ring wolves walk round to reach a far melee slot (clears biters at DRUID_MELEE_RADIUS); larger enemies use it + their extra radius
 export const ENEMY_DIRECT_APPROACH_ANGLE = 0.6; // TUNING — rad; slots closer than this in angle are walked to directly
 export const STUCK_TIME = 0.6;                 // TUNING — s an enemy held up by a slower walking enemy waits before passing through it (M2d §3.4)
+export const STUCK_DECAY_RATE = 0.25;          // TUNING — a free step runs the stuck timer down at this × real time, so creeping behind a blocker still adds up
 export const SIDE_KEEP_MARGIN = 4;            // px a keepSide enemy stays from its corridor edge (M2d §3.3)
 
 // ---------------------------------------------------------------------------
