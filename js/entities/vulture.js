@@ -12,7 +12,8 @@ export const VultureState = Object.freeze({
   HOVERING: 'HOVERING',
 });
 
-export function createVulture(id, x, y) {
+// duration: its effective lifetime (stats resolver, M2e §2.2).
+export function createVulture(id, x, y, duration = C.VULTURE_DURATION) {
   return {
     id,
     x,
@@ -20,7 +21,8 @@ export function createVulture(id, x, y) {
     hp: C.VULTURE_HP,
     state: VultureState.HOVERING, // picks a target on its first update
     targetId: null,
-    remaining: C.VULTURE_DURATION, // s left before it expires
+    duration,                      // s it lasts in all (status bar)
+    remaining: duration,           // s left before it expires
     attackTimer: 0,                // s since landing / last peck
     lastHitTime: -Infinity,        // combat time it was last bitten (hit flash)
     lastPeckTime: -Infinity,       // combat time of its last peck (animation)

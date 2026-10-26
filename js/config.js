@@ -227,13 +227,14 @@ export const TURRET_BASE_OFFSET = 18;     // px the slot pad sits below its loca
 // ---------------------------------------------------------------------------
 // 17.7 Searchable features
 // ---------------------------------------------------------------------------
-// yields: resource → [min, max] inclusive integers. All ranges TUNING.
+// yields: resource → [min, max] inclusive integers. All ranges TUNING. mainResource: the one
+// Forager's Belt adds to (M2e §2.3).
 export const FEATURE_TYPES = {
-  tree:      { name: 'Tree',       searchTime: 1.2, yields: { pits: [2, 4], boughs: [1, 3] } },   // boughs: M1i §1.2
-  reedPatch: { name: 'Reed Patch', searchTime: 1.4, yields: { reeds: [2, 3] } },
-  shrub:     { name: 'Shrub',      searchTime: 1.7, yields: { feathers: [2, 3], boughs: [1, 2] } }, // boughs: M1i §1.2
-  ruins:     { name: 'Ruins',      searchTime: 1.8, yields: { pits: [2, 3], feathers: [1, 3] } },
-  pond:      { name: 'Pond',       searchTime: 2.0, yields: { pits: [2, 3], reeds: [1, 3] } },
+  tree:      { name: 'Tree',       searchTime: 1.2, yields: { pits: [2, 4], boughs: [1, 3] }, mainResource: 'pits' },   // boughs: M1i §1.2
+  reedPatch: { name: 'Reed Patch', searchTime: 1.4, yields: { reeds: [2, 3] }, mainResource: 'reeds' },
+  shrub:     { name: 'Shrub',      searchTime: 1.7, yields: { feathers: [2, 3], boughs: [1, 2] }, mainResource: 'feathers' }, // boughs: M1i §1.2
+  ruins:     { name: 'Ruins',      searchTime: 1.8, yields: { pits: [2, 3], feathers: [1, 3] }, mainResource: 'pits' },
+  pond:      { name: 'Pond',       searchTime: 2.0, yields: { pits: [2, 3], reeds: [1, 3] }, mainResource: 'reeds' },
 };
 
 export const FEATURE_RADIUS = 32;         // TUNING — px, feature sprite scale (drawing only; sprites must fit LOCATION_RADIUS)
@@ -1169,3 +1170,90 @@ export const MAP_PULSE_HZ = 0.8;          // gentle glow pulse of available node
 export const MAP_ROAD_WIGGLE = 26;        // px, sideways sway of a road between two nodes
 export const MAP_DECOR_SEED = 909;        // the map's procedural tree clusters, identical every run
 export const CARRY_DRUID_HP = false;      // TUNING — true: the Druid starts the next encounter with the HP he won with (M2a §3)
+
+// ---------------------------------------------------------------------------
+// Druid equipment (M2e §1–§2). Six slots: three staff charms, each strengthening one summon,
+// and three pieces of personal equipment with passive effects. Items are data: effects are
+// { stat, op: 'add' | 'mult', value } on the stats in js/stats.js (adds first, then mults),
+// applied by the stats resolver when a battle starts. Item IDs are stable keys.
+// ---------------------------------------------------------------------------
+export const SLOT_TYPES = {
+  crown:    { label: 'Crown Charm',   group: 'staff' },    // Vulture
+  grip:     { label: 'Grip Charm',    group: 'staff' },    // Squirrel
+  ferrule:  { label: 'Ferrule Charm', group: 'staff' },    // Bough Double
+  necklace: { label: 'Necklace',      group: 'personal' }, // HP and survival
+  belt:     { label: 'Belt',          group: 'personal' }, // work and gathering
+  shoes:    { label: 'Shoes',         group: 'personal' }, // movement
+};
+
+// Base values of the stats only equipment changes (the rest come from their usual config).
+export const DRUID_REGEN_AMOUNT = 0;      // HP regained every DRUID_REGEN_INTERVAL in Combat (Sap Pendant)
+export const DRUID_REGEN_INTERVAL = 4;    // TUNING — s
+export const BOUGH_REFUND_CHANCE = 0;     // chance a Bough Double's Bough is refunded when its job starts (Mossheart Ferrule)
+export const WORK_SPEED = 1;              // build / upgrade speed multiplier: job time ÷ this (Wright's Belt)
+export const SEARCH_MAIN_BONUS = 0;       // extra units of a spot's mainResource per search (Forager's Belt)
+
+// The 12 starter items (M2e §2.3), two per slot. All values TUNING.
+// colors: [main, accent] for the item's icon; mark: its distinguishing mark (render/items.js).
+export const ITEMS = {
+  hawkfeatherCrown: {
+    slot: 'crown', name: 'Hawkfeather Crown', description: 'Vultures stay 4 s longer.',
+    effects: [{ stat: 'vulture.duration', op: 'add', value: 4 }],
+    colors: ['#c9a25a', '#f4ecd8'], mark: 'feather',
+  },
+  talonCrown: {
+    slot: 'crown', name: 'Talon Crown', description: 'Vultures deal 3 more damage.',
+    effects: [{ stat: 'vulture.damage', op: 'add', value: 3 }],
+    colors: ['#8e3b2c', '#efe0c4'], mark: 'talon',
+  },
+  nutwoodGrip: {
+    slot: 'grip', name: 'Nutwood Grip', description: 'Squirrels stay 6 s longer.',
+    effects: [{ stat: 'squirrel.duration', op: 'add', value: 6 }],
+    colors: ['#7a4e2a', '#e3b46a'], mark: 'nut',
+  },
+  quickpawGrip: {
+    slot: 'grip', name: 'Quickpaw Grip', description: 'Squirrels run 40% faster and grab drops from 10 px further.',
+    effects: [{ stat: 'squirrel.speed', op: 'mult', value: 1.4 }, { stat: 'squirrel.pickupRange', op: 'add', value: 10 }],
+    colors: ['#b5652e', '#f6d9a8'], mark: 'paw',
+  },
+  mossheartFerrule: {
+    slot: 'ferrule', name: 'Mossheart Ferrule', description: '35% chance a Bough Double gives its Bough back when its job starts.',
+    effects: [{ stat: 'double.boughRefundChance', op: 'add', value: 0.35 }],
+    colors: ['#4f7a3a', '#b8e08a'], mark: 'moss',
+  },
+  twinrootFerrule: {
+    slot: 'ferrule', name: 'Twin-root Ferrule', description: 'One more Bough Double can work at a time.',
+    effects: [{ stat: 'double.max', op: 'add', value: 1 }],
+    colors: ['#6b4a2e', '#d8b88a'], mark: 'roots',
+  },
+  oakheartAmulet: {
+    slot: 'necklace', name: 'Oakheart Amulet', description: '+20 max HP.',
+    effects: [{ stat: 'druid.maxHp', op: 'add', value: 20 }],
+    colors: ['#8a5a2b', '#7fc46a'], mark: 'acorn',
+  },
+  sapPendant: {
+    slot: 'necklace', name: 'Sap Pendant', description: 'Regain 1 HP every 4 s in Combat.',
+    effects: [{ stat: 'druid.regenAmount', op: 'add', value: 1 }],
+    colors: ['#c98a1e', '#ffd36a'], mark: 'drop',
+  },
+  wrightsBelt: {
+    slot: 'belt', name: "Wright's Belt", description: 'Building and upgrading 25% faster.',
+    effects: [{ stat: 'work.speed', op: 'mult', value: 1.25 }],
+    colors: ['#5a4632', '#c0c4c8'], mark: 'hammer',
+  },
+  foragersBelt: {
+    slot: 'belt', name: "Forager's Belt", description: "Every search yields 1 more of the spot's main resource.",
+    effects: [{ stat: 'search.mainBonus', op: 'add', value: 1 }],
+    colors: ['#6e7a3a', '#e8d27a'], mark: 'pouch',
+  },
+  fernstepBoots: {
+    slot: 'shoes', name: 'Fernstep Boots', description: '+15 steps.',
+    effects: [{ stat: 'steps.budget', op: 'add', value: 15 }],
+    colors: ['#3f6a3a', '#9fdc7a'], mark: 'fern',
+  },
+  haresShoes: {
+    slot: 'shoes', name: "Hare's Shoes", description: 'Travel costs 15% fewer steps.',
+    effects: [{ stat: 'steps.length', op: 'mult', value: 1.15 }],
+    colors: ['#a08a6e', '#f2ece0'], mark: 'ears',
+  },
+};

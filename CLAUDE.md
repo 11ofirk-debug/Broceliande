@@ -27,9 +27,9 @@ python -m http.server 8000
 Open http://localhost:8000 in Chrome.
 
 ## Working style
-- Work in the phases given in the prompts. At the end of each phase, stop and give me:
-  1. a short summary of what was built,
-  2. any judgement calls you made,
-  3. exact steps to test it in the browser.
+- This is a throwaway prototype. I test by playing it myself. Speed matters more than test coverage.
+- Do NOT write automated test suites or headless-browser tests, and don't re-run or maintain existing ones. Old test files can be ignored.
+- After implementing a phase, do one quick smoke check only: the page loads, there are no console errors, and one battle starts and runs at ×4 speed for a few seconds. Spend no more than a few minutes on checking.
+- When a prompt asks you to "check every item" in an acceptance list, do it by reading through the code, not by running tests. Mark anything you're unsure of as "for you to check" instead of testing it.
+- At the end of each phase, stop and give me: what was built, any judgement calls, anything that might be broken, and how to try it in the browser. Then commit and push.
 - Don't start the next phase until I say so.
-- Check the browser console for errors before reporting a phase complete.

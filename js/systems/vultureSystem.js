@@ -66,7 +66,7 @@ export function updateVultures(game, dt) {
         v.attackTimer -= C.VULTURE_ATTACK_INTERVAL;
         v.lastPeckTime = game.combatTime;
         events.emit('vulturePecked', { x: v.x, y: v.y });
-        damageEnemy(game, target, C.VULTURE_DAMAGE); // if it dies, next step picks a new target
+        damageEnemy(game, target, game.stats['vulture.damage']); // effective (M2e); if it dies, next step picks a new target
       }
     }
   }

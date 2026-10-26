@@ -54,14 +54,15 @@ export function updateSquirrels(game, dt) {
     const dx = target.x - s.x;
     const dy = target.y - s.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > C.SQUIRREL_PICKUP_RANGE) {
-      const step = Math.min(C.SQUIRREL_SPEED * dt, dist);
+    const range = game.stats['squirrel.pickupRange']; // effective (M2e)
+    if (dist > range) {
+      const step = Math.min(game.stats['squirrel.speed'] * dt, dist);
       s.x += (dx / dist) * step;
       s.y += (dy / dist) * step;
       s.stride += step;
       if (Math.abs(dx) > 0.5) s.facing = Math.sign(dx);
     }
-    if (Math.hypot(target.x - s.x, target.y - s.y) <= C.SQUIRREL_PICKUP_RANGE) {
+    if (Math.hypot(target.x - s.x, target.y - s.y) <= range) {
       collect(game, s, target);
       retarget(game, s); // next nearest unclaimed drop, or wait
     }

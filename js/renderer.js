@@ -136,7 +136,7 @@ export function createRenderer(canvas) {
     for (const v of game.vultures) drawVultureStatus(ctx, v);
     for (const s of game.squirrels) drawSquirrelStatus(ctx, s);
     // Nothing can hurt the Druid in Prep, so his world HP bar only appears from Combat on.
-    if (!isPrep) drawDruidHpBar(ctx, druidPos.x, druidPos.y, game.druidHp);
+    if (!isPrep) drawDruidHpBar(ctx, druidPos.x, druidPos.y, game.druidHp, game.stats['druid.maxHp']); // effective max (M2e)
     drawActionProgress(ctx, game, druidPos);
     for (const d of game.doubles) {
       if (d.state !== DoubleState.WORKING) continue;

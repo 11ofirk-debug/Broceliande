@@ -12,7 +12,9 @@ import { ActionState } from './states.js';
 import { undoLastMove } from './systems/actionSystem.js';
 import { toggleDropMult } from './systems/dropSystem.js';
 import { initAudio, toggleMute } from './audio.js';
-import { isRunComplete, mapNode, availableNodeAt, validateMap } from './run.js';
+import { isRunComplete, mapNode, availableNodeAt, validateMap, addItem, equipItem, unequipSlot, randomUnownedItem } from './run.js';
+import { validateItems } from './stats.js';
+import { createRng } from './rng.js';
 import { events } from './events.js';
 
 const stage = document.getElementById('stage');
@@ -42,6 +44,7 @@ validateConfig();
 
 validateLevels(); // every level's scene checks (M2a §5.1)
 validateMap();    // MAP_NODES links and levels (M2a §4.1)
+validateItems();  // ITEMS slots, stats and ops (M2e §2)
 
 const game = createGame(mapNode(C.MAP_START_NODE).levelId);
 const clock = { speed: 1, paused: false };            // acts on simulation time only
@@ -133,6 +136,7 @@ const input = createInput(stage, canvas, () => scale, {
       case 'g': grantResources(game); break;
       case 'v': toggleMute(); break;                    // M1g §3.6: mute / unmute sound
       case 'x': toggleDropMult(game); break;            // M1d §3: enemy drop chances ×1 / ×DEBUG_DROP_MULT
+      case 'i': debugAddItem(); break;                  // M2e §6: on the map, add a random unowned item to the run
       case 'Escape': interaction.onEscape(); break;
       default: break;
     }
@@ -141,7 +145,23 @@ const input = createInput(stage, canvas, () => scale, {
 
 // Temporary console hook so VICTORY/DEFEAT and Restart can be tested before wolves exist:
 //   broceliande.forceEnd('VICTORY')  /  broceliande.forceEnd('DEFEAT')
-window.broceliande = { game, forceEnd: (result) => beginEnding(game, result) };
+window.broceliande = {
+  game,
+  forceEnd: (result) => beginEnding(game, result),
+  // Temporary equipment helpers (M2e E1, until the map's equipment panel exists):
+  //   broceliande.equip('talonCrown')  — adds the item to the run if needed and equips it
+  //   broceliande.unequip('crown')     — empties a slot
+  // Equipment applies from the next battle that starts (stats are resolved at its start).
+  equip: (itemId) => { addItem(game.run, itemId); return equipItem(game.run, itemId); },
+  unequip: (slot) => unequipSlot(game.run, slot),
+};
+
+// Debug key I on the map (M2e §6): a random unowned item joins the run (seeded from the run seed).
+function debugAddItem() {
+  if (game.state !== GameState.MAP) return;
+  const id = randomUnownedItem(game.run, createRng(game.run.seed + 7919 * (game.run.items.length + 1)));
+  if (id) addItem(game.run, id);
+}
 
 newRun(game); // START → MAP on page load (M2a §2.1)
 

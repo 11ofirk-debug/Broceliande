@@ -20,6 +20,12 @@ export function completeSearch(game, featureIndex) {
   const feature = game.features[featureIndex];
   if (feature.exhausted) return;
   const gained = rollYield(game.rng, feature.type);
+  // Forager's Belt (M2e §2.3): extra units of the spot's main resource, even if it rolled 0.
+  const bonus = game.stats['search.mainBonus'];
+  if (bonus > 0) {
+    const main = C.FEATURE_TYPES[feature.type].mainResource;
+    gained[main] = (gained[main] ?? 0) + bonus;
+  }
   add(game.resources, gained);
   game.doubleStats.boughsGained += gained.boughs ?? 0; // M1i §4 debug figure
   feature.exhausted = true;

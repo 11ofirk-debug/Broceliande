@@ -587,8 +587,8 @@ export function drawHpBar(ctx, x, y, width, fraction) {
 }
 
 // Druid HP bar, always shown above his head.
-export function drawDruidHpBar(ctx, x, y, hp) {
-  drawHpBar(ctx, x, y - C.DRUID_RADIUS * 2.55, 56, hp / C.DRUID_HP);
+export function drawDruidHpBar(ctx, x, y, hp, maxHp = C.DRUID_HP) {
+  drawHpBar(ctx, x, y - C.DRUID_RADIUS * 2.55, 56, hp / maxHp);
 }
 
 // Enemy HP bars (§13, M1e §3.4): hidden until first damage; sized to the sprite.
@@ -1425,7 +1425,7 @@ function drawSummonStatus(ctx, x, y, r, hpY, durationFrac, hpFrac) {
 export function drawVultureStatus(ctx, v) {
   const r = C.VULTURE_RADIUS;
   const lift = v.state !== 'LANDED' ? C.VULTURE_FLIGHT_HEIGHT : 0;
-  drawSummonStatus(ctx, v.x, v.y, r, v.y - lift - r * 3.6, v.remaining / C.VULTURE_DURATION, v.hp / C.VULTURE_HP);
+  drawSummonStatus(ctx, v.x, v.y, r, v.y - lift - r * 3.6, v.remaining / v.duration, v.hp / C.VULTURE_HP);
 }
 
 // Visual size of the Squirrel sprite relative to SQUIRREL_RADIUS (drawing only).
@@ -1490,7 +1490,7 @@ export function drawSquirrel(ctx, s, t, hit, ghost = false) {
 
 export function drawSquirrelStatus(ctx, s) {
   const r = C.SQUIRREL_RADIUS;
-  drawSummonStatus(ctx, s.x, s.y, r, s.y - r * 4.2, s.remaining / C.SQUIRREL_DURATION, s.hp / C.SQUIRREL_HP);
+  drawSummonStatus(ctx, s.x, s.y, r, s.y - r * 4.2, s.remaining / s.duration, s.hp / C.SQUIRREL_HP);
 }
 
 // Placement ghost (M1d §2.1): the same shape, translucent; with SQUIRREL_BLOCKS_WOLVES it also

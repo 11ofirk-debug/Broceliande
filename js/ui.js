@@ -13,7 +13,7 @@ import { RESOURCE_ICON_SVG } from './icons.js';
 import { costRowsElement, costRowsKey } from './costRows.js';
 import { portraitCanvas } from './render/portraits.js';
 import { canAfford, RESOURCE_KEYS, resourceName, formatCost } from './resources.js';
-import { canStartBuild, summonAvailability, druidDisplayPos, isTravelling, SUMMONS } from './systems/actionSystem.js';
+import { canStartBuild, summonAvailability, summonMax, druidDisplayPos, isTravelling, SUMMONS } from './systems/actionSystem.js';
 import { isDoubleTargeting, isDoubleTarget, doubleOnSlot, doubleJob } from './systems/doubleSystem.js';
 import { DoubleState } from './entities/boughDouble.js';
 import { AttackState } from './entities/enemy.js';
@@ -23,6 +23,7 @@ import { isStepMode, stepCost, canVisit, anyVisitable, routePreview, calibration
 import { enemyTotals, waveCounts } from './game.js';
 import { isMuted, soundStats, audioStatus } from './audio.js';
 import { isRunComplete, mapNode } from './run.js';
+import { resolveStats, changedStats, STAT_LABELS } from './stats.js';
 
 const RESOURCE_LABELS = { pits: 'Peach Pits', reeds: 'Reeds', feathers: 'Feathers', boughs: 'Mossy Boughs' };
 // "Pits 3  Reeds 0  Feathers 2  Boughs 1": every resource, in display order (debug panel).
@@ -135,7 +136,7 @@ function dropDebugLines(game) {
 // Bough figures and Double jobs this encounter (M1i §4).
 function doubleDebugLines(game) {
   const s = game.doubleStats;
-  return [`Boughs: gained ${s.boughsGained}  spent ${s.boughsSpent}   Doubles active ${game.doubles.length}/${C.MAX_BOUGH_DOUBLES}  `
+  return [`Boughs: gained ${s.boughsGained}  spent ${s.boughsSpent}   Doubles active ${game.doubles.length}/${game.stats['double.max']}  `
     + `jobs completed ${s.completed}  cancelled ${s.cancelled}`];
 }
 
@@ -447,11 +448,12 @@ function updateHud(el, game) {
   // Nothing left to click: prompt the player to start (M1b §5.6).
   el.startCombat.classList.toggle('pulse', isPrep && isStepMode(game) && !isTravelling(game) && !anyVisitable(game));
 
-  const hpFrac = Math.max(0, game.druidHp) / C.DRUID_HP;
+  const maxHp = game.stats['druid.maxHp']; // effective (M2e)
+  const hpFrac = Math.max(0, game.druidHp) / maxHp;
   const hpWidth = `${hpFrac * 100}%`;
   if (el.hpFill.style.width !== hpWidth) el.hpFill.style.width = hpWidth;
   el.hpFill.dataset.level = hpFrac > 0.5 ? 'high' : hpFrac > 0.25 ? 'mid' : 'low';
-  setText(el.hpText, `${game.druidHp} / ${C.DRUID_HP}`);
+  setText(el.hpText, `${game.druidHp} / ${maxHp}`);
 
   for (const [k, node] of Object.entries(el.res)) {
     setText(node, String(game.resources[k]));
@@ -471,7 +473,7 @@ function updateStepBar(el, game, view) {
 
   const preview = routePreview(game, view.hover);
   const spend = preview?.affordable ? preview.cost : 0;
-  const budget = game.scene.level.stepBudget;
+  const budget = game.stats['steps.budget']; // effective (M2e)
   const pct = (n) => `${(n / budget) * 100}%`;
   const fillWidth = pct(game.stepsRemaining - spend);
   if (el.stepsFill.style.width !== fillWidth) el.stepsFill.style.width = fillWidth;
@@ -647,12 +649,13 @@ function menuHeader(game, menu) {
   return { text: `Travel: ${steps} ${steps === 1 ? 'step' : 'steps'}`, warn: steps > game.stepsRemaining };
 }
 
-const SUMMON_DETAIL = {
-  vulture: `Lasts ${C.VULTURE_DURATION} s · flies to the wolf nearest to it`,
-  squirrel: `Lasts ${C.SQUIRREL_DURATION} s · collects the nearest drop`
+// Effective durations from the stats resolver (M2e §4.5: summon changes show in the Druid's menu).
+const summonDetail = (game) => ({
+  vulture: `Lasts ${game.stats['vulture.duration']} s · flies to the wolf nearest to it`,
+  squirrel: `Lasts ${game.stats['squirrel.duration']} s · collects the nearest drop`
     + (C.SQUIRREL_BLOCKS_WOLVES ? ' · blocks wolves while waiting' : ''),
   double: 'Builds or upgrades one turret, then vanishes · plus that job\'s cost',
-};
+});
 
 // Turret choice for a Bough Double's build job (M1i §2.4 step 3): one card per turret type, its
 // cost rows including the Bough.
@@ -719,7 +722,7 @@ function menuOptions(game, menu) {
       const { available, reason } = summonAvailability(game, kind);
       return {
         title: `Summon ${s.name}`, portrait: kind, cost: s.cost, costText: null,
-        detail: `Active: ${s.active(game).length} / ${s.max}\n${SUMMON_DETAIL[kind]}`,
+        detail: `Active: ${s.active(game).length} / ${summonMax(game, kind)}\n${summonDetail(game)[kind]}`,
         action: null, disabled: !available, reason,
       };
     });
@@ -847,6 +850,22 @@ function updateEndOverlay(el, game) {
   setText(el.restart, goesOn ? 'Continue' : 'Start again');
 }
 
+// Equipment (M2e §6): owned and equipped items, and every stat the resolver has changed
+// (base → effective). In battle, the battle's fixed stats; on the map, what the next battle
+// would get (for the last level shown).
+function equipmentLines(game) {
+  const r = game.run;
+  const stats = game.state === GameState.MAP ? resolveStats(r.equipped, game.scene.level) : game.stats;
+  const equipped = Object.entries(r.equipped).filter(([, id]) => id).map(([slot, id]) => `${slot} ${id}`);
+  const changed = changedStats(stats, game.scene.level).map((c) => `${STAT_LABELS[c.stat]} ${fmt(c.base)} → ${fmt(c.value)}`);
+  return [
+    `Items:  ${r.items.join(', ') || '—'}   (I on the map adds one)`,
+    `Equipped: ${equipped.join(', ') || '—'}`,
+    `Changed stats: ${changed.join(' · ') || 'none'}`,
+  ];
+}
+const fmt = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
+
 // Run figures (M2a §8): run seed, current and completed nodes, carried inventory, level.
 function runLines(game) {
   const r = game.run;
@@ -854,6 +873,7 @@ function runLines(game) {
     `Run seed: ${r.seed}  (Shift+R new run)`,
     `Node:   ${r.currentNodeId ?? '—'}   completed: ${r.completedNodeIds.join(', ') || '—'}${isRunComplete(r) ? '   RUN COMPLETE' : ''}`,
     `Carried: ${resourceLine(r.inventory)}   Druid HP ${r.druidHp}${C.CARRY_DRUID_HP ? ' (carried)' : ' (not carried)'}`,
+    ...equipmentLines(game),
     // M2d §4: items the field sweep gathered on the last Victory.
     `Last sweep: ${game.lastSweep ? `${game.lastSweep.items} items  ${resourceLine(game.lastSweep.gathered)}` : 'none yet'}`,
   ];
@@ -874,7 +894,7 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
   const stepLines = [];
   if (isStepMode(game)) {
     const d = game.druidPos;
-    stepLines.push(`Steps:  ${game.stepsRemaining} / ${game.scene.level.stepBudget}  (${C.STEP_PX} px/step)`);
+    stepLines.push(`Steps:  ${game.stepsRemaining} / ${game.stats['steps.budget']}  (${game.stats['steps.length'].toFixed(2)} px/step)`);
     stepLines.push(`Druid at: (${Math.round(d.x)}, ${Math.round(d.y)})  moves ${game.moveHistory.length} (U undoes)`);
     const h = view.hover;
     if (game.state === GameState.PREP && (h?.kind === 'feature' || h?.kind === 'slot')) {
@@ -893,7 +913,7 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
     `Speed:  ${speed}`,
     `FPS:    ${Math.round(view.fps)}`,
     '',
-    `Druid HP: ${game.druidHp} / ${C.DRUID_HP}`,
+    `Druid HP: ${game.druidHp} / ${game.stats['druid.maxHp']}`,
     druidMeleeLine(game),
     ...enemyDebugLines(game),
     ...bossDebugLines(game),

@@ -19,7 +19,8 @@ export function markerPos(game, marker) {
 // Whole steps from the Druid's current position to a marker (§4).
 export function stepCost(game, marker) {
   const p = markerPos(game, marker);
-  return Math.ceil(Math.hypot(p.x - game.druidPos.x, p.y - game.druidPos.y) / C.STEP_PX);
+  // Effective step length (M2e, Hare's Shoes: STEP_PX × 1.15).
+  return Math.ceil(Math.hypot(p.x - game.druidPos.x, p.y - game.druidPos.y) / game.stats['steps.length']);
 }
 
 // Turret types the player can currently pay for (M1f §5.2).
@@ -51,7 +52,8 @@ export function anyVisitable(game) {
 }
 
 // ---------------------------------------------------------------------------
-// Calibration figures for tuning STEP_BUDGET (§8, §9), for this run's layout.
+// Calibration figures for tuning STEP_BUDGET (§8, §9), for this run's layout. These and the
+// layout's feature-route check use the base STEP_PX and stepBudget, not equipment (M2e).
 // ---------------------------------------------------------------------------
 const legCost = (a, b) => Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / C.STEP_PX);
 

@@ -11,7 +11,8 @@ export const SquirrelState = Object.freeze({
   WAITING: 'WAITING',
 });
 
-export function createSquirrel(id, x, y) {
+// duration: its effective lifetime (stats resolver, M2e §2.2).
+export function createSquirrel(id, x, y, duration = C.SQUIRREL_DURATION) {
   return {
     id,
     x,
@@ -19,7 +20,8 @@ export function createSquirrel(id, x, y) {
     hp: C.SQUIRREL_HP,
     state: SquirrelState.WAITING, // picks a target on its first update
     targetId: null,               // id of the claimed drop
-    remaining: C.SQUIRREL_DURATION, // s left before it expires
+    duration,                     // s it lasts in all (status bar)
+    remaining: duration,          // s left before it expires
     lastHitTime: -Infinity,       // combat time it was last bitten (hit flash)
     strikeTimer: 0,               // M1h §3: s counted while something attacks it; strikes back at SQUIRREL_ATTACK_INTERVAL
     strikeTargetId: null,         // attacker it would strike now (lowest HP), for the debug overlay

@@ -63,7 +63,8 @@ export function isBuildingSlot(game, slotIndex) {
 // deducted on completion. The action's target is the slot; turretType says what is built.
 export function startBuild(game, slotIndex, type) {
   if (!canStartBuild(game, slotIndex, type)) return false;
-  if (!setAction(game, ActionState.BUILDING, slotIndex, buildTime(type))) return false;
+  // Build time divided by the effective work speed (M2e, Wright's Belt).
+  if (!setAction(game, ActionState.BUILDING, slotIndex, buildTime(type) / game.stats['work.speed'])) return false;
   game.action.turretType = type;
   return true;
 }
@@ -128,8 +129,14 @@ function completeTravel(game, marker, turretType) {
 export const SUMMONS = {
   vulture: { kind: 'vulture', name: 'Vulture', plural: 'Vultures', cost: C.VULTURE_COST, max: C.MAX_VULTURES, active: (g) => g.vultures, create: createVulture },
   squirrel: { kind: 'squirrel', name: 'Squirrel', plural: 'Squirrels', cost: C.SQUIRREL_COST, max: C.MAX_SQUIRRELS, active: (g) => g.squirrels, create: createSquirrel },
-  double: { kind: 'double', name: 'Bough Double', plural: 'Bough Doubles', cost: C.BOUGH_DOUBLE_COST, max: C.MAX_BOUGH_DOUBLES, active: (g) => g.doubles, targeted: true },
+  // The Bough Double's cap is the effective double.max (M2e), checked in doubleSystem.js.
+  double: { kind: 'double', name: 'Bough Double', plural: 'Bough Doubles', cost: C.BOUGH_DOUBLE_COST, active: (g) => g.doubles, targeted: true },
 };
+
+// A summon's cap: its config max, or for the Bough Double the effective double.max (M2e).
+export function summonMax(game, kind) {
+  return SUMMONS[kind].targeted ? game.stats['double.max'] : SUMMONS[kind].max;
+}
 
 // "Not enough Feathers" / "Not enough Pits, Feathers": the resources the cost is short of.
 function shortfallReason(resources, cost) {
@@ -172,7 +179,7 @@ export function placeSummon(game, p) {
   game.action = createIdleAction();
   if (s.active(game).length >= s.max || !canAfford(game.resources, s.cost)) return false;
   deduct(game.resources, s.cost);
-  s.active(game).push(s.create(game.nextEntityId++, p.x, p.y));
+  s.active(game).push(s.create(game.nextEntityId++, p.x, p.y, game.stats[`${s.kind}.duration`])); // effective duration (M2e)
   events.emit('summonPlaced', { kind: s.kind, x: p.x, y: p.y });
   return true;
 }

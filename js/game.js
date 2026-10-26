@@ -19,6 +19,7 @@ import { isStepMode } from './systems/stepSystem.js';
 import { GameState, PrepMode, ActionState } from './states.js';
 import { sceneFor } from './scene.js';
 import { createRun, mapNode, nodeState, encounterSeed, recordVictory, isRunComplete, startingDruidHp } from './run.js';
+import { resolveStats } from './stats.js';
 import { events } from './events.js';
 import { updateDruidMelee } from './systems/druidMeleeSystem.js';
 import { updateClouds } from './systems/cloudSystem.js';
@@ -64,6 +65,7 @@ export function createGame(levelId) {
     prepMode: C.PREP_MODE, // PrepMode; kept across restarts, toggled by debug M (M1b §2)
     run: null,             // M2a §2.2: the run (map progress, inventory), kept apart from the encounter state
     encounterStart: null,  // how the current encounter started { levelId, seed, resources, druidHp } (debug R)
+    stats: resolveStats(null, scene.level), // M2e §2.2: effective stats, resolved again when each battle starts
     levelId,
     scene,
     lanes: scene.lanes,
@@ -139,12 +141,14 @@ export function startEncounter(game, { newSeed = false, levelId = null, resource
     game.lanes = game.scene.lanes;
   }
   const level = game.scene.level;
+  // M2e §2.2: effective stats from the run's equipment, fixed for this battle.
+  game.stats = resolveStats(game.run?.equipped, level);
   game.seed = seed ?? (newSeed ? makeRandomSeed() : (C.DEBUG_SEED ?? makeRandomSeed()));
   game.rng = createRng(game.seed);
   game.layout = generateLayout(game.rng, game.scene);
   game.slots = game.layout.slots;
   game.prepRemaining = C.PREP_DURATION;
-  game.stepsRemaining = level.stepBudget;
+  game.stepsRemaining = game.stats['steps.budget'];
   game.druidPos = level.druidPos;
   game.trail = [];
   game.moveHistory = [];
@@ -152,7 +156,8 @@ export function startEncounter(game, { newSeed = false, levelId = null, resource
   game.pendingResult = null;
   game.endRemaining = 0;
   game.endElapsed = 0;
-  game.druidHp = druidHp ?? C.DRUID_HP;
+  game.druidHp = druidHp ?? game.stats['druid.maxHp'];
+  game.regenTimer = 0; // M2e: s towards the next regen tick (Sap Pendant)
   game.druidLastHitTime = -Infinity;
   game.druidMeleeTimer = 0;
   game.druidWasBusy = false;
@@ -261,7 +266,7 @@ export function enterNode(game, nodeId) {
     levelId: node.levelId,
     seed: encounterSeed(game.run, nodeId),
     resources: { ...game.run.inventory },
-    druidHp: startingDruidHp(game.run),
+    druidHp: startingDruidHp(game.run, resolveStats(game.run.equipped, C.LEVELS[node.levelId])['druid.maxHp']),
   };
   events.emit('mapNodeChosen', { nodeId });
   startEncounter(game, game.encounterStart);
@@ -293,6 +298,17 @@ function checkEndConditions(game) {
   } else if (allEnemiesDefeated(game)) {
     beginEnding(game, GameState.VICTORY);
   }
+}
+
+// Equipment HP regen (M2e §2.3, Sap Pendant): druid.regenAmount HP every DRUID_REGEN_INTERVAL of
+// Combat, never above his max HP. Nothing happens without it.
+function updateDruidRegen(game, dt) {
+  const amount = game.stats['druid.regenAmount'];
+  if (amount <= 0) return;
+  game.regenTimer += dt;
+  if (game.regenTimer < C.DRUID_REGEN_INTERVAL - 1e-9) return;
+  game.regenTimer -= C.DRUID_REGEN_INTERVAL;
+  game.druidHp = Math.min(game.stats['druid.maxHp'], game.druidHp + amount);
 }
 
 // Expected number of each enemy type in the level's wave (M1e §3.6, M2a §5.2).
@@ -395,6 +411,7 @@ export function updateGame(game, dt) {
       expireSquirrels(game, dt);
       updateAction(game, dt);
       updateDruidMelee(game, dt);   // after updateAction, so a just-finished upgrade restarts the timer
+      updateDruidRegen(game, dt);   // M2e: equipment HP regen
       updateEffects(game, dt);
       checkEndConditions(game);
       break;

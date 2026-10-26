@@ -6,9 +6,11 @@ import * as C from './config.js';
 import { emptyResources } from './resources.js';
 import { makeRandomSeed } from './rng.js';
 
-// run: { seed, currentNodeId, completedNodeIds, inventory, druidHp }
+// run: { seed, currentNodeId, completedNodeIds, inventory, druidHp, items, equipped, seenItems }
 // currentNodeId: the node last entered (null before the first). inventory: resources carried
-// between encounters. druidHp: used for the next encounter only with CARRY_DRUID_HP.
+// between encounters. druidHp: used for the next encounter only with CARRY_DRUID_HP. Equipment
+// (M2e §5): items owned this run (ITEMS keys), the one equipped in each slot (or null), and the
+// owned items the player has looked at (badges and New marks).
 export function createRun() {
   return {
     seed: C.DEBUG_SEED ?? makeRandomSeed(), // DEBUG_SEED reproduces the whole run
@@ -16,6 +18,9 @@ export function createRun() {
     completedNodeIds: [],
     inventory: emptyResources(),
     druidHp: C.DRUID_HP,
+    items: [],
+    equipped: Object.fromEntries(Object.keys(C.SLOT_TYPES).map((slot) => [slot, null])),
+    seenItems: [],
   };
 }
 
@@ -84,9 +89,10 @@ export function recordVictory(run, resources, druidHp) {
   run.druidHp = druidHp;
 }
 
-// HP the Druid starts the next encounter with.
-export function startingDruidHp(run) {
-  return C.CARRY_DRUID_HP ? run.druidHp : C.DRUID_HP;
+// HP the Druid starts the next encounter with: full (his effective max HP, M2e §5), or with
+// CARRY_DRUID_HP the HP he won with, clamped to that max (it may have dropped after unequipping).
+export function startingDruidHp(run, maxHp) {
+  return C.CARRY_DRUID_HP ? Math.min(run.druidHp, maxHp) : maxHp;
 }
 
 // The available node under p (for hover and clicks), or null. Locked, completed and bypassed
@@ -110,4 +116,34 @@ export function validateMap() {
     if (!C.NODE_TYPES[n.type]) console.error(`Map node ${n.id}: unknown type "${n.type}" (NODE_TYPES)`);
     for (const next of n.next) if (!ids.includes(next)) console.error(`Map node ${n.id}: unknown next node "${next}"`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Equipment (M2e §5). Items fit only their own slot; one per slot; swapping is free (on the map).
+// ---------------------------------------------------------------------------
+
+// A random ITEMS key the run doesn't own yet (seeded rng), or null if it owns them all.
+export function randomUnownedItem(run, rng) {
+  const left = Object.keys(C.ITEMS).filter((id) => !run.items.includes(id));
+  return left.length ? left[rng.int(0, left.length - 1)] : null;
+}
+
+export function addItem(run, itemId) {
+  if (!C.ITEMS[itemId] || run.items.includes(itemId)) return false;
+  run.items.push(itemId);
+  return true;
+}
+
+// Equip an owned item in its slot, replacing whatever was there.
+export function equipItem(run, itemId) {
+  const item = C.ITEMS[itemId];
+  if (!item || !run.items.includes(itemId)) return false;
+  run.equipped[item.slot] = itemId;
+  return true;
+}
+
+export function unequipSlot(run, slot) {
+  if (!(slot in run.equipped)) return false;
+  run.equipped[slot] = null;
+  return true;
 }
