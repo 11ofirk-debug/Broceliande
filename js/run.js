@@ -147,3 +147,11 @@ export function unequipSlot(run, slot) {
   run.equipped[slot] = null;
   return true;
 }
+
+// The player has looked at a slot's items (its popover opened, M2e §4.4): they lose their New
+// marks and the slot's badge clears.
+export function markSlotSeen(run, slot) {
+  for (const id of run.items) {
+    if (C.ITEMS[id].slot === slot && !run.seenItems.includes(id)) run.seenItems.push(id);
+  }
+}

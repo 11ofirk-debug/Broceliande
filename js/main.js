@@ -12,7 +12,8 @@ import { ActionState } from './states.js';
 import { undoLastMove } from './systems/actionSystem.js';
 import { toggleDropMult } from './systems/dropSystem.js';
 import { initAudio, toggleMute } from './audio.js';
-import { isRunComplete, mapNode, availableNodeAt, validateMap, addItem, equipItem, unequipSlot, randomUnownedItem } from './run.js';
+import { isRunComplete, mapNode, availableNodeAt, validateMap, addItem, equipItem, unequipSlot, randomUnownedItem, markSlotSeen } from './run.js';
+import { createEquipmentPanel } from './equipmentPanel.js';
 import { validateItems } from './stats.js';
 import { createRng } from './rng.js';
 import { events } from './events.js';
@@ -102,6 +103,12 @@ const ui = createUI({
 });
 checkLevelNameLabel(LEVEL_IDS.map(sceneFor)); // M2a §6: the label must not cover a candidate in any level
 checkBossBar(LEVEL_IDS.map(sceneFor));        // M2c §2.7: nor may the boss HP bar
+// Equipment panel on the map (M2e §4): equipping is free and only possible there, between battles.
+const equipPanel = createEquipmentPanel({
+  onEquip: (itemId) => equipItem(game.run, itemId),
+  onUnequip: (slot) => unequipSlot(game.run, slot),
+  onSlotViewed: (slot) => markSlotSeen(game.run, slot),
+});
 
 const input = createInput(stage, canvas, () => scale, {
   onPointerDown(world, button) {
@@ -211,6 +218,7 @@ function frame(now) {
   view.resourceTargets = game.sweep ? (view.resourceTargets ?? ui.resourceTargets()) : null;
   renderer.render(game, view);
   ui.update(game, clock, view);
+  equipPanel.update(game);
   requestAnimationFrame(frame);
 }
 

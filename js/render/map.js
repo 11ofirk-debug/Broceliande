@@ -32,10 +32,10 @@ function mapClusters() {
   const rng = createRng(C.MAP_DECOR_SEED);
   clusters = [];
   for (let i = 0; i < 90; i++) {
-    const x = rng.range(0, C.STAGE_WIDTH);
+    const x = rng.range(C.EQUIP_PANEL_WIDTH, C.STAGE_WIDTH); // the map area, right of the equipment panel (M2e §4.1)
     const y = rng.range(C.HUD_STRIP_HEIGHT, C.STAGE_HEIGHT);
     const blobs = Array.from({ length: rng.int(3, 7) }, () => ({ dx: rng.range(-34, 34), dy: rng.range(-18, 18), r: rng.range(10, 24) }));
-    const clear = C.MAP_NODES.every((n) => Math.hypot(n.pos.x - x, n.pos.y + 20 - y) > C.MAP_NODE_RADIUS + 110);
+    const clear = C.MAP_NODES.every((n) => Math.hypot(n.pos.x - x, n.pos.y + 20 - y) > C.MAP_NODE_RADIUS + 80);
     if (clear) clusters.push({ x, y, blobs });
   }
   return clusters;
@@ -103,7 +103,7 @@ function drawNode(ctx, node, state, hovered, t) {
   if (state === 'completed') {
     // A bold red V over the circle.
     ctx.strokeStyle = COLORS.victory;
-    ctx.lineWidth = 10;
+    ctx.lineWidth = r * 0.23; // scales with the node (M2e §4.6)
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
@@ -112,33 +112,44 @@ function drawNode(ctx, node, state, hovered, t) {
     ctx.lineTo(x + r * 0.7, y - r * 0.78);
     ctx.stroke();
   }
-  ctx.font = 'italic 28px Georgia, serif';
+  ctx.font = `italic ${C.MAP_LABEL_FONT_PX}px Georgia, serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
   ctx.shadowBlur = 6;
   ctx.fillStyle = COLORS.label;
-  ctx.fillText(node.name, x, y + C.MAP_NODE_RADIUS + 14);
+  labelLines(ctx, node.name).forEach((line, i) => ctx.fillText(line, x, y + C.MAP_NODE_RADIUS + 8 + i * (C.MAP_LABEL_FONT_PX + 2)));
   ctx.restore();
 }
 
-// The Druid token (§4.3 SHOULD): beside the node he last won, or below the start node.
+// A node name in one line, or two if wider than MAP_LABEL_MAX_WIDTH (split at the space nearest
+// the middle; M2e §4.6). ctx must have the label font set.
+function labelLines(ctx, name) {
+  if (ctx.measureText(name).width <= C.MAP_LABEL_MAX_WIDTH || !name.includes(' ')) return [name];
+  const spaces = [...name.matchAll(/ /g)].map((m) => m.index);
+  const cut = spaces.reduce((a, b) => (Math.abs(b - name.length / 2) < Math.abs(a - name.length / 2) ? b : a));
+  return [name.slice(0, cut), name.slice(cut + 1)];
+}
+
+// The Druid token (§4.3 SHOULD): beside the node he last won, or beside the start node (M2e:
+// the smaller map leaves no room below it).
 function drawDruidToken(ctx, run) {
   const won = run.completedNodeIds;
   const node = won.length ? mapNode(won[won.length - 1]) : mapNode(C.MAP_START_NODE);
   const at = won.length
     ? { x: node.pos.x + C.MAP_NODE_RADIUS + 34, y: node.pos.y + 6 }   // beside it
-    : { x: node.pos.x, y: node.pos.y + C.MAP_NODE_RADIUS + 110 };      // below it, under its name
+    : { x: node.pos.x - C.MAP_NODE_RADIUS - 34, y: node.pos.y + 6 };   // beside the start node, on its left
   ctx.save();
   ctx.translate(at.x, at.y);
-  ctx.scale(0.75, 0.75);
+  ctx.scale(0.6, 0.6);
   drawDruid(ctx, 0, 0, false, 0, DRUID_REST_POSE);
   ctx.restore();
 }
 
 // hoverId: the available node under the pointer, or null. t: s (real time) for the pulse.
 export function drawMap(ctx, run, hoverId, t, debug) {
-  const g = ctx.createRadialGradient(C.STAGE_WIDTH / 2, C.STAGE_HEIGHT * 0.6, 100, C.STAGE_WIDTH / 2, C.STAGE_HEIGHT * 0.6, C.STAGE_WIDTH * 0.7);
+  const mx = (C.EQUIP_PANEL_WIDTH + C.STAGE_WIDTH) / 2; // centre of the map area (M2e §4.1)
+  const g = ctx.createRadialGradient(mx, C.STAGE_HEIGHT * 0.6, 100, mx, C.STAGE_HEIGHT * 0.6, C.STAGE_WIDTH * 0.6);
   g.addColorStop(0, COLORS.groundLight);
   g.addColorStop(1, COLORS.ground);
   ctx.fillStyle = g;
@@ -179,7 +190,7 @@ export function drawMap(ctx, run, hoverId, t, debug) {
     ctx.fillStyle = COLORS.debug;
     ctx.textBaseline = 'top';
     C.MAP_NODES.forEach((n, i) => {
-      ctx.fillText(`${n.id} (${n.levelId}) → [${n.next.join(', ')}]  ${nodeState(run, n.id)}`, 24, C.HUD_STRIP_HEIGHT + 16 + i * 20);
+      ctx.fillText(`${n.id} (${n.levelId}) → [${n.next.join(', ')}]  ${nodeState(run, n.id)}`, C.EQUIP_PANEL_WIDTH + 24, C.HUD_STRIP_HEIGHT + 16 + i * 20);
       ctx.fillText(n.id, n.pos.x - C.MAP_NODE_RADIUS, n.pos.y - C.MAP_NODE_RADIUS - 22);
     });
     ctx.restore();

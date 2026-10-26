@@ -88,6 +88,20 @@
 
       <div id="mode-banner" hidden></div>
 
+      <!-- Equipment panel on the map (M2e §4), built by js/equipmentPanel.js. -->
+      <div id="equip-panel" hidden>
+        <canvas id="equip-portrait" width="560" height="470"></canvas>
+        <div id="equip-slots"></div>
+        <div id="equip-lower">
+          <div class="equip-heading">Effective stats</div>
+          <div id="equip-stats"></div>
+          <div class="equip-heading">Carried resources</div>
+          <div id="equip-carried-rows"></div>
+        </div>
+        <div id="equip-popover" hidden></div>
+        <div id="equip-tip" hidden></div>
+      </div>
+
       <div id="tooltip" hidden></div>
 
       <!-- Contextual menu: one .menu-option per choice, built by js/ui.js. -->

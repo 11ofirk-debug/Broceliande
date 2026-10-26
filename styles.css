@@ -680,3 +680,202 @@ html, body {
   font-style: italic;
   color: #d8cfae;
 }
+
+/* ---------- Equipment panel on the map (M2e §4) ---------- */
+#equip-panel {
+  position: absolute;
+  left: 0;
+  background: linear-gradient(#1f2618, #161b12);
+  border-right: 3px solid #4a5e36;
+  pointer-events: auto;
+}
+#equip-portrait {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.equip-slot {
+  position: absolute;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid #8a7a54;
+  background: radial-gradient(#2c3324, #1a1f14);
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.equip-slot:hover {
+  border-color: #e8c547;
+}
+.equip-slot.filled {
+  border-color: #c9a74a;
+}
+.equip-slot-label {
+  position: absolute;
+  top: 100%;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #b9b29a;
+  white-space: nowrap;
+}
+.equip-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e8553a;
+  border: 2px solid #fff0c4;
+}
+#equip-lower {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 490px;
+}
+.equip-heading {
+  margin: 14px 0 8px;
+  font-size: 18px;
+  color: #d8cfae;
+  letter-spacing: 0.05em;
+}
+#equip-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+.equip-stat {
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 17px;
+  color: #d8d2bc;
+}
+.equip-stat.changed {
+  color: #9ee27a;
+  background: rgba(120, 200, 90, 0.14);
+}
+#equip-carried-rows {
+  display: flex;
+  gap: 22px;
+  font-family: 'Consolas', monospace;
+  font-size: 22px;
+}
+.equip-res {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.equip-res-icon {
+  width: 26px;
+  height: 26px;
+}
+.equip-res-icon svg {
+  width: 100%;
+  height: 100%;
+}
+#equip-popover {
+  position: absolute;
+  z-index: 5;
+  width: 320px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding: 10px;
+  background: rgba(24, 20, 12, 0.97);
+  border: 2px solid #c9a74a;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+}
+.equip-pop-title {
+  margin: 0 4px 8px;
+  font-size: 19px;
+  color: #f1e3b0;
+}
+.equip-pop-empty {
+  margin: 4px;
+  font-size: 18px;
+}
+.equip-pop-hint {
+  margin: 4px 4px 6px;
+  font-size: 15px;
+  font-style: italic;
+  color: #a9a58f;
+}
+.equip-pop-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 6px;
+  text-align: left;
+  border: 2px solid transparent;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.equip-pop-item:hover {
+  background: rgba(255, 236, 170, 0.12);
+}
+.equip-pop-item.equipped {
+  border-color: #c9a74a;
+  background: rgba(201, 167, 74, 0.18);
+}
+.equip-pop-name {
+  font-size: 17px;
+  color: #f4ecd4;
+}
+.equip-pop-desc {
+  font-size: 14px;
+  color: #c4bda4;
+}
+.equip-new,
+.equip-on {
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  vertical-align: middle;
+}
+.equip-new {
+  background: #e8553a;
+  color: #fff4dc;
+}
+.equip-on {
+  background: #6b5a2a;
+  color: #f1e3b0;
+}
+.equip-pop-remove {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #8a7a54;
+  border-radius: 8px;
+  background: transparent;
+  color: #e0b8a8;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+#equip-tip {
+  position: absolute;
+  z-index: 4;
+  max-width: 260px;
+  padding: 8px 12px;
+  background: rgba(24, 20, 12, 0.95);
+  border: 1px solid #8a7a54;
+  border-radius: 8px;
+  pointer-events: none;
+}
+.equip-tip-name {
+  font-size: 16px;
+  color: #f4ecd4;
+}
+.equip-tip-desc {
+  font-size: 14px;
+  color: #c4bda4;
+}
