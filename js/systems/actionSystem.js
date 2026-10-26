@@ -13,6 +13,7 @@ import { canVisit, stepCost, markerPos, legFootprints } from './stepSystem.js';
 import { buildCost, buildTime } from '../entities/turret.js';
 import { doubleAvailability } from './doubleSystem.js';
 import { events } from '../events.js';
+import { addFloatingText } from '../effects.js';
 
 // Timed actions show a progress bar and can be cancelled. TRAVELLING is neither:
 // its steps are already spent and input is ignored until it lands (M1b §5.3).
@@ -154,6 +155,14 @@ export function summonAvailability(game, kind) {
   if (s.active(game).length >= s.max) return { available: false, reason: `${s.max} ${s.max === 1 ? s.name : s.plural} already active` };
   if (!canAfford(game.resources, s.cost)) return { available: false, reason: shortfallReason(game.resources, s.cost) };
   return { available: true, reason: '' };
+}
+
+// A summon shortcut that can't be used now: its reason in small grey text above the Druid and a
+// soft "denied" sound. Nothing else changes.
+export function denySummon(game, kind, reason) {
+  const p = druidDisplayPos(game);
+  addFloatingText(game, reason, p.x, p.y - C.DRUID_RADIUS * 3, true, true);
+  events.emit('summonDenied', { kind });
 }
 
 // Confirming Summon: enter placement mode for that summon (the action's target). Nothing is paid yet.

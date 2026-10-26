@@ -768,6 +768,7 @@ function menuOptions(game, menu) {
         title: `Summon ${s.name}`, portrait: kind, cost: s.cost, costText: null,
         detail: `Active: ${s.active(game).length} / ${summonMax(game, kind)}\n${summonDetail(game)[kind]}`,
         action: null, disabled: !available, reason,
+        keyBadge: C.SUMMON_KEYS[kind].toUpperCase(), // its keyboard shortcut
       };
     });
   }
@@ -780,6 +781,12 @@ function createMenuOption(index, option) {
   card.className = 'menu-option';
   card.dataset.option = String(index);
   if (option.portrait) card.append(portraitCanvas(option.portrait));
+  if (option.keyBadge) {
+    const badge = document.createElement('span');
+    badge.className = 'menu-key';
+    badge.textContent = option.keyBadge;
+    card.append(badge);
+  }
   const body = document.createElement('div');
   body.className = 'menu-body';
   for (const part of ['title', 'cost', 'detail']) {
@@ -840,6 +847,9 @@ function updateMenu(el, game, view, prevKey, hoverIndex) {
     button.disabled = o.disabled;
     node.classList.toggle('disabled', o.disabled && !o.info);
     node.classList.toggle('clickable', !o.disabled);
+    // A summon shortcut pressed while unavailable flashes its option (real time, UI only).
+    const flash = view.flashSummon;
+    node.classList.toggle('flash', menu.kind === 'summon' && !!flash && flash.kind === Object.keys(SUMMONS)[i] && performance.now() < flash.until);
   });
 
   if (key !== prevKey) {

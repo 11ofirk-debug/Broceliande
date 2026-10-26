@@ -128,7 +128,10 @@ const input = createInput(stage, canvas, () => scale, {
         break;
       case 'n': if (game.state === GameState.PREP) startCombat(game); break;
       case 'r': if (e.shiftKey) startNewRun(); else if (game.state !== GameState.MAP) { restartEncounter(game); afterRestart(); } break; // M2a §8: R this encounter again, Shift+R a new run
-      case 'w': winNow(game); break;                    // M2a §8: win the battle now (Combat only)
+      case 'w': // Shift+W (debug): win the battle now (Combat only); W alone is the Squirrel shortcut
+        if (e.shiftKey) winNow(game); else summonShortcut(key);
+        break;
+      case 'q': case 'e': summonShortcut(key); break; // summon shortcuts (Combat only)
       case 'l': if (game.state !== GameState.MAP) restart({ newSeed: true }); break; // M1c §6.1: restart with a new layout
       case 'm': // M1b §2: switch timed / steps Prep, then restart this encounter
         togglePrepMode(game);
@@ -165,6 +168,12 @@ window.broceliande = {
   equip: (itemId) => { addItem(game.run, itemId); return equipItem(game.run, itemId); },
   unequip: (slot) => unequipSlot(game.run, slot),
 };
+
+// Q / W / E (SUMMON_KEYS): the summon shortcuts, Combat only (ignored in Prep, on the map, in ENDING).
+function summonShortcut(key) {
+  const kind = Object.keys(C.SUMMON_KEYS).find((k) => C.SUMMON_KEYS[k] === key);
+  if (kind) interaction.onSummonKey(kind);
+}
 
 // Debug key I on the map (M2e §6): a random unowned item joins the run (seeded from the run seed).
 function debugAddItem() {

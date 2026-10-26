@@ -102,6 +102,7 @@ function subscribe() {
   events.on('runComplete', (e) => play('runComplete', e));
   events.on('magicFound', (e) => play('magicFound', e));
   events.on('bellToll', (e) => play('bellToll', e));
+  events.on('summonDenied', (e) => play('summonDenied', e));
   events.on('doubleAppears', (e) => play('doubleAppears', e));
   events.on('doubleCraftHit', (e) => play('doubleCraftHit', e));
   events.on('doubleCancelled', (e) => play('doubleCancelled', e));
@@ -382,6 +383,12 @@ const RECIPES = {
     });
     noise(t, out, { filter: 'highpass', freq: 6000 * p, dur: 0.9, attack: 0.05, gain: 0.25 });
     return 0.95;
+  },
+
+  // Summon shortcut denied: a soft, short two-note low blip, falling.
+  summonDenied(t, out, p) {
+    tone(t, out, { type: 'triangle', freq: 330 * p, dur: 0.08, gain: 0.7, attack: 0.005 });
+    return tone(t, out, { type: 'triangle', freq: 247 * p, dur: 0.12, gain: 0.7, attack: 0.005, delay: 0.08 });
   },
 
   // Bell toll (M2f §4.10): a deep bronze bell, its slightly inharmonic partials ringing out long,

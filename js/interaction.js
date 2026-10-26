@@ -10,12 +10,16 @@ import { pick } from './picking.js';
 import {
   startSearch, startBuild, cancelAction, isBuildingSlot,
   startSummonPlacement, exitSummonPlacement, placeSummon, startTravel, isTravelling, SUMMONS,
+  summonAvailability, denySummon,
 } from './systems/actionSystem.js';
 import { isStepMode, canVisit } from './systems/stepSystem.js';
 import { isDoubleTargeting, isDoubleTarget, doubleOnSlot, startDoubleJob, cancelDoubleJob } from './systems/doubleSystem.js';
 import { TURRET_TYPE_KEYS } from './entities/turret.js';
 import { startCombat, enterNode } from './game.js';
 import { availableNodeAt } from './run.js';
+import * as C from './config.js';
+
+const SUMMON_FLASH_MS = C.SUMMON_DENIED_FLASH_TIME * 1000; // real time: a UI flash, not gameplay
 
 export function createInteraction(game, view) {
   function closeMenu() {
@@ -118,12 +122,38 @@ export function createInteraction(game, view) {
     if (menu.kind === 'summon' && startSummonPlacement(game, Object.keys(SUMMONS)[option])) closeMenu();
   }
 
+  // Summon shortcuts (Q / W / E): exactly what choosing that summon in the Druid's menu does,
+  // Combat only. The same key again while placing it cancels placement (like Esc); another
+  // summon's key switches to it if it is available. Unavailable: no placement, but its reason
+  // near the Druid, a soft "denied" sound and, if the Druid's menu is open, a flash of its option.
+  function onSummonKey(kind) {
+    if (game.state !== GameState.COMBAT) return;
+    const placing = game.action.state === ActionState.SUMMON_PLACEMENT;
+    if (placing && game.action.target === kind) {
+      exitSummonPlacement(game);
+      closeMenu();
+      return;
+    }
+    // While placing another summon the Druid counts as idle for the switch.
+    const previous = game.action;
+    if (placing) exitSummonPlacement(game);
+    const { available, reason } = summonAvailability(game, kind);
+    if (!available) {
+      if (placing) game.action = previous;
+      denySummon(game, kind, reason || 'Not now');
+      if (view.menu?.kind === 'summon') view.flashSummon = { kind, until: performance.now() + SUMMON_FLASH_MS };
+      return;
+    }
+    closeMenu();
+    startSummonPlacement(game, kind);
+  }
+
   // Start Combat / Start Battle button. Ignored mid-travel so a paid move always lands.
   function onStartCombat() {
     if (!isTravelling(game)) startCombat(game);
   }
 
-  return { onLeftClick, onEscape, onMenuAction, onStartCombat, closeMenu };
+  return { onLeftClick, onEscape, onMenuAction, onStartCombat, onSummonKey, closeMenu };
 }
 
 // Whether the hovered object reacts to a click right now (for the pointer cursor).

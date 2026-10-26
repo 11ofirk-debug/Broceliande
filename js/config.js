@@ -312,6 +312,10 @@ export const SQUIRREL_HP = 15;              // TUNING
 export const SQUIRREL_DURATION = 12;        // TUNING — s
 export const SQUIRREL_SPEED = 110;          // TUNING — px/s, straight line, ignores terrain
 export const MAX_SQUIRRELS = 3;             // TUNING — separate from MAX_VULTURES
+
+// Summon shortcuts in Combat (same as choosing the summon in the Druid's menu), shown as key badges there.
+export const SUMMON_KEYS = { vulture: 'q', squirrel: 'w', double: 'e' };
+export const SUMMON_DENIED_FLASH_TIME = 0.45; // s an unavailable summon's option flashes in the open Druid menu
 export const SQUIRREL_RADIUS = 12;          // TUNING
 export const SQUIRREL_PICKUP_RANGE = 14;    // TUNING — px, collects a drop within this distance
 export const SQUIRREL_BLOCKS_WOLVES = true; // M1d §2.4: true = a waiting Squirrel blocks and is bitten like a landed Vulture. M1h §3.3: true by default (needed for the counter-attack)
@@ -377,6 +381,7 @@ export const SOUNDS = {
   mapNodeChosen: { volume: 0.6,  pitch: 1, minGap: 0.2,  maxVoices: 1, enabled: true }, // TUNING — warm drum hit + rising tone
   runComplete:   { volume: 0.6,  pitch: 1, minGap: 1,    maxVoices: 1, enabled: true }, // TUNING — short triumphant phrase
   magicFound:    { volume: 0.6,  pitch: 1, minGap: 0.5,  maxVoices: 1, enabled: true }, // TUNING — bright shimmer on finding a hidden item (M2e §3.2)
+  summonDenied:  { volume: 0.35, pitch: 1, minGap: 0.15, maxVoices: 1, enabled: true }, // TUNING — soft low blip when a summon shortcut can't be used
   bellToll:      { volume: 0.8,  pitch: 1, minGap: 2,    maxVoices: 1, enabled: true }, // TUNING — deep bell before each Hollow of Bells surge (M2f §4.10)
   // The Ogre (M2c §2.9)
   ogreSpawns:    { volume: 0.9,  pitch: 1, minGap: 1,    maxVoices: 1, enabled: true }, // TUNING — deep, long roar

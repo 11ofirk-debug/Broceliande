@@ -512,6 +512,7 @@ html, body {
   margin: -6px;
   padding: 6px;
   border-radius: 6px;
+  position: relative; /* for the key badge */
 }
 
 .menu-option + .menu-option {
@@ -884,4 +885,25 @@ html, body {
 .equip-tip-desc {
   font-size: 14px;
   color: #c4bda4;
+}
+
+/* Summon shortcut badge on each Druid-menu option (Q / W / E). */
+.menu-key {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  min-width: 18px;
+  padding: 0 5px;
+  border: 1px solid #8a7a54;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  font-family: 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: center;
+  color: #f1e3b0;
+}
+/* A summon shortcut pressed while unavailable flashes its option. */
+.menu-option.flash {
+  background: rgba(224, 85, 58, 0.35);
 }
