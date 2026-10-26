@@ -42,6 +42,7 @@ const COLORS = {
   pebbleTrail: 'rgba(255, 250, 230, 0.6)',
   wolfEye: '#ff2a1a',
   wolfEyeGlow: 'rgba(255, 40, 20, 0.35)',
+  wolfEyeHot: '#ffb08a', // bright centre of the Fell Wilds icon's eyes (M2c §1.2)
   hpBack: 'rgba(0, 0, 0, 0.7)',
   hpHigh: '#7ccf5a',
   hpMid: '#e0c04a',
@@ -388,13 +389,17 @@ export function drawWolfHead(ctx, x, y, size, color, cutColor, { redEyes = false
     ctx.fill();
   };
   if (redEyes) {
+    // Large and bright so they read at map size: a wide faint glow, a big red eye, a hot centre.
     ctx.fillStyle = COLORS.wolfEyeGlow;
-    for (const side of [-1, 1]) eye(side, 1.9);
+    for (const side of [-1, 1]) eye(side, 3.2);
     ctx.fillStyle = COLORS.wolfEye;
+    for (const side of [-1, 1]) eye(side, 1.9);
+    ctx.fillStyle = COLORS.wolfEyeHot;
+    for (const side of [-1, 1]) eye(side, 0.8);
   } else {
     ctx.fillStyle = cutColor;
+    for (const side of [-1, 1]) eye(side, 1);
   }
-  for (const side of [-1, 1]) eye(side, 1);
   ctx.fillStyle = cutColor;
   ctx.beginPath();
   ctx.ellipse(x, y + 0.6 * s, 0.11 * s, 0.07 * s, 0, 0, Math.PI * 2);
