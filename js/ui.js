@@ -7,7 +7,7 @@ import { GameState, ActionState } from './states.js';
 import { laneStats, expectedResources, candidateProblems } from './scene.js';
 import { routeBand, generateLayout } from './layout.js';
 import { zoneIds, zoneQuota, zoneCandidates, quotaTotals } from './zones.js';
-import { corridorWidth, featureMix } from './levelSettings.js';
+import { corridorWidth, featureMix, stuckTime } from './levelSettings.js';
 import { createRng } from './rng.js';
 import { RESOURCE_ICON_SVG } from './icons.js';
 import { costRowsElement, costRowsKey } from './costRows.js';
@@ -22,7 +22,7 @@ import { buildCost, levelStats, levelRange, nextLevelStats, maxLevel, turretType
 import { isStepMode, stepCost, canVisit, anyVisitable, routePreview, calibrationFigures, affordableTurretTypes } from './systems/stepSystem.js';
 import { enemyTotals, waveCounts } from './game.js';
 import { isMuted, soundStats, audioStatus } from './audio.js';
-import { isRunComplete, mapNode } from './run.js';
+import { isRunComplete, mapNode, nodeRadius } from './run.js';
 import { resolveStats, changedStats, STAT_LABELS } from './stats.js';
 import { drawSlotIcon } from './render/items.js';
 
@@ -78,7 +78,7 @@ function bossDebugLines(game) {
     const attack = e.attack === AttackState.WINDUP
       ? `WIND-UP ${e.windupElapsed.toFixed(2)} / ${t.windupTime} s → ${e.windupTarget.kind === 'druid' ? 'Druid' : `summon #${e.windupTarget.id}`}`
       : `ready to wind up in ${Math.max(0, t.attackInterval - t.windupTime - e.sinceBlow).toFixed(1)} s`;
-    lines.push(`  ${t.name} #${e.id}: HP ${Math.ceil(e.hp)} / ${t.hp}  ${attack}`);
+    lines.push(`  ${t.name} #${e.id}: HP ${Math.ceil(e.hp)} / ${e.maxHp}  ${attack}`);
   }
   return lines;
 }
@@ -401,7 +401,7 @@ function updateBoss(el, game) {
   el.bossBar.hidden = !boss;
   el.uiLayer.classList.toggle('boss-active', !!boss);
   if (boss) {
-    const max = C.ENEMY_TYPES[boss.type].hp;
+    const max = boss.maxHp; // scaled by the level's enemyHpMult (M2f §3.1)
     const hp = Math.max(0, Math.ceil(boss.hp));
     setText(el.bossName, C.ENEMY_TYPES[boss.type].name.toUpperCase());
     el.bossFill.style.width = `${(100 * hp) / max}%`;
@@ -595,17 +595,20 @@ function mapTooltip(nodeId) {
   if (!nodeId) return null;
   const node = mapNode(nodeId);
   const level = C.LEVELS[node.levelId];
-  const anchor = { x: node.pos.x, y: node.pos.y, halfWidth: C.MAP_NODE_RADIUS * C.MAP_HOVER_SCALE };
+  const anchor = { x: node.pos.x, y: node.pos.y, halfWidth: nodeRadius(node) * C.MAP_HOVER_SCALE };
   const counts = (types) => types.map(([type, n]) => `${C.ENEMY_TYPES[type].plural} ${n}`).join(' · ');
   const entries = Object.entries(level.enemyCounts).filter(([, n]) => n > 0);
-  if (node.type !== 'fell') return { title: `${node.name} — ${level.description}`, lines: [['', counts(entries)]], anchor };
-  const bosses = [...new Set((level.bosses ?? []).map((b) => C.ENEMY_TYPES[b.type].name))];
+  if (node.type === 'wilds') return { title: `${node.name} — ${level.description}`, lines: [['', counts(entries)]], anchor };
+  // Fell Wilds: "Mini-boss: Ogre"; the Boss node (M2f §2): "Bosses: Ogre ×2" (counted from its level).
+  const tally = {};
+  for (const b of level.bosses ?? []) tally[C.ENEMY_TYPES[b.type].name] = (tally[C.ENEMY_TYPES[b.type].name] ?? 0) + 1;
+  const bosses = Object.entries(tally).map(([name, n]) => (n > 1 ? `${name} ×${n}` : name)).join(', ');
   return {
     title: `${node.name} — ${C.NODE_TYPES[node.type].label}`,
     lines: [
       ['', level.description],
       ['', counts(entries.filter(([type]) => !C.ENEMY_TYPES[type].boss))],
-      ['tip-boss', `Mini-boss: ${bosses.join(', ')}`],
+      ['tip-boss', `${node.type === 'boss' ? 'Bosses' : 'Mini-boss'}: ${bosses || '—'}`],
     ],
     anchor,
   };
@@ -878,7 +881,8 @@ function updateEndOverlay(el, game) {
   }
   el.endCarry.hidden = !goesOn;
   el.endMessage.hidden = !(won && !goesOn);
-  if (!el.endMessage.hidden) setText(el.endMessage, RUN_COMPLETE_LINE);
+  // M2f §2: winning the Boss node closes the run with its own line.
+  if (!el.endMessage.hidden) setText(el.endMessage, C.NODE_TYPES[mapNode(game.run.currentNodeId)?.type]?.finalLine ?? RUN_COMPLETE_LINE);
   if (goesOn) {
     const inv = game.run.inventory;
     const key = JSON.stringify(inv);
@@ -946,6 +950,7 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
     ...runLines(game),
     `Level:  ${game.levelId} (${game.scene.level.name})  ([ / ] previous / next level)`,
     `  corridor ${corridorWidth(game.scene.level)} px · feature mix ${Object.entries(featureMix(game.scene.level)).map(([t, n]) => `${n} ${C.FEATURE_TYPES[t].name}`).join(', ')}`,
+    `  enemy HP ×${game.stats['enemy.hpMult']} · stuck time ${stuckTime(game.scene.level)} s`, // M2f §3.1, §4
     `Seed:   ${game.seed}`,
     `Mode:   ${game.prepMode}  (M to toggle + restart)`,
     `State:  ${game.state}`,

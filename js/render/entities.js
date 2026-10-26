@@ -603,7 +603,7 @@ const HP_BAR = { wolf: { lift: 2.9, width: 30 }, bear: { lift: 1.75, width: 48 }
 // Mini-bosses (M2c §2.7) keep theirs visible all the time.
 export function drawEnemyHpBar(ctx, enemy) {
   const t = C.ENEMY_TYPES[enemy.type];
-  const maxHp = t.hp;
+  const maxHp = enemy.maxHp; // scaled by the level's enemyHpMult (M2f §3.1)
   if (enemy.hp >= maxHp && !t.boss) return;
   const bar = HP_BAR[enemy.type];
   drawHpBar(ctx, enemy.x, enemy.y - enemy.radius * bar.lift, bar.width, enemy.hp / maxHp);

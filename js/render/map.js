@@ -5,7 +5,7 @@
 
 import * as C from '../config.js';
 import { createRng } from '../rng.js';
-import { mapNode, nodeState } from '../run.js';
+import { mapNode, nodeState, nodeRadius } from '../run.js';
 import { drawWolfHead, drawDruid, DRUID_REST_POSE } from './entities.js';
 
 const COLORS = {
@@ -21,6 +21,8 @@ const COLORS = {
   head: '#ece0c2',
   glow: '255, 233, 168',
   victory: '#d6302a',
+  bossRim: '#8e1f1a',
+  bossGlow: '200, 30, 20',
   label: '#f1e8cc',
   debug: 'rgba(120, 220, 255, 0.95)',
 };
@@ -54,10 +56,11 @@ function roadPoints(a, b) {
   const nx = -dy / len;
   const ny = dx / len;
   const sign = Math.sign(nx * (a.pos.x - b.pos.x)) || 1;
-  const gap = (C.MAP_NODE_RADIUS + 10) / len;
+  const gapA = (nodeRadius(a) + 10) / len; // each end just outside its own circle (a Boss node is larger)
+  const gapB = (nodeRadius(b) + 10) / len;
   const pts = [];
   for (let i = 0; i <= 40; i++) {
-    const t = gap + (1 - 2 * gap) * (i / 40);
+    const t = gapA + (1 - gapA - gapB) * (i / 40);
     const sway = (Math.sin(t * Math.PI) * 1.0 + Math.sin(t * Math.PI * 3) * 0.35) * C.MAP_ROAD_WIGGLE * sign;
     pts.push({ x: a.pos.x + dx * t + nx * sway, y: a.pos.y + dy * t + ny * sway });
   }
@@ -79,7 +82,8 @@ const NODE_ICONS = { wolfHead: drawWolfHead };
 const STATE_ALPHA = { available: 1, completed: 1, locked: 0.5, bypassed: 0.3 };
 
 function drawNode(ctx, node, state, hovered, t) {
-  const r = C.MAP_NODE_RADIUS * (hovered ? C.MAP_HOVER_SCALE : 1);
+  const type = C.NODE_TYPES[node.type];
+  const r = nodeRadius(node) * (hovered ? C.MAP_HOVER_SCALE : 1);
   const { x, y } = node.pos;
   ctx.save();
   ctx.globalAlpha = STATE_ALPHA[state];
@@ -93,15 +97,15 @@ function drawNode(ctx, node, state, hovered, t) {
     ctx.arc(x, y, r + 22, 0, Math.PI * 2);
     ctx.fill();
   }
+  if (type.large) drawBossPulse(ctx, x, y, r, t); // M2f §2: a slow, faint red pulse round the Boss
   ctx.fillStyle = COLORS.node;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = COLORS.rim;
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = type.large ? COLORS.bossRim : COLORS.rim;
+  ctx.lineWidth = type.large ? 6 : 4;
   ctx.stroke();
-  // Icon per node type (M2c §1.1): the wolf's head, with red eyes for Fell Wilds.
-  const type = C.NODE_TYPES[node.type];
+  // Icon per node type (M2c §1.1): the wolf's head, with red eyes for Fell Wilds and the Boss.
   NODE_ICONS[type.icon](ctx, x, y + r * 0.04, r * 0.62, COLORS.head, COLORS.node, { redEyes: type.redEyes });
   if (state === 'completed') {
     // A bold red V over the circle.
@@ -121,8 +125,20 @@ function drawNode(ctx, node, state, hovered, t) {
   ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
   ctx.shadowBlur = 6;
   ctx.fillStyle = COLORS.label;
-  labelLines(ctx, node.name).forEach((line, i) => ctx.fillText(line, x, y + C.MAP_NODE_RADIUS + 8 + i * (C.MAP_LABEL_FONT_PX + 2)));
+  labelLines(ctx, node.name).forEach((line, i) => ctx.fillText(line, x, y + nodeRadius(node) + 8 + i * (C.MAP_LABEL_FONT_PX + 2)));
   ctx.restore();
+}
+
+// The Boss node's slow, faint red pulse (M2f §2), in every state.
+function drawBossPulse(ctx, x, y, r, t) {
+  const pulse = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * C.MAP_BOSS_PULSE_HZ);
+  const g = ctx.createRadialGradient(x, y, r * 0.9, x, y, r + 30);
+  g.addColorStop(0, `rgba(${COLORS.bossGlow}, ${0.18 + 0.22 * pulse})`);
+  g.addColorStop(1, `rgba(${COLORS.bossGlow}, 0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r + 30, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // A node name in one line, or two if wider than MAP_LABEL_MAX_WIDTH (split at the space nearest
@@ -140,7 +156,7 @@ function drawDruidToken(ctx, run) {
   const won = run.completedNodeIds;
   const node = won.length ? mapNode(won[won.length - 1]) : mapNode(C.MAP_START_NODE);
   const at = won.length
-    ? { x: node.pos.x + C.MAP_NODE_RADIUS + 34, y: node.pos.y + 6 }   // beside it
+    ? { x: node.pos.x + nodeRadius(node) + 34, y: node.pos.y + 6 }    // beside it
     : { x: node.pos.x - C.MAP_NODE_RADIUS - 34, y: node.pos.y + 6 };   // beside the start node, on its left
   ctx.save();
   ctx.translate(at.x, at.y);

@@ -100,7 +100,7 @@ export function startingDruidHp(run, maxHp) {
 export function availableNodeAt(run, p) {
   for (const id of availableNodeIds(run)) {
     const n = mapNode(id);
-    if (Math.hypot(p.x - n.pos.x, p.y - n.pos.y) <= C.MAP_NODE_RADIUS * C.MAP_HOVER_SCALE) return id;
+    if (Math.hypot(p.x - n.pos.x, p.y - n.pos.y) <= nodeRadius(n) * C.MAP_HOVER_SCALE) return id;
   }
   return null;
 }
@@ -154,4 +154,9 @@ export function markSlotSeen(run, slot) {
   for (const id of run.items) {
     if (C.ITEMS[id].slot === slot && !run.seenItems.includes(id)) run.seenItems.push(id);
   }
+}
+
+// A map node's radius: MAP_NODE_RADIUS, × MAP_BOSS_SCALE for a large node type (M2f §2).
+export function nodeRadius(node) {
+  return C.MAP_NODE_RADIUS * (C.NODE_TYPES[node.type]?.large ? C.MAP_BOSS_SCALE : 1);
 }

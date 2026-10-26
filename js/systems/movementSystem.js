@@ -7,6 +7,7 @@ import * as C from '../config.js';
 import { EnemyState, AttackState, enemyType, maxOffset, laneWorldPos, remainingDistance } from '../entities/enemy.js';
 import { findBlocker } from './collisionSystem.js';
 import { events } from '../events.js';
+import { stuckTime } from '../levelSettings.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const clampOffset = (enemy, o) => clamp(o, -maxOffset(enemy.type, enemy.lane), maxOffset(enemy.type, enemy.lane));
@@ -116,7 +117,7 @@ function walk(game, enemy, dt) {
 
   enemy.advancing = enemy.s > s0; // moving forward this step (the unstick rule's "walking" blocker)
   enemy.blockerId = blocker ? blocker.id : null; // what held up its full step (unstick rule)
-  updateStuck(enemy, blocker, dt);
+  updateStuck(enemy, blocker, dt, stuckTime(game.scene.level));
 
   if (enemy.s >= exitS) {
     enemy.state = EnemyState.WAITING;
@@ -128,7 +129,8 @@ function walk(game, enemy, dt) {
 // STUCK_TIME by the same slower enemy, itself walking freely (not queuing at the lane end, not
 // held by a summon), passes through that one enemy until the two no longer overlap. Everything
 // else still collides as normal.
-function updateStuck(enemy, blocker, dt) {
+// limit: the level's stuckTime (M2f §4; default STUCK_TIME).
+function updateStuck(enemy, blocker, dt, limit) {
   if (enemy.passThroughId !== null) return;
   const slower = blocker
     && blocker.state === EnemyState.WALKING
@@ -149,7 +151,7 @@ function updateStuck(enemy, blocker, dt) {
     enemy.stuckTimer = 0;
   }
   enemy.stuckTimer += dt;
-  if (enemy.stuckTimer > C.STUCK_TIME) {
+  if (enemy.stuckTimer > limit) {
     enemy.passThroughId = blocker.id;
     enemy.passTime = 0;
     enemy.passOverlapped = false;
@@ -168,7 +170,7 @@ function endPassing(game, enemy, dt) {
   enemy.passTime += dt;
   const overlap = other && Math.hypot(other.x - enemy.x, other.y - enemy.y) < other.collisionRadius + enemy.collisionRadius - 1e-6;
   if (overlap) enemy.passOverlapped = true;
-  if (!other || (!overlap && (enemy.passOverlapped || enemy.passTime > C.STUCK_TIME))) {
+  if (!other || (!overlap && (enemy.passOverlapped || enemy.passTime > stuckTime(game.scene.level)))) {
     enemy.passThroughId = null;
   }
 }

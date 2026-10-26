@@ -70,7 +70,7 @@ function trySpawn(game, lane, type) {
     : game.rng.range(-maxOffset(type, lane), maxOffset(type, lane));
   const pos = laneWorldPos(lane, 0, offset);
   if (findBlocker(game.enemies, null, pos.x, pos.y, collisionRadiusOf(type))) return false;
-  game.enemies.push(createEnemy(game.nextEntityId++, type, lane, offset, game.rng));
+  game.enemies.push(createEnemy(game.nextEntityId++, type, lane, offset, game.rng, game.stats['enemy.hpMult']));
   game.enemyCounts[type].spawned++;
   game.enemyCounts[type].alive++;
   // A mini-boss arrives (M2c §2.6): banner, its lane's entrance pulses red, roar (audio).

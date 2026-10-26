@@ -21,6 +21,8 @@ const BASES = {
   'search.mainBonus':         () => C.SEARCH_MAIN_BONUS,
   'steps.budget':             (level) => level.stepBudget,
   'steps.length':             () => C.STEP_PX,
+  // Per level, not changed by equipment (M2f §3.1): every enemy's HP × this.
+  'enemy.hpMult':             (level) => level.enemyHpMult ?? 1,
 };
 
 export const STAT_KEYS = Object.keys(BASES);
@@ -40,6 +42,7 @@ export const STAT_LABELS = {
   'search.mainBonus': 'Search bonus',
   'steps.budget': 'Steps',
   'steps.length': 'Step length (px)',
+  'enemy.hpMult': 'Enemy HP ×',
 };
 
 export function baseStats(level) {

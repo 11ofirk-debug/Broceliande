@@ -52,7 +52,8 @@ export function laneWorldPos(lane, s, offset) {
   return { x: p.x + n.x * offset, y: p.y + n.y * offset };
 }
 
-export function createEnemy(id, type, lane, offset, rng) {
+// hpMult: the level's enemyHpMult (M2f §3.1, through the stats resolver); HP rounds to whole points.
+export function createEnemy(id, type, lane, offset, rng, hpMult = 1) {
   const t = C.ENEMY_TYPES[type];
   const pos = laneWorldPos(lane, 0, offset);
   return {
@@ -68,7 +69,8 @@ export function createEnemy(id, type, lane, offset, rng) {
     wanderTimer: rng.range(C.ENEMY_WANDER_INTERVAL[0], C.ENEMY_WANDER_INTERVAL[1]),
     x: pos.x,
     y: pos.y,
-    hp: t.hp,
+    hp: Math.round(t.hp * hpMult),
+    maxHp: Math.round(t.hp * hpMult), // its full HP in this level (HP bars, boss bar)
     slots: [],             // claimed Druid melee slot indices (meleeSlotsUsed of them, adjacent)
     stand: null,           // where it stands while attacking the Druid { x, y, angle }
     biteTimer: 0,          // s since the last bite (or since reaching its slot)

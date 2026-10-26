@@ -448,6 +448,8 @@ export const STRIKE_KNOCKBACK_TIME = 0.15; // s for that visual knock-back to se
 //                           per type (bosses included), validated at start-up against the bursts.
 //   bosses                  mini-bosses (M2c §3): { type, time, lane: a lane id or 'random' (seeded) }
 //   stepBudget              TUNING — steps available in step-mode Prep
+//   enemyHpMult             optional (M2f §3.1): every enemy's HP × this in the level; default 1
+//   stuckTime               optional (M2f §4): the level's STUCK_TIME (unstick rule); default STUCK_TIME
 // ---------------------------------------------------------------------------
 export const LEVELS = {
   tornville: {
@@ -1151,13 +1153,16 @@ export const LEVELS = {
 export const NODE_TYPES = {
   wilds: { label: 'Wilds',      icon: 'wolfHead', redEyes: false },
   fell:  { label: 'Fell Wilds', icon: 'wolfHead', redEyes: true  },
+  // M2f §2: the final node, drawn MAP_BOSS_SCALE × as large with a dark red rim and a slow red
+  // pulse; winning it completes the run with finalLine.
+  boss:  { label: 'Boss', icon: 'wolfHead', redEyes: true, large: true, finalLine: 'The Heartwood is cleansed. Broceliande breathes again.' },
 };
 
 // M2e §4.6 (as revised): the map's ground runs across the whole screen; its nodes use the right
 // half (x ≥ EQUIP_PANEL_WIDTH), and it doesn't scroll.
 // Rows are MAP_ROW_SPACING apart from MAP_BOTTOM_ROW_Y up, so MAP_ROW_CAPACITY rows fit below the
-// HUD strip; the 3 current rows sit at the bottom, slightly off-symmetric (Barrow centred between
-// Gallows and Blackthorn).
+// HUD strip; the 8 rows (M2f) fill it from the bottom, slightly off-symmetric; 2-node rows sit left
+// and right of centre, 3-node rows left, centre and right, so roads never cross.
 export const MAP_BOTTOM_ROW_Y = 985;      // px, the start row
 export const MAP_ROW_SPACING = 108;       // px between rows (≈ y of row k = MAP_BOTTOM_ROW_Y − k × this)
 export const MAP_ROW_CAPACITY = 9;        // rows the map must be able to hold
@@ -1170,12 +1175,31 @@ export const MAP_NODES = [
   { id: 'gallows',    name: 'Gallows Copse',      type: 'wilds', levelId: 'gallows',    pos: { x: 1278, y: 879 }, next: ['wychwood', 'barrow'] },
   { id: 'blackthorn', name: 'Blackthorn Hollow',  type: 'wilds', levelId: 'blackthorn', pos: { x: 1598, y: 873 }, next: ['barrow', 'drowned'] },
   // Row 3 (M2b §1, §3)
-  { id: 'wychwood',   name: 'Wychwood Circle',    type: 'wilds', levelId: 'wychwood',   pos: { x: 1142, y: 771 }, next: [] },
-  { id: 'barrow',     name: 'Forgotten Barrow',   type: 'fell',  levelId: 'barrow',     pos: { x: 1440, y: 765 }, next: [] },
-  { id: 'drowned',    name: 'The Drowned Hamlet', type: 'wilds', levelId: 'drowned',    pos: { x: 1742, y: 769 }, next: [] },
+  { id: 'wychwood',   name: 'Wychwood Circle',    type: 'wilds', levelId: 'wychwood',   pos: { x: 1142, y: 771 }, next: ['charcoal'] },
+  { id: 'barrow',     name: 'Forgotten Barrow',   type: 'fell',  levelId: 'barrow',     pos: { x: 1440, y: 765 }, next: ['charcoal', 'stags'] },
+  { id: 'drowned',    name: 'The Drowned Hamlet', type: 'wilds', levelId: 'drowned',    pos: { x: 1742, y: 769 }, next: ['stags'] },
+  // Rows 4–8 (M2f §1). levelId: placeholders (existing levels) until their own levels exist.
+  // Row 4
+  { id: 'charcoal',   name: "Charcoal Burner's Camp", type: 'wilds', levelId: 'tornville', pos: { x: 1288, y: 663 }, next: ['briar', 'causeway'] },
+  { id: 'stags',      name: "Stag's Crossing",    type: 'wilds', levelId: 'tornville',  pos: { x: 1594, y: 657 }, next: ['causeway', 'widows'] },
+  // Row 5
+  { id: 'briar',      name: 'Briar Chapel',       type: 'wilds', levelId: 'tornville',  pos: { x: 1134, y: 555 }, next: ['mossbound'] },
+  { id: 'causeway',   name: 'Sunken Causeway',    type: 'wilds', levelId: 'tornville',  pos: { x: 1444, y: 549 }, next: ['mossbound', 'ashen'] },
+  { id: 'widows',     name: "Widow's Orchard",    type: 'wilds', levelId: 'tornville',  pos: { x: 1748, y: 553 }, next: ['ashen'] },
+  // Row 6
+  { id: 'mossbound',  name: 'Mossbound Cairn',    type: 'wilds', levelId: 'tornville',  pos: { x: 1284, y: 447 }, next: ['bone', 'weeping'] },
+  { id: 'ashen',      name: 'The Ashen Glade',    type: 'fell',  levelId: 'barrow',     pos: { x: 1600, y: 441 }, next: ['weeping', 'bells'] },
+  // Row 7
+  { id: 'bone',       name: 'Bone Orchard',       type: 'wilds', levelId: 'tornville',  pos: { x: 1138, y: 339 }, next: ['heartwood'] },
+  { id: 'weeping',    name: 'The Weeping Stones', type: 'wilds', levelId: 'tornville',  pos: { x: 1442, y: 335 }, next: ['heartwood'] },
+  { id: 'bells',      name: 'Hollow of Bells',    type: 'wilds', levelId: 'tornville',  pos: { x: 1746, y: 339 }, next: ['heartwood'] },
+  // Row 8: the final boss
+  { id: 'heartwood',  name: 'The Heartwood',      type: 'boss',  levelId: 'barrow',     pos: { x: 1440, y: 229 }, next: [] },
 ];
 export const MAP_START_NODE = 'tornville';
 export const MAP_NODE_RADIUS = 30;        // px (M2e §4.6, was 44)
+export const MAP_BOSS_SCALE = 1.5;        // M2f §2: a large node (the Boss) is drawn and hit-tested this much bigger
+export const MAP_BOSS_PULSE_HZ = 0.35;    // its slow, faint red pulse
 export const MAP_HOVER_SCALE = 1.08;      // an available node under the pointer grows this much
 export const MAP_PULSE_HZ = 0.8;          // gentle glow pulse of available nodes
 export const MAP_ROAD_WIGGLE = 14;        // px, sideways sway of a road between two nodes (smaller with the smaller map, M2e)
