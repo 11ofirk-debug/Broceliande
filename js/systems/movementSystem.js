@@ -4,11 +4,12 @@
 // so enemies never overlap. Per-type values come from ENEMY_TYPES; everything else is shared.
 
 import * as C from '../config.js';
-import { EnemyState, enemyType, maxOffset, laneWorldPos, remainingDistance } from '../entities/enemy.js';
+import { EnemyState, AttackState, enemyType, maxOffset, laneWorldPos, remainingDistance } from '../entities/enemy.js';
 import { findBlocker } from './collisionSystem.js';
+import { events } from '../events.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const clampOffset = (enemy, o) => clamp(o, -maxOffset(enemy.type), maxOffset(enemy.type));
+const clampOffset = (enemy, o) => clamp(o, -maxOffset(enemy.type, enemy.lane), maxOffset(enemy.type, enemy.lane));
 
 // How much wider than a wolf an enemy is. Larger enemies stand and walk round the Druid this
 // much further out (M1e §3.5); for a wolf it is 0, so wolves use the original positions.
@@ -21,9 +22,12 @@ function wrapAngle(a) {
 
 export function updateEnemyMovement(game, dt) {
   // Front-most enemies move first, so followers react to where leaders went this step.
+  for (const enemy of game.enemies) endPassing(game, enemy, dt); // M2d §3.4
   const order = [...game.enemies].sort((a, b) => remainingDistance(a) - remainingDistance(b));
   for (const enemy of order) {
     if (enemy.blockedBy !== null) continue; // held up by a landed Vulture (§15.4)
+    if (enemy.attack === AttackState.WINDUP) continue; // finishes its swing where it stands (M2c §2.5)
+    const before = { x: enemy.x, y: enemy.y };
     switch (enemy.state) {
       case EnemyState.WALKING: walk(game, enemy, dt); break;
       case EnemyState.WAITING: tryClaimSlots(game, enemy); break;
@@ -31,12 +35,23 @@ export function updateEnemyMovement(game, dt) {
       case EnemyState.BITING: break; // stands still; attacking is handled by the combat system
       default: break;
     }
+    footsteps(enemy, before, dt);
   }
+}
+
+// Heavy footsteps (M2c §2.9): a sound event every stepSoundInterval s of walking.
+function footsteps(enemy, before, dt) {
+  const interval = enemyType(enemy).stepSoundInterval;
+  if (!interval || (enemy.x === before.x && enemy.y === before.y)) return;
+  enemy.stepTimer += dt;
+  if (enemy.stepTimer < interval) return;
+  enemy.stepTimer -= interval;
+  events.emit('enemyStep', { type: enemy.type, x: enemy.x, y: enemy.y });
 }
 
 // Move the enemy to (x, y) if nothing is in the way. Returns the blocking enemy, or null on success.
 function tryMoveTo(game, enemy, x, y) {
-  const blocker = findBlocker(game.enemies, enemy, x, y, enemy.radius);
+  const blocker = findBlocker(game.enemies, enemy, x, y, enemy.collisionRadius);
   if (blocker) return blocker;
   const dx = x - enemy.x;
   if (Math.abs(dx) > 0.01) enemy.facing = Math.sign(dx);
@@ -57,15 +72,20 @@ function tryLaneMove(game, enemy, s, offset) {
 }
 
 function updateWander(game, enemy, dt) {
+  const t = enemyType(enemy);
   enemy.wanderTimer -= dt;
   if (enemy.wanderTimer <= 0) {
-    enemy.wanderTarget = game.rng.range(-maxOffset(enemy.type), maxOffset(enemy.type));
+    // keepSide (M2d §3.3): only a little wander round the side it keeps to.
+    enemy.wanderTarget = t.keepSide
+      ? clampOffset(enemy, enemy.sideOffset + game.rng.range(-t.sideWander, t.sideWander))
+      : game.rng.range(-maxOffset(enemy.type, enemy.lane), maxOffset(enemy.type, enemy.lane));
     enemy.wanderTimer = game.rng.range(C.ENEMY_WANDER_INTERVAL[0], C.ENEMY_WANDER_INTERVAL[1]);
   }
 }
 
 function walk(game, enemy, dt) {
   const exitS = enemy.lane.path.length - C.ENEMY_SLOT_CLAIM_DISTANCE;
+  const s0 = enemy.s;
   updateWander(game, enemy, dt);
 
   const ds = enemyType(enemy).speed * dt;
@@ -78,7 +98,7 @@ function walk(game, enemy, dt) {
     const n = enemy.lane.path.normalAt(enemy.s);
     let dir = Math.sign(n.x * (enemy.x - blocker.x) + n.y * (enemy.y - blocker.y)) || (enemy.id % 2 ? 1 : -1);
     const step = C.ENEMY_SIDESTEP_SPEED * dt;
-    if (Math.abs(enemy.offset + dir * step) > maxOffset(enemy.type)) dir = -dir;
+    if (Math.abs(enemy.offset + dir * step) > maxOffset(enemy.type, enemy.lane)) dir = -dir;
     const side = clampOffset(enemy, enemy.offset + dir * step);
     const candidates = [
       [enemy.s + ds * 0.5, side],
@@ -88,15 +108,68 @@ function walk(game, enemy, dt) {
     for (const [s, offset] of candidates) {
       if (!tryLaneMove(game, enemy, Math.min(s, exitS), offset)) {
         // Keep drifting to the side we stepped to, so it doesn't wander back into the blocker.
-        if (offset === side) enemy.wanderTarget = clampOffset(enemy, side + dir * enemy.radius);
+        if (offset === side) enemy.wanderTarget = clampOffset(enemy, side + dir * enemy.collisionRadius);
         break;
       }
     }
   }
 
+  enemy.advancing = enemy.s > s0; // moving forward this step (the unstick rule's "walking" blocker)
+  enemy.blockerId = blocker ? blocker.id : null; // what held up its full step (unstick rule)
+  updateStuck(enemy, blocker, dt);
+
   if (enemy.s >= exitS) {
     enemy.state = EnemyState.WAITING;
     tryClaimSlots(game, enemy);
+  }
+}
+
+// Unstick rule (M2d §3.4): a walking enemy whose full forward step has been blocked for more than
+// STUCK_TIME by the same slower enemy, itself walking freely (not queuing at the lane end, not
+// held by a summon), passes through that one enemy until the two no longer overlap. Everything
+// else still collides as normal.
+function updateStuck(enemy, blocker, dt) {
+  if (enemy.passThroughId !== null) return;
+  const slower = blocker
+    && blocker.state === EnemyState.WALKING
+    && blocker.blockedBy === null
+    // actually moving (not queued behind enemies waiting for melee slots), or held up by this
+    // enemy in turn (two enemies blocking each other on a bend)
+    && (blocker.advancing || blocker.blockerId === enemy.id)
+    && enemyType(blocker).speed < enemyType(enemy).speed;
+  if (!slower) {
+    // A free step lets the timer run down rather than reset it, so an enemy that creeps behind
+    // its blocker (blocked on most steps, now and then a free one) still counts as held up.
+    enemy.stuckTimer = Math.max(0, enemy.stuckTimer - dt);
+    if (enemy.stuckTimer === 0) enemy.stuckOn = null;
+    return;
+  }
+  if (enemy.stuckOn !== blocker.id) {
+    enemy.stuckOn = blocker.id;
+    enemy.stuckTimer = 0;
+  }
+  enemy.stuckTimer += dt;
+  if (enemy.stuckTimer > C.STUCK_TIME) {
+    enemy.passThroughId = blocker.id;
+    enemy.passTime = 0;
+    enemy.passOverlapped = false;
+    enemy.stuckTimer = 0;
+    enemy.stuckOn = null;
+  }
+}
+
+// An enemy stops passing through another once their collision circles have overlapped and no
+// longer do (it is past), or the other is gone, or it never moved into it within STUCK_TIME
+// (the way cleared some other way). When the rule triggers they are only touching, so "no
+// longer overlap" counts only after they first overlapped.
+function endPassing(game, enemy, dt) {
+  if (enemy.passThroughId === null) return;
+  const other = game.enemies.find((e) => e.id === enemy.passThroughId);
+  enemy.passTime += dt;
+  const overlap = other && Math.hypot(other.x - enemy.x, other.y - enemy.y) < other.collisionRadius + enemy.collisionRadius - 1e-6;
+  if (overlap) enemy.passOverlapped = true;
+  if (!other || (!overlap && (enemy.passOverlapped || enemy.passTime > C.STUCK_TIME))) {
+    enemy.passThroughId = null;
   }
 }
 
@@ -110,7 +183,8 @@ function standPoint(game, enemy, first, n) {
   }
   const angle = slots[first].angle + ((n - 1) / 2) * ((Math.PI * 2) / slots.length);
   const r = C.DRUID_MELEE_RADIUS + extraRadius(enemy);
-  return { x: C.DRUID_POS.x + Math.cos(angle) * r, y: C.DRUID_POS.y + Math.sin(angle) * r, angle };
+  const home = game.scene.level.druidPos;
+  return { x: home.x + Math.cos(angle) * r, y: home.y + Math.sin(angle) * r, angle };
 }
 
 // Claim the nearest group of meleeSlotsUsed adjacent free slots (§12.5, M1e §3.5). Without
@@ -145,7 +219,7 @@ const STEER_ANGLES = [0, 0.5, -0.5, 1.0, -1.0, 1.5, -1.5];
 // otherwise round the Druid along the approach ring so the enemy passes outside the biters.
 function approach(game, enemy, dt) {
   const stand = enemy.stand;
-  const d = C.DRUID_POS;
+  const d = game.scene.level.druidPos;
   const angle = Math.atan2(enemy.y - d.y, enemy.x - d.x);
   const dAngle = wrapAngle(stand.angle - angle);
 

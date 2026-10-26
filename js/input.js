@@ -34,7 +34,7 @@ export function createInput(stageEl, canvasEl, getScale, handlers) {
 
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-    handlers.onKeyDown?.(e.key.length === 1 ? e.key.toLowerCase() : e.key);
+    handlers.onKeyDown?.(e.key.length === 1 ? e.key.toLowerCase() : e.key, e); // e: e.g. shiftKey (Shift+R, M2a §8)
   });
 
   return { mouse };

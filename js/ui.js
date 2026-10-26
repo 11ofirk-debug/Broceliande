@@ -5,7 +5,10 @@
 import * as C from './config.js';
 import { GameState, ActionState } from './states.js';
 import { laneStats, expectedResources, candidateProblems } from './scene.js';
-import { routeBand } from './layout.js';
+import { routeBand, generateLayout } from './layout.js';
+import { zoneIds, zoneQuota, zoneCandidates, quotaTotals } from './zones.js';
+import { corridorWidth, featureMix } from './levelSettings.js';
+import { createRng } from './rng.js';
 import { RESOURCE_ICON_SVG } from './icons.js';
 import { costRowsElement, costRowsKey } from './costRows.js';
 import { portraitCanvas } from './render/portraits.js';
@@ -13,11 +16,13 @@ import { canAfford, RESOURCE_KEYS, resourceName, formatCost } from './resources.
 import { canStartBuild, summonAvailability, druidDisplayPos, isTravelling, SUMMONS } from './systems/actionSystem.js';
 import { isDoubleTargeting, isDoubleTarget, doubleOnSlot, doubleJob } from './systems/doubleSystem.js';
 import { DoubleState } from './entities/boughDouble.js';
+import { AttackState } from './entities/enemy.js';
 import { turretOnSlot } from './systems/buildSystem.js';
 import { buildCost, levelStats, levelRange, nextLevelStats, maxLevel, turretType, TURRET_TYPE_KEYS } from './entities/turret.js';
 import { isStepMode, stepCost, canVisit, anyVisitable, routePreview, calibrationFigures, affordableTurretTypes } from './systems/stepSystem.js';
-import { enemyTotals, WAVE_COUNTS } from './game.js';
+import { enemyTotals, waveCounts } from './game.js';
 import { isMuted, soundStats, audioStatus } from './audio.js';
+import { isRunComplete, mapNode } from './run.js';
 
 const RESOURCE_LABELS = { pits: 'Peach Pits', reeds: 'Reeds', feathers: 'Feathers', boughs: 'Mossy Boughs' };
 // "Pits 3  Reeds 0  Feathers 2  Boughs 1": every resource, in display order (debug panel).
@@ -39,13 +44,13 @@ function formatTime(seconds) {
 function layoutDebugLines(scene) {
   const lines = ['', `Lanes (unopposed, wolf speed; target ×${C.LANE_LENGTH_FACTOR.toFixed(2)}):`];
   for (const lane of scene.lanes) {
-    const st = laneStats(lane);
+    const st = laneStats(scene, lane);
     lines.push(`  ${lane.name.padEnd(12)}${Math.round(st.length)} px  ${st.travelTime.toFixed(1)} s  ×${st.factor.toFixed(2)}`);
   }
   // M1c §2: candidate validation summary (details are in the console and drawn red in the overlay).
   const failing = [...new Set(candidateProblems(scene).map((p) => p.index))];
   lines.push('', `Candidates: ${scene.candidates.length}, ${failing.length ? `failing validation: #${failing.join(' #')}` : 'all valid'}`);
-  const res = expectedResources();
+  const res = expectedResources(scene.level);
   lines.push('', 'Search all features (avg):');
   lines.push(`  ${resourceLine(res)}`);
   lines.push(`  Search time ${res.searchTime.toFixed(1)} s`);
@@ -56,8 +61,24 @@ function layoutDebugLines(scene) {
 function enemyDebugLines(game) {
   return Object.entries(game.enemyCounts).map(([type, c]) => {
     const name = C.ENEMY_TYPES[type].plural;
-    return `${`${name}:`.padEnd(9)} spawned ${c.spawned}/${WAVE_COUNTS[type]}  alive ${c.alive}  killed ${c.killed}`;
+    return `${`${name}:`.padEnd(9)} spawned ${c.spawned}/${waveCounts(game)[type] ?? 0}  alive ${c.alive}  killed ${c.killed}`;
   });
+}
+
+// Mini-bosses (M2c §4): spawned / alive / killed over every boss type, then each living one's
+// HP and attack (counting to its next wind-up, or the wind-up timer).
+function bossDebugLines(game) {
+  const types = Object.keys(C.ENEMY_TYPES).filter((type) => C.ENEMY_TYPES[type].boss);
+  const sum = (k) => types.reduce((a, type) => a + game.enemyCounts[type][k], 0);
+  const lines = [`Bosses:   spawned ${sum('spawned')}  alive ${sum('alive')}  killed ${sum('killed')}`];
+  for (const e of game.enemies.filter((x) => C.ENEMY_TYPES[x.type].boss)) {
+    const t = C.ENEMY_TYPES[e.type];
+    const attack = e.attack === AttackState.WINDUP
+      ? `WIND-UP ${e.windupElapsed.toFixed(2)} / ${t.windupTime} s → ${e.windupTarget.kind === 'druid' ? 'Druid' : `summon #${e.windupTarget.id}`}`
+      : `ready to wind up in ${Math.max(0, t.attackInterval - t.windupTime - e.sinceBlow).toFixed(1)} s`;
+    lines.push(`  ${t.name} #${e.id}: HP ${Math.ceil(e.hp)} / ${t.hp}  ${attack}`);
+  }
+  return lines;
 }
 
 // Druid melee timer (M1e §6): counting / ready (waiting for an attacker) / paused while busy.
@@ -131,20 +152,55 @@ function soundDebugLines() {
 
 // This run's layout lines for the debug panel (M1c §6.3, M1b §8). Recomputed each frame;
 // the layout only changes on restart.
+// Feature-route cost over many seeded layouts (M1j §6), computed once: { median, min, max, n }.
+const TYPICAL_ROUTE_SEEDS = 40;
+const typicalRoutes = {}; // per level
+
+function typicalRouteCost(scene) {
+  if (typicalRoutes[scene.levelId]) return typicalRoutes[scene.levelId];
+  const costs = [];
+  for (let seed = 1; seed <= TYPICAL_ROUTE_SEEDS; seed++) costs.push(generateLayout(createRng(seed), scene, { quiet: true }).routeCost);
+  costs.sort((a, b) => a - b);
+  typicalRoutes[scene.levelId] = { median: costs[Math.floor(costs.length / 2)], min: costs[0], max: costs[costs.length - 1], n: costs.length };
+  return typicalRoutes[scene.levelId];
+}
+
+// Zones (M1j §6): per zone its candidates and quota (turret slots, resource spots, vacant), with
+// this run's actual roles in brackets; totals derived from the quotas; typical route cost.
+function zoneDebugLines(game, scene) {
+  const roles = game.layout.roles;
+  const lines = ['', 'Zones   cand  turret  feature  vacant   (this run: T / F / V)'];
+  const level = scene.level;
+  for (const zone of zoneIds(level)) {
+    const q = zoneQuota(level, zone);
+    const mine = zoneCandidates(level, zone).map((i) => roles[i].kind);
+    const n = (k) => mine.filter((r) => r === k).length;
+    lines.push(`  ${zone.padEnd(5)} ${String(mine.length).padStart(4)} ${String(q.turret).padStart(7)} ${String(q.feature).padStart(8)} ${String(q.vacant).padStart(7)}`
+      + `   (${n('slot')} / ${n('feature')} / ${n('vacant')})${level.zoneQuotaOverrides[zone] ? '  override' : ''}`);
+  }
+  const t = quotaTotals(level);
+  lines.push(`  total ${String(t.candidates).padStart(4)} ${String(t.turret).padStart(7)} ${String(t.feature).padStart(8)} ${String(t.vacant).padStart(7)}`);
+  const r = typicalRouteCost(scene);
+  lines.push(`  Feature route over ${r.n} seeds: median ${r.median} steps (${r.min}–${r.max}) vs stepBudget ${level.stepBudget}`);
+  return lines;
+}
+
 function runDebugLines(game, scene) {
   const L = game.layout;
-  const band = routeBand();
+  const band = routeBand(scene.level);
   const failures = Object.entries(L.failures).map(([k, n]) => `${k.replace('coverage:', 'cover ')} ${n}`).join(' · ') || 'none';
-  const lines = ['', `Layout: ${L.randomised ? 'randomised' : 'FIXED (RANDOMISE_LAYOUT false)'}  attempts ${L.attempts}/${C.MAX_LAYOUT_ATTEMPTS}  (L = new seed)`];
-  if (L.randomised) lines.push(`  failed constraints over all attempts: ${failures}`);
+  const lines = ['', `Layout: zone-based, ${L.randomised ? 'randomised' : `FIXED (RANDOMISE_LAYOUT false, seed ${C.FIXED_LAYOUT_SEED})`}  attempts ${L.attempts}/${C.MAX_LAYOUT_ATTEMPTS}  (L = new seed)`];
+  lines.push(`  failed constraints over all attempts: ${failures}`);
   lines.push(`  Lane coverage (min ${C.LANE_MIN_TURRET_SLOTS}): ${scene.lanes.map((lane) => `${lane.name} ${L.coverage[lane.id]}`).join(' · ')}`);
   lines.push(`  Feature route ${L.routeCost} steps  (band ${Math.ceil(band.min)}–${Math.floor(band.max)})`);
   if (L.fallback) lines.push(`  ⚠ FALLBACK: best failed attempt used — fails ${L.failed.join(', ')}`);
+  lines.push(...zoneDebugLines(game, scene));
 
-  // M1b §8: greedy nearest-neighbour routes from home, for tuning STEP_BUDGET.
+  // M1b §8: greedy nearest-neighbour routes from home, for tuning the level's stepBudget.
   const cal = calibrationFigures(game);
-  const ratio = cal.featuresAndSlots.steps / C.STEP_BUDGET;
-  lines.push('', `Step calibration (greedy from home, budget ${C.STEP_BUDGET}):`);
+  const budget = scene.level.stepBudget;
+  const ratio = cal.featuresAndSlots.steps / budget;
+  lines.push('', `Step calibration (greedy from home, budget ${budget}):`);
   lines.push(`  ${cal.features.visits} features            ${cal.features.steps} steps`);
   lines.push(`  + ${C.CALIBRATION_SLOT_COUNT} nearest slots (${cal.featuresAndSlots.visits})  ${cal.featuresAndSlots.steps} steps`);
   lines.push(`  = ${ratio.toFixed(2)} × budget (target ≈ ${C.CALIBRATION_TARGET_RATIO}; budget for target ${Math.round(cal.featuresAndSlots.steps / C.CALIBRATION_TARGET_RATIO)})`);
@@ -163,11 +219,14 @@ function placeBeside(popup, x, y, halfWidth) {
   popup.style.top = `${top}px`;
 }
 
-// callbacks: { onStartCombat(), onRestart(), onMenuAction() }
-export function createUI(scene, callbacks) {
-  const layoutLines = layoutDebugLines(scene);
+// callbacks: { onStartCombat(), onEndButton(), onMenuAction(), onToggleMute() }
+export function createUI(callbacks) {
+  // Static layout lines of each level's scene, built once per level.
+  const layoutLinesByLevel = {};
+  const layoutLinesFor = (scene) => (layoutLinesByLevel[scene.levelId] ??= layoutDebugLines(scene));
   const el = {
     hud: document.getElementById('hud'),
+    levelName: document.getElementById('level-name'),
     phase: document.getElementById('hud-phase'),
     timer: document.getElementById('hud-timer'),
     steps: document.getElementById('hud-steps'),
@@ -189,12 +248,23 @@ export function createUI(scene, callbacks) {
     endOverlay: document.getElementById('end-overlay'),
     endTitle: document.getElementById('end-title'),
     endStats: document.getElementById('end-stats'),
+    endCarry: document.getElementById('end-carry'),
+    endCarryRows: document.getElementById('end-carry-rows'),
+    endGathered: document.getElementById('end-gathered'),
+    endGatheredRows: document.getElementById('end-gathered-rows'),
+    endMessage: document.getElementById('end-message'),
     restart: document.getElementById('btn-restart'),
     tooltip: document.getElementById('tooltip'),
     menu: document.getElementById('menu'),
     menuHeader: document.getElementById('menu-header'),
     menuOptions: document.getElementById('menu-options'),
     modeBanner: document.getElementById('mode-banner'),
+    uiLayer: document.getElementById('ui-layer'),
+    bossBar: document.getElementById('boss-bar'),
+    bossName: document.getElementById('boss-name'),
+    bossFill: document.getElementById('boss-bar-fill'),
+    bossHp: document.getElementById('boss-hp'),
+    bossBanner: document.getElementById('boss-banner'),
     debugPanel: document.getElementById('debug-panel'),
   };
 
@@ -207,7 +277,7 @@ export function createUI(scene, callbacks) {
   }
   el.stepsBar.style.setProperty('--blink-period', `${1 / C.STEP_BAR_BLINK_HZ}s`);
   el.startCombat.addEventListener('click', () => callbacks.onStartCombat());
-  el.restart.addEventListener('click', () => callbacks.onRestart());
+  el.restart.addEventListener('click', () => callbacks.onEndButton());
   el.mute.addEventListener('click', () => {
     callbacks.onToggleMute();
     el.mute.blur(); // so Space / Enter later don't toggle it again
@@ -248,10 +318,108 @@ export function createUI(scene, callbacks) {
         : `Placing ${SUMMONS[game.action.target].name} — click the battlefield to place · Esc / right-click to cancel`);
     }
     updateEndOverlay(el, game);
-    updateDebugPanel(el, game, clock, view, layoutLines, scene);
+    updateLevelName(el, game);
+    updateBoss(el, game);
+    updateDebugPanel(el, game, clock, view, layoutLinesFor(game.scene), game.scene);
   }
 
-  return { update };
+  // Stage coordinates of each HUD resource icon (M2d §2.2: where swept items fly to).
+  function resourceTargets() {
+    const stageRect = document.getElementById('stage').getBoundingClientRect();
+    const s = stageRect.width / C.STAGE_WIDTH;
+    const out = {};
+    for (const icon of document.querySelectorAll('#hud-resources .res-icon')) {
+      const r = icon.getBoundingClientRect();
+      out[icon.dataset.resource] = { x: (r.left + r.width / 2 - stageRect.left) / s, y: (r.top + r.height / 2 - stageRect.top) / s };
+    }
+    return out;
+  }
+
+  return { update, resourceTargets };
+}
+
+// The current Wilds' name, bottom-left (M2a §6): during Prep and Combat, and still through
+// ENDING and under the Victory / Defeat overlay.
+function updateLevelName(el, game) {
+  const shown = game.state !== GameState.START && game.state !== GameState.MAP;
+  el.levelName.hidden = !shown;
+  if (shown) setText(el.levelName, game.scene.level.name);
+}
+
+// The living mini-boss, if any (M2c §2.7): the first one spawned.
+function livingBoss(game) {
+  return game.enemies?.find((e) => C.ENEMY_TYPES[e.type].boss) ?? null;
+}
+
+// Mini-boss HP bar while one is alive (from its spawn, not its first damage), and the arrival
+// banner fading out over its last third (M2c §2.6–2.7).
+function updateBoss(el, game) {
+  const inBattle = game.state === GameState.COMBAT || game.state === GameState.ENDING;
+  const boss = inBattle ? livingBoss(game) : null;
+  el.bossBar.hidden = !boss;
+  el.uiLayer.classList.toggle('boss-active', !!boss);
+  if (boss) {
+    const max = C.ENEMY_TYPES[boss.type].hp;
+    const hp = Math.max(0, Math.ceil(boss.hp));
+    setText(el.bossName, C.ENEMY_TYPES[boss.type].name.toUpperCase());
+    el.bossFill.style.width = `${(100 * hp) / max}%`;
+    setText(el.bossHp, `${hp} / ${max}`);
+  }
+  const a = inBattle ? game.bossAnnouncement : null;
+  el.bossBanner.hidden = !a;
+  if (a) {
+    setText(el.bossBanner, a.text);
+    const fade = C.BOSS_BANNER_TIME / 3;
+    el.bossBanner.style.opacity = String(Math.min(1, (C.BOSS_BANNER_TIME - a.age) / fade));
+  }
+}
+
+// Start-up check (M2c §2.7): the boss HP bar must not cover any candidate location, in any level
+// (like the level name label), measured with sample content. Agreed relaxation: only each
+// candidate's visible footprint (LOCATION_RADIUS) must stay clear, not its jitter allowance, so a
+// jittered top location may be partly under the bar while a boss is alive.
+export function checkBossBar(scenes) {
+  const bar = document.getElementById('boss-bar');
+  const wasHidden = bar.hidden;
+  bar.hidden = false;
+  document.getElementById('boss-name').textContent = 'OGRE';
+  document.getElementById('boss-hp').textContent = '450 / 450';
+  const r = { left: bar.offsetLeft - bar.offsetWidth / 2, top: bar.offsetTop, right: bar.offsetLeft + bar.offsetWidth / 2, bottom: bar.offsetTop + bar.offsetHeight };
+  const footprint = C.LOCATION_RADIUS; // visible footprint only (see above)
+  for (const scene of scenes) {
+    for (const c of scene.candidates) {
+      const nx = Math.max(r.left, Math.min(c.x, r.right));
+      const ny = Math.max(r.top, Math.min(c.y, r.bottom));
+      if (Math.hypot(c.x - nx, c.y - ny) < footprint) {
+        console.warn(`${scene.levelId}: candidate ${c.index} at (${c.x}, ${c.y}) is under the boss HP bar`);
+      }
+    }
+  }
+  bar.hidden = wasHidden;
+}
+
+// Start-up check (M2a §6): the label must not cover any candidate location, in any level. The
+// label is measured with each level's name; a candidate's footprint + jitter must stay clear.
+export function checkLevelNameLabel(scenes) {
+  const label = document.getElementById('level-name');
+  const wasHidden = label.hidden;
+  const text = label.textContent;
+  label.hidden = false;
+  const occupied = C.LOCATION_RADIUS + C.LOCATION_JITTER;
+  for (const scene of scenes) {
+    label.textContent = scene.level.name;
+    // Stage coordinates: the label sits at its CSS offsets inside the unscaled 1920×1080 stage.
+    const r = { left: label.offsetLeft, top: label.offsetTop, right: label.offsetLeft + label.offsetWidth, bottom: label.offsetTop + label.offsetHeight };
+    for (const c of scene.candidates) {
+      const nx = Math.max(r.left, Math.min(c.x, r.right));
+      const ny = Math.max(r.top, Math.min(c.y, r.bottom));
+      if (Math.hypot(c.x - nx, c.y - ny) < occupied) {
+        console.warn(`${scene.levelId}: candidate ${c.index} at (${c.x}, ${c.y}) is under the level name label`);
+      }
+    }
+  }
+  label.textContent = text;
+  label.hidden = wasHidden;
 }
 
 function updateHud(el, game) {
@@ -285,7 +453,12 @@ function updateHud(el, game) {
   el.hpFill.dataset.level = hpFrac > 0.5 ? 'high' : hpFrac > 0.25 ? 'mid' : 'low';
   setText(el.hpText, `${game.druidHp} / ${C.DRUID_HP}`);
 
-  for (const [k, node] of Object.entries(el.res)) setText(node, String(game.resources[k]));
+  for (const [k, node] of Object.entries(el.res)) {
+    setText(node, String(game.resources[k]));
+    // M2d §2.2: a counter pulses briefly when a swept item lands on it.
+    const pulsing = game.state === GameState.ENDING && game.endElapsed - (game.hudPulses?.[k] ?? -Infinity) < C.SWEEP_PULSE_TIME;
+    node.parentElement.classList.toggle('sweep-pulse', pulsing);
+  }
 }
 
 // Step bar (M1b §6): remaining fill, the segment the hovered marker would spend, and a red
@@ -293,19 +466,20 @@ function updateHud(el, game) {
 function updateStepBar(el, game, view) {
   const shown = game.state === GameState.PREP && isStepMode(game);
   el.steps.hidden = !shown;
-  el.timer.hidden = shown;
+  el.timer.hidden = shown || game.state === GameState.MAP; // no clock on the map (M2a §4)
   if (!shown) return;
 
   const preview = routePreview(game, view.hover);
   const spend = preview?.affordable ? preview.cost : 0;
-  const pct = (n) => `${(n / C.STEP_BUDGET) * 100}%`;
+  const budget = game.scene.level.stepBudget;
+  const pct = (n) => `${(n / budget) * 100}%`;
   const fillWidth = pct(game.stepsRemaining - spend);
   if (el.stepsFill.style.width !== fillWidth) el.stepsFill.style.width = fillWidth;
   el.stepsPreview.hidden = spend === 0;
   el.stepsPreview.style.left = pct(game.stepsRemaining - spend);
   el.stepsPreview.style.width = pct(spend);
   el.stepsBar.classList.toggle('blink', !!preview && !preview.affordable);
-  setText(el.stepsText, `${game.stepsRemaining} / ${C.STEP_BUDGET}`);
+  setText(el.stepsText, `${game.stepsRemaining} / ${budget}`);
 }
 
 // Tooltip content for the hovered object in Prep, or null (§8.4; step mode M1b §5.2.1).
@@ -371,8 +545,31 @@ function combatTooltip(game, hover) {
 }
 
 // Hover tooltip (Prep; turret slots in Combat). Rebuilt only when its content changes.
+// Map node tooltip (M2a §4.3), e.g. "Gallows Copse — A restless swarm." / "Wolves 44 · Bears 3".
+// Fell Wilds (M2c §1.3): "Forgotten Barrow — Fell Wilds", the description, the counts without the
+// mini-bosses, then "Mini-boss: Ogre". Everything from the level data.
+function mapTooltip(nodeId) {
+  if (!nodeId) return null;
+  const node = mapNode(nodeId);
+  const level = C.LEVELS[node.levelId];
+  const anchor = { x: node.pos.x, y: node.pos.y, halfWidth: C.MAP_NODE_RADIUS * C.MAP_HOVER_SCALE };
+  const counts = (types) => types.map(([type, n]) => `${C.ENEMY_TYPES[type].plural} ${n}`).join(' · ');
+  const entries = Object.entries(level.enemyCounts).filter(([, n]) => n > 0);
+  if (node.type !== 'fell') return { title: `${node.name} — ${level.description}`, lines: [['', counts(entries)]], anchor };
+  const bosses = [...new Set((level.bosses ?? []).map((b) => C.ENEMY_TYPES[b.type].name))];
+  return {
+    title: `${node.name} — ${C.NODE_TYPES[node.type].label}`,
+    lines: [
+      ['', level.description],
+      ['', counts(entries.filter(([type]) => !C.ENEMY_TYPES[type].boss))],
+      ['tip-boss', `Mini-boss: ${bosses.join(', ')}`],
+    ],
+    anchor,
+  };
+}
+
 function updateTooltip(el, game, view, prevKey) {
-  const content = tooltipContent(game, view.hover);
+  const content = game.state === GameState.MAP ? mapTooltip(view.mapHover) : tooltipContent(game, view.hover);
   const key = content ? JSON.stringify(content) + (content.cost ? costRowsKey(content.cost, game.resources) : '') : null;
   if (key === prevKey) return key;
 
@@ -610,6 +807,11 @@ function updateMenu(el, game, view, prevKey, hoverIndex) {
   return key;
 }
 
+// Victory / Defeat (M2a §4.4): Victory with more nodes reachable shows what carries over and
+// Continue; Victory that completes the run shows a closing line and Start again; Defeat shows
+// Start again.
+const RUN_COMPLETE_LINE = 'The wilds are quiet… for now.';
+
 function updateEndOverlay(el, game) {
   const ended = game.state === GameState.VICTORY || game.state === GameState.DEFEAT;
   el.endOverlay.hidden = !ended;
@@ -618,11 +820,52 @@ function updateEndOverlay(el, game) {
   el.endOverlay.dataset.result = game.state;
   const totals = enemyTotals(game);
   setText(el.endStats, `Combat time ${formatTime(game.combatTime)}  ·  Enemies killed ${totals.killed} / ${totals.total}`);
+  const won = game.state === GameState.VICTORY;
+  const goesOn = won && !isRunComplete(game.run);
+  // M2d §2.3: what the field sweep gathered, on Victory only and only if anything.
+  const gathered = won ? game.sweep?.gathered : null;
+  el.endGathered.hidden = !gathered || !Object.values(gathered).some((n) => n > 0);
+  if (!el.endGathered.hidden) {
+    const key = JSON.stringify(gathered);
+    if (el.endGatheredRows.dataset.key !== key) {
+      el.endGatheredRows.dataset.key = key;
+      el.endGatheredRows.replaceChildren(costRowsElement(gathered, gathered));
+    }
+  }
+  el.endCarry.hidden = !goesOn;
+  el.endMessage.hidden = !(won && !goesOn);
+  if (!el.endMessage.hidden) setText(el.endMessage, RUN_COMPLETE_LINE);
+  if (goesOn) {
+    const inv = game.run.inventory;
+    const key = JSON.stringify(inv);
+    if (el.endCarryRows.dataset.key !== key) {
+      el.endCarryRows.dataset.key = key;
+      const any = Object.values(inv).some((n) => n > 0);
+      el.endCarryRows.replaceChildren(any ? costRowsElement(inv, inv) : document.createTextNode('nothing'));
+    }
+  }
+  setText(el.restart, goesOn ? 'Continue' : 'Start again');
+}
+
+// Run figures (M2a §8): run seed, current and completed nodes, carried inventory, level.
+function runLines(game) {
+  const r = game.run;
+  return [
+    `Run seed: ${r.seed}  (Shift+R new run)`,
+    `Node:   ${r.currentNodeId ?? '—'}   completed: ${r.completedNodeIds.join(', ') || '—'}${isRunComplete(r) ? '   RUN COMPLETE' : ''}`,
+    `Carried: ${resourceLine(r.inventory)}   Druid HP ${r.druidHp}${C.CARRY_DRUID_HP ? ' (carried)' : ' (not carried)'}`,
+    // M2d §4: items the field sweep gathered on the last Victory.
+    `Last sweep: ${game.lastSweep ? `${game.lastSweep.items} items  ${resourceLine(game.lastSweep.gathered)}` : 'none yet'}`,
+  ];
 }
 
 function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
   el.debugPanel.hidden = !view.debug;
   if (!view.debug) return;
+  if (game.state === GameState.MAP) {
+    setText(el.debugPanel, [`State:  ${game.state}`, ...runLines(game), `Level:  ${game.levelId} (last scene)`].join('\n'));
+    return;
+  }
   const speed = clock.paused ? `PAUSED (×${clock.speed})` : `×${clock.speed}`;
   const a = game.action;
   const target = a.state === ActionState.TRAVELLING ? `→ ${a.target.kind} #${a.target.index}`
@@ -631,7 +874,7 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
   const stepLines = [];
   if (isStepMode(game)) {
     const d = game.druidPos;
-    stepLines.push(`Steps:  ${game.stepsRemaining} / ${C.STEP_BUDGET}  (${C.STEP_PX} px/step)`);
+    stepLines.push(`Steps:  ${game.stepsRemaining} / ${game.scene.level.stepBudget}  (${C.STEP_PX} px/step)`);
     stepLines.push(`Druid at: (${Math.round(d.x)}, ${Math.round(d.y)})  moves ${game.moveHistory.length} (U undoes)`);
     const h = view.hover;
     if (game.state === GameState.PREP && (h?.kind === 'feature' || h?.kind === 'slot')) {
@@ -639,6 +882,9 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
     }
   }
   setText(el.debugPanel, [
+    ...runLines(game),
+    `Level:  ${game.levelId} (${game.scene.level.name})  ([ / ] previous / next level)`,
+    `  corridor ${corridorWidth(game.scene.level)} px · feature mix ${Object.entries(featureMix(game.scene.level)).map(([t, n]) => `${n} ${C.FEATURE_TYPES[t].name}`).join(', ')}`,
     `Seed:   ${game.seed}`,
     `Mode:   ${game.prepMode}  (M to toggle + restart)`,
     `State:  ${game.state}`,
@@ -650,6 +896,7 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
     `Druid HP: ${game.druidHp} / ${C.DRUID_HP}`,
     druidMeleeLine(game),
     ...enemyDebugLines(game),
+    ...bossDebugLines(game),
     `Resources: ${resourceLine(game.resources)}`,
     `Turrets: ${game.turrets.length}  Pebbles in flight: ${game.projectiles.length}  Vultures: ${game.vultures.length}/${C.MAX_VULTURES}  Squirrels: ${game.squirrels.length}/${C.MAX_SQUIRRELS}${C.SQUIRREL_BLOCKS_WOLVES ? ' (block wolves)' : ''}`,
     ...dropDebugLines(game),

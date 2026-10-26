@@ -57,13 +57,28 @@
         </div>
       </div>
 
+      <!-- Current Wilds name, bottom-left (M2a §6); never blocks clicks. Before the end overlay, so
+           it stays visible under it. -->
+      <div id="level-name" hidden></div>
+
       <div id="end-overlay" hidden>
         <div class="end-panel">
           <div id="end-title"></div>
           <div id="end-stats"></div>
+          <!-- M2a §4.4: what carries over (Victory, run goes on) or the closing line (run complete). -->
+          <!-- M2d §2.3: what the field sweep collected on Victory (omitted if nothing). -->
+          <div id="end-gathered" hidden><div class="end-carry-title">Gathered from the field:</div><div id="end-gathered-rows"></div></div>
+          <div id="end-carry" hidden><div class="end-carry-title">Carried to the next Wilds:</div><div id="end-carry-rows"></div></div>
+          <div id="end-message" hidden></div>
           <button id="btn-restart" type="button">Restart</button>
         </div>
       </div>
+
+
+      <!-- Mini-boss (M2c §2.6–2.7): HP bar just below the HUD strip while one is alive, and the
+           centred arrival banner. Neither blocks clicks. -->
+      <div id="boss-bar" hidden><span id="boss-name"></span><div id="boss-bar-track"><div id="boss-bar-fill"></div></div><span id="boss-hp"></span></div>
+      <div id="boss-banner" hidden></div>
 
       <div id="mode-banner" hidden></div>
 

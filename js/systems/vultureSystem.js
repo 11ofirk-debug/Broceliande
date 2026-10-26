@@ -100,6 +100,7 @@ export function updateBlocking(game, dt) {
     enemy.blockedBy = blocker.id;
     enemy.facing = blocker.x >= enemy.x ? 1 : -1;
     const t = enemyType(enemy); // attacks the blocker with its own type's damage and interval (M1e §3.4)
+    if (t.windupTime) continue; // wind-up attackers (the Ogre) strike it in updateWindupAttacks (M2c §2.5)
     enemy.vultureBiteTimer += dt;
     if (enemy.vultureBiteTimer >= t.attackInterval) {
       enemy.vultureBiteTimer -= t.attackInterval;

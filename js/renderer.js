@@ -3,13 +3,13 @@
 import * as C from './config.js';
 import { GameState, ActionState } from './states.js';
 import { drawDebugOverlay } from './debug/debugOverlay.js';
-import { drawFloor, drawCorridors, drawDecor } from './render/environment.js';
+import { drawFloor, drawCorridors, drawFlats, drawDecor } from './render/environment.js';
 import {
-  drawTurretSlot, drawDruid, drawFeature, drawWolf, drawBear, drawEnemyHpBar, drawDruidHpBar,
+  drawTurretSlot, drawDruid, drawFeature, drawWolf, drawBear, drawOgre, drawEnemyHpBar, drawDruidHpBar, drawDustRing, drawLanePulse,
   drawTurret, drawToader, toaderMouthOpen, drawPellet, drawCloud, drawRange, drawProgressBar, drawFloatingText, drawPebble,
   drawVulture, drawVultureStatus, drawVultureGhost, featureBase, slotBase, drawDrop,
   drawSquirrel, drawSquirrelStatus, drawSquirrelGhost, drawSwipe, drawSpark, drawNextRange, DRUID_REST_POSE,
-  drawDoubleWisp, drawDoublePuff, drawChip, drawDoubleFade, drawDoubleTargeting,
+  drawDoubleWisp, drawDoublePuff, drawChip, drawDoubleFade, drawDoubleTargeting, drawFloater, drawSweepItem,
 } from './render/entities.js';
 import { turretRange, levelRange, maxLevel } from './entities/turret.js';
 import { druidDisplayPos, actionTargetPos, isTimedAction } from './systems/actionSystem.js';
@@ -18,10 +18,11 @@ import { DoubleState } from './entities/boughDouble.js';
 import { isStepMode, routePreview } from './systems/stepSystem.js';
 import { drawFootsteps, drawTrail } from './render/footsteps.js';
 import { animationTime } from './game.js';
+import { drawMap } from './render/map.js';
 
 const HIT_FLASH_TIME = 0.15; // s of hit flash on the Druid (bite) or an enemy (pebble); visual only
 // Draw function per enemy type (M1e §3.4): ENEMY_TYPES holds the data, this holds the look.
-const ENEMY_DRAW = { wolf: drawWolf, bear: drawBear };
+const ENEMY_DRAW = { wolf: drawWolf, bear: drawBear, ogre: drawOgre };
 const PROGRESS_GAP = 12;     // px between the top of a location's footprint and its progress bar
 
 const COLORS = {
@@ -29,21 +30,48 @@ const COLORS = {
   marker: '#ffe066',
 };
 
-export function createRenderer(canvas, scene) {
+export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
   canvas.width = C.STAGE_WIDTH;
   canvas.height = C.STAGE_HEIGHT;
 
-  // Static decor; everything else is merged in and y-sorted per frame.
-  const decor = scene.decor.map((item) => ({ y: item.y, draw: () => drawDecor(ctx, item) }));
+  // Static decor of each level's scene, built once per level; everything else is merged in
+  // and y-sorted per frame.
+  const decorByLevel = new Map();
+  const decorOf = (scene) => {
+    if (!decorByLevel.has(scene.levelId)) {
+      decorByLevel.set(scene.levelId, scene.decor.map((item) => ({ y: item.y, draw: () => drawDecor(ctx, item, scene.level) })));
+    }
+    return decorByLevel.get(scene.levelId);
+  };
 
   function render(game, view) {
+    if (game.state === GameState.MAP) {
+      // The level map (M2a §4) instead of an encounter scene.
+      drawMap(ctx, game.run, view.mapHover, performance.now() / 1000, view.debug);
+      ctx.fillStyle = COLORS.hudBackdrop;
+      ctx.fillRect(0, 0, C.STAGE_WIDTH, C.HUD_STRIP_HEIGHT);
+      return;
+    }
+    const scene = game.scene; // the current level's scene (M2a §5)
     const isPrep = game.state === GameState.PREP;
     const hover = view.hover;
+
+    // Screen shake after an Ogre blow (M2c §2.5): the canvas drawing only, not the HUD strip.
+    ctx.save();
+    const shake = shakeOffset(game);
+    if (shake) {
+      ctx.fillStyle = COLORS.hudBackdrop;
+      ctx.fillRect(0, 0, C.STAGE_WIDTH, C.STAGE_HEIGHT);
+      ctx.translate(shake.x, shake.y);
+    }
 
     // Ground layer.
     drawFloor(ctx, scene);
     drawCorridors(ctx, scene);
+    drawFlats(ctx, scene);
+    // A mini-boss's lane entrance pulsing red as it arrives (M2c §2.6).
+    for (const p of game.lanePulses) drawLanePulse(ctx, laneEntrance(game.lanes.find((l) => l.id === p.laneId)), p.age / C.BOSS_LANE_PULSE_TIME);
     game.slots.forEach((slot, i) => {
       drawTurretSlot(ctx, slot, !isPrep, isPrep && hover?.kind === 'slot' && hover.index === i);
     });
@@ -53,6 +81,8 @@ export function createRenderer(canvas, scene) {
     // Poison clouds lie on the ground too, under anything upright (M1f §6.5).
     // Each is drawn at its own creation stats, so its visible edge is its damage radius (M1h §2.4).
     for (const cloud of game.clouds) drawCloud(ctx, cloud, cloud.spec.radius, cloud.spec.duration);
+    // Dust rings where Ogre blows land (M2c §2.5), on the ground.
+    for (const d of game.dustRings) drawDustRing(ctx, d, d.age / C.OGRE_DUST_TIME);
     drawRanges(ctx, game, view);
     // Committed route trail (M1h §1): the footprints of every leg so far, under anything upright.
     if (isPrep && isStepMode(game)) drawTrail(ctx, game.trail);
@@ -64,7 +94,7 @@ export function createRenderer(canvas, scene) {
     const recent = (time) => anim - time < HIT_FLASH_TIME;
     const hurt = recent(game.druidLastHitTime);
     const drawables = [
-      ...decor,
+      ...decorOf(scene),
       ...game.features.map((f) => ({
         y: featureBase(f).y,
         draw: () => drawFeature(ctx, f, isPrep && hover?.kind === 'feature' && hover.index === f.index),
@@ -74,7 +104,7 @@ export function createRenderer(canvas, scene) {
       { y: druidPos.y + C.DRUID_RADIUS * 0.6, draw: () => drawDruid(ctx, druidPos.x, druidPos.y, hurt, defeatProgress(game), druidPose(game)) },
       ...game.enemies.map((e) => ({
         y: e.y + e.radius * 0.5,
-        draw: () => ENEMY_DRAW[e.type](ctx, knockedBack(e, anim), strikeFlash(e, anim) ? 'strike' : recent(e.lastHitTime), recent(e.lastBiteTime)),
+        draw: () => ENEMY_DRAW[e.type](ctx, knockedBack(e, anim), strikeFlash(e, anim) ? 'strike' : recent(e.lastHitTime), recent(e.lastBiteTime), anim),
       })),
       ...game.vultures.map((v) => ({
         y: v.y + C.VULTURE_RADIUS * 0.4,
@@ -93,7 +123,8 @@ export function createRenderer(canvas, scene) {
     // Bough Double wisps in flight from the Druid to their targets (M1i §2.4).
     for (const d of game.doubles) {
       if (d.state !== DoubleState.WISP) continue;
-      const from = { x: C.DRUID_POS.x, y: C.DRUID_POS.y - C.DRUID_RADIUS * 0.8 };
+      const home = scene.level.druidPos;
+      const from = { x: home.x, y: home.y - C.DRUID_RADIUS * 0.8 };
       const to = doubleStandPos(game, d);
       drawDoubleWisp(ctx, from, { x: to.x, y: to.y - C.DRUID_RADIUS * 0.6 }, Math.min(1, d.wispElapsed / C.DOUBLE_WISP_TIME));
     }
@@ -114,7 +145,11 @@ export function createRenderer(canvas, scene) {
     }
     drawFootstepPreview(ctx, game, hover);
     for (const t of game.floatingTexts) {
-      drawFloatingText(ctx, t.text, t.x, t.y - (t.age / C.FLOATING_TEXT_TIME) * C.FLOATING_TEXT_RISE, t.age / C.FLOATING_TEXT_TIME, t.small);
+      drawFloatingText(ctx, t.text, t.x, t.y - (t.age / C.FLOATING_TEXT_TIME) * C.FLOATING_TEXT_RISE, t.age / C.FLOATING_TEXT_TIME, t.small, t.muted);
+    }
+    // Resource floaters (M2d §1), above all entities; each waits for its stagger.
+    for (const f of game.floaters) {
+      if (f.age >= f.delay) drawFloater(ctx, f, (f.age - f.delay) / C.FLOATER_TIME);
     }
 
     // Summon placement ghost of the chosen summon under the cursor (§15.1, M1d §2.1). The Bough
@@ -124,9 +159,13 @@ export function createRenderer(canvas, scene) {
       drawGhost(ctx, view.pointer, performance.now() / 1000);
     }
 
+    ctx.restore(); // end of the shaken drawing
+
     // Area behind the HTML HUD strip.
     ctx.fillStyle = COLORS.hudBackdrop;
     ctx.fillRect(0, 0, C.STAGE_WIDTH, C.HUD_STRIP_HEIGHT);
+    // Field sweep (M2d §2.2): after the backdrop, so items stay visible as they fly into the strip.
+    if (game.sweep) drawSweep(ctx, game, view);
 
     if (view.debug) {
       drawDebugOverlay(ctx, game, scene);
@@ -135,6 +174,47 @@ export function createRenderer(canvas, scene) {
   }
 
   return { render };
+}
+
+// Field sweep (M2d §2.2): items waiting their turn lie where they were; launched ones fly to
+// their HUD counter (positions measured by the UI, view.resourceTargets) along a gentle curve,
+// shrinking to SWEEP_END_SCALE; landed ones are gone. Timed by the simulation's endElapsed.
+function drawSweep(ctx, game, view) {
+  const e = game.endElapsed;
+  for (const item of game.sweep.items) {
+    if (item.arrived) continue;
+    const k = Math.max(0, Math.min(1, (e - item.launchAt) / C.SWEEP_FLIGHT_TIME));
+    if (k === 0) {
+      drawSweepItem(ctx, item.resource, item.x, item.y, 1);
+      continue;
+    }
+    const to = view.resourceTargets?.[item.resource] ?? { x: C.STAGE_WIDTH / 2, y: C.HUD_STRIP_HEIGHT / 2 };
+    // Quadratic curve whose control point lies beside the start, at the height of the middle,
+    // so the item first rises then swings across to its counter.
+    const ctrl = { x: item.x + (to.x - item.x) * 0.15, y: (item.y + to.y) / 2 };
+    const u = ease(k);
+    const x = (1 - u) * (1 - u) * item.x + 2 * (1 - u) * u * ctrl.x + u * u * to.x;
+    const y = (1 - u) * (1 - u) * item.y + 2 * (1 - u) * u * ctrl.y + u * u * to.y;
+    drawSweepItem(ctx, item.resource, x, y, 1 + (C.SWEEP_END_SCALE - 1) * k);
+  }
+}
+
+// Screen shake offset (M2c §2.5): a quick decaying wobble of up to OGRE_SHAKE_PX, from the
+// shake's age (no randomness); null when there is none or SCREEN_SHAKE_ENABLED is false.
+function shakeOffset(game) {
+  if (!C.SCREEN_SHAKE_ENABLED || !game.shake) return null;
+  const k = C.OGRE_SHAKE_PX * (1 - game.shake.age / C.OGRE_SHAKE_TIME);
+  return { x: k * Math.sin(game.shake.age * 95), y: k * Math.cos(game.shake.age * 73) };
+}
+
+// Where a lane enters the screen: its first centreline point inside the stage (below the HUD).
+function laneEntrance(lane) {
+  const margin = 20;
+  for (let s = 0; s < lane.path.length; s += 5) {
+    const p = lane.path.pointAt(s);
+    if (p.x >= margin && p.x <= C.STAGE_WIDTH - margin && p.y >= C.HUD_STRIP_HEIGHT + margin && p.y <= C.STAGE_HEIGHT - margin) return p;
+  }
+  return lane.path.pointAt(0);
 }
 
 // Range circles (§9.2, §10.4): an empty slot shows the base range while hovered in Prep

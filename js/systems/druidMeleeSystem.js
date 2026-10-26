@@ -39,8 +39,9 @@ export function druidMeleeTarget(game) {
 // fromReady: the strike was waiting for an attacker with the timer already full, so its
 // impact comes a full STRIKE_LEAD after it starts; otherwise it lands when the timer is up.
 function startStrike(game, target, fromReady) {
-  const dx = target.x - C.DRUID_POS.x;
-  const dy = target.y - C.DRUID_POS.y;
+  const home = game.scene.level.druidPos;
+  const dx = target.x - home.x;
+  const dy = target.y - home.y;
   const len = Math.hypot(dx, dy) || 1;
   game.druidStrike = { elapsed: 0, targetId: target.id, dirX: dx / len, dirY: dy / len, fromReady, impactAt: null };
 }
@@ -66,13 +67,14 @@ function impact(game) {
   let target = game.enemies.find((e) => e.id === strike.targetId);
   if (!target || !isAttacker(target)) target = druidMeleeTarget(game);
   if (!target) return; // wasted
-  const dx = target.x - C.DRUID_POS.x;
-  const dy = target.y - C.DRUID_POS.y;
+  const home = game.scene.level.druidPos;
+  const dx = target.x - home.x;
+  const dy = target.y - home.y;
   const len = Math.hypot(dx, dy) || 1;
   strike.dirX = dx / len;
   strike.dirY = dy / len;
   strike.targetId = target.id;
-  game.swipes.push({ x1: C.DRUID_POS.x, y1: C.DRUID_POS.y, x2: target.x, y2: target.y, age: 0 });
+  game.swipes.push({ x1: home.x, y1: home.y, x2: target.x, y2: target.y, age: 0 });
   game.sparks.push({ x: target.x, y: target.y - target.radius * 0.8, age: 0 });
   target.knockDir = { x: strike.dirX, y: strike.dirY };
   target.lastKnockTime = game.combatTime; // visual knock-back only; position is not touched

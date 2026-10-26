@@ -1,0 +1,113 @@
+// Run state (M2a §2.2): a path through the level map, kept apart from the encounter state in
+// game.js. A run starts on MAP_START_NODE; winning a node makes its `next` nodes available, and
+// winning a node with no `next` completes the run. Nothing here is tied to particular nodes.
+
+import * as C from './config.js';
+import { emptyResources } from './resources.js';
+import { makeRandomSeed } from './rng.js';
+
+// run: { seed, currentNodeId, completedNodeIds, inventory, druidHp }
+// currentNodeId: the node last entered (null before the first). inventory: resources carried
+// between encounters. druidHp: used for the next encounter only with CARRY_DRUID_HP.
+export function createRun() {
+  return {
+    seed: C.DEBUG_SEED ?? makeRandomSeed(), // DEBUG_SEED reproduces the whole run
+    currentNodeId: null,
+    completedNodeIds: [],
+    inventory: emptyResources(),
+    druidHp: C.DRUID_HP,
+  };
+}
+
+export function mapNode(id) {
+  return C.MAP_NODES.find((n) => n.id === id) ?? null;
+}
+
+// The last node won, or null at the start of a run.
+function lastCompleted(run) {
+  return run.completedNodeIds.length ? mapNode(run.completedNodeIds[run.completedNodeIds.length - 1]) : null;
+}
+
+// Nodes the player may enter now (§4.3): the start node at the beginning of a run, then the
+// not-yet-won `next` nodes of the last node won.
+// Once the player has entered one of them, that choice is made: only it stays available and its
+// siblings are bypassed.
+export function availableNodeIds(run) {
+  const last = lastCompleted(run);
+  if (!last) return [C.MAP_START_NODE];
+  const choices = last.next.filter((id) => !run.completedNodeIds.includes(id));
+  return choices.includes(run.currentNodeId) ? [run.currentNodeId] : choices;
+}
+
+// Nodes still reachable by following `next` links from the available nodes (not counting them).
+function reachableNodeIds(run) {
+  const seen = new Set();
+  const queue = availableNodeIds(run).flatMap((id) => mapNode(id).next);
+  while (queue.length) {
+    const id = queue.shift();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    queue.push(...mapNode(id).next);
+  }
+  return seen;
+}
+
+// 'available' | 'completed' | 'locked' | 'bypassed', for any map shape (M2b §1.2, replacing
+// M2a §4.3): completed = won this run; available = see above; locked = not yet reachable but still
+// reachable from where the run stands; bypassed = no longer reachable (e.g. a skipped sibling and
+// anything reachable only through it).
+export function nodeState(run, id) {
+  if (run.completedNodeIds.includes(id)) return 'completed';
+  if (availableNodeIds(run).includes(id)) return 'available';
+  return reachableNodeIds(run).has(id) ? 'locked' : 'bypassed';
+}
+
+// The run is complete when the last node won has no `next` nodes (§4.1).
+export function isRunComplete(run) {
+  const last = lastCompleted(run);
+  return !!last && last.next.length === 0;
+}
+
+// Each encounter's seed, derived from the run seed and the node ID (§2.2), so a fixed run seed
+// reproduces every encounter of the run.
+export function encounterSeed(run, nodeId) {
+  let h = run.seed >>> 0;
+  for (let i = 0; i < nodeId.length; i++) h = Math.imul(h ^ nodeId.charCodeAt(i), 2654435761) >>> 0;
+  return (h ^ (h >>> 15)) >>> 0;
+}
+
+// On Victory (§3): the node is won and the resources (all four) are carried; with
+// CARRY_DRUID_HP, the Druid's HP too.
+export function recordVictory(run, resources, druidHp) {
+  if (run.currentNodeId && !run.completedNodeIds.includes(run.currentNodeId)) run.completedNodeIds.push(run.currentNodeId);
+  run.inventory = { ...emptyResources(), ...resources };
+  run.druidHp = druidHp;
+}
+
+// HP the Druid starts the next encounter with.
+export function startingDruidHp(run) {
+  return C.CARRY_DRUID_HP ? run.druidHp : C.DRUID_HP;
+}
+
+// The available node under p (for hover and clicks), or null. Locked, completed and bypassed
+// nodes do not react.
+export function availableNodeAt(run, p) {
+  for (const id of availableNodeIds(run)) {
+    const n = mapNode(id);
+    if (Math.hypot(p.x - n.pos.x, p.y - n.pos.y) <= C.MAP_NODE_RADIUS * C.MAP_HOVER_SCALE) return id;
+  }
+  return null;
+}
+
+// Start-up check of MAP_NODES (M2a §4.1, M2c §1.1): unique IDs, a known start node, known levels, types and
+// `next` links.
+export function validateMap() {
+  const ids = C.MAP_NODES.map((n) => n.id);
+  if (new Set(ids).size !== ids.length) console.error(`MAP_NODES has duplicate IDs: ${ids.join(', ')}`);
+  if (!ids.includes(C.MAP_START_NODE)) console.error(`MAP_START_NODE "${C.MAP_START_NODE}" is not in MAP_NODES`);
+  for (const n of C.MAP_NODES) {
+    if (!C.LEVELS[n.levelId]) console.error(`Map node ${n.id}: unknown level "${n.levelId}"`);
+    if (!C.NODE_TYPES[n.type]) console.error(`Map node ${n.id}: unknown type "${n.type}" (NODE_TYPES)`);
+    for (const next of n.next) if (!ids.includes(next)) console.error(`Map node ${n.id}: unknown next node "${next}"`);
+  }
+}

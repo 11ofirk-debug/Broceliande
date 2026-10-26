@@ -55,12 +55,12 @@ export function anyVisitable(game) {
 // ---------------------------------------------------------------------------
 const legCost = (a, b) => Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / C.STEP_PX);
 
-// Greedy nearest-neighbour route from DRUID_POS through every point. Each leg is charged
+// Greedy nearest-neighbour route from `start` (the level's Druid position) through every point. Each leg is charged
 // in whole steps, exactly as in play. Returns { steps, visits }. Also used for the
 // M1c §4.2 feature-route fairness check.
-export function greedyRoute(points) {
+export function greedyRoute(points, start) {
   const left = [...points];
-  let pos = C.DRUID_POS;
+  let pos = start;
   let steps = 0;
   while (left.length) {
     let best = 0;
@@ -74,11 +74,12 @@ export function greedyRoute(points) {
 }
 
 export function calibrationFigures(game) {
-  const dist = (p) => Math.hypot(p.x - C.DRUID_POS.x, p.y - C.DRUID_POS.y);
+  const home = game.scene.level.druidPos;
+  const dist = (p) => Math.hypot(p.x - home.x, p.y - home.y);
   const nearestSlots = [...game.slots].sort((a, b) => dist(a) - dist(b)).slice(0, C.CALIBRATION_SLOT_COUNT);
   return {
-    features: greedyRoute(game.features),
-    featuresAndSlots: greedyRoute([...game.features, ...nearestSlots]),
+    features: greedyRoute(game.features, home),
+    featuresAndSlots: greedyRoute([...game.features, ...nearestSlots], home),
   };
 }
 
@@ -118,7 +119,8 @@ export function footprintLayout(from, to, cost, fromMarker) {
 // The footprints of the leg from the Druid's current position to a marker.
 export function legFootprints(game, marker) {
   const from = game.druidPos;
-  const fromMarker = from.x !== C.DRUID_POS.x || from.y !== C.DRUID_POS.y;
+  const home = game.scene.level.druidPos;
+  const fromMarker = from.x !== home.x || from.y !== home.y;
   return footprintLayout(from, markerPos(game, marker), stepCost(game, marker), fromMarker);
 }
 

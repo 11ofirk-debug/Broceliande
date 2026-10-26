@@ -3,8 +3,8 @@
 
 import * as C from '../config.js';
 import { SquirrelState } from '../entities/squirrel.js';
-import { add, resourceName } from '../resources.js';
-import { addFloatingText } from '../effects.js';
+import { add } from '../resources.js';
+import { addFloatingText, addResourceFloaters } from '../effects.js';
 import { isLanded } from './dropSystem.js';
 import { events } from '../events.js';
 import { damageEnemy } from './combatSystem.js';
@@ -34,13 +34,13 @@ function retarget(game, s) {
   return drop;
 }
 
-// §1.4: resource into the inventory immediately, item removed, floating "+1 Feather".
+// §1.4: resource into the inventory immediately, item removed, a resource floater (M2d §1).
 function collect(game, s, drop) {
   add(game.resources, { [drop.resource]: 1 });
   game.dropStats.collected[drop.resource]++;
   if (drop.resource === 'boughs') game.doubleStats.boughsGained++; // M1i §4 debug figure
   game.drops = game.drops.filter((d) => d !== drop);
-  addFloatingText(game, `+1 ${resourceName(drop.resource, 1)}`, drop.x, drop.y - 14, true);
+  addResourceFloaters(game, { [drop.resource]: 1 }, drop.x, drop.y - 14); // M2d §1.3, at the item
   events.emit('resourcesGained', { resources: [drop.resource] });
   s.targetId = null;
 }

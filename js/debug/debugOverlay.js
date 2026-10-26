@@ -9,11 +9,14 @@ import { isStepMode, isVisitTarget, stepCost } from '../systems/stepSystem.js';
 import { candidateProblems } from '../scene.js';
 import { turretMuzzle } from '../entities/turret.js';
 import { doubleStandPos } from '../systems/doubleSystem.js';
+import { geometricZone } from '../zones.js';
+import { AttackState } from '../entities/enemy.js';
 
 const COLOR = 'rgba(120, 220, 255, 0.9)';
 const EDGE_COLOR = 'rgba(120, 220, 255, 0.45)';
 const SPAWN_COLOR = 'rgba(255, 110, 110, 0.95)';
 const ENEMY_COLOR = 'rgba(255, 150, 90, 0.95)';
+const UNSTICK_COLOR = 'rgba(255, 230, 40, 0.95)'; // enemies passing through a slower one (M2d §4)
 const TARGET_COLOR = 'rgba(255, 235, 120, 0.9)';
 const VULTURE_COLOR = 'rgba(255, 140, 220, 0.9)';
 const SQUIRREL_COLOR = 'rgba(170, 255, 140, 0.95)';
@@ -58,6 +61,7 @@ export function drawDebugOverlay(ctx, game, scene) {
   for (const lane of scene.lanes) drawLane(ctx, lane);
   drawDruid(ctx, game);
 
+  drawZones(ctx, scene.level);
   drawCandidates(ctx, game, scene);
 
   drawEnemies(ctx, game);
@@ -75,13 +79,69 @@ export function drawDebugOverlay(ctx, game, scene) {
 }
 
 // Label for this run's role of a candidate (M1c §6.2): T<slot>, F:<type> or V.
-function roleTag(game, role) {
-  if (role.kind === 'slot') return `T${role.index}`;
-  if (role.kind === 'feature') return `F:${C.FEATURE_TYPES[game.features[role.index].type].name}`;
-  return 'V';
+// M1j §6: zone and this run's role, e.g. "fSW·T", "nE·F:Pond", "fNW·V". A zone label that
+// overrides the candidate's geometric zone is marked with *.
+function roleTag(game, role, index) {
+  const level = game.scene.level;
+  const c = level.candidateLocations[index];
+  const zone = `${c.zone}${geometricZone(level, c) !== c.zone ? '*' : ''}`;
+  if (role.kind === 'slot') return `${zone}·T`;
+  if (role.kind === 'feature') return `${zone}·F:${C.FEATURE_TYPES[game.features[role.index].type].name}`;
+  return `${zone}·V`;
 }
 
-// All 25 candidates (M1c §6.2): footprint and footprint + jitter circles around the
+// Zones (M1j §6): each zone faintly tinted (near brighter than far) with its ID, the sector
+// boundary lines from the Druid and the NEAR_RADIUS ring.
+const ZONE_TINTS = ['120, 200, 255', '255, 190, 110', '170, 255, 150']; // per sector, in order
+function drawZones(ctx, level) {
+  const D = level.druidPos;
+  const B = level.sectorBoundaryAngles;
+  const far = 3000; // px, past every screen corner
+  const rad = (deg) => deg * Math.PI / 180;
+  ctx.save();
+  B.forEach((from, i) => {
+    let to = B[(i + 1) % B.length];
+    if (to <= from) to += 360;
+    const name = level.sectorNames[i];
+    const tint = ZONE_TINTS[i % ZONE_TINTS.length];
+    for (const [r0, r1, alpha] of [[0, level.nearRadius, 0.09], [level.nearRadius, far, 0.045]]) {
+      ctx.fillStyle = `rgba(${tint}, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(D.x, D.y, r1, rad(from), rad(to));
+      ctx.arc(D.x, D.y, r0, rad(to), rad(from), true);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Zone IDs on the sector's middle angle: near halfway out, far beyond the ring (kept on screen).
+    const mid = rad((from + to) / 2);
+    ctx.font = 'bold 22px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(${tint}, 0.9)`;
+    const at = (r) => ({
+      x: Math.min(C.STAGE_WIDTH - 60, Math.max(60, D.x + Math.cos(mid) * r)),
+      y: Math.min(C.STAGE_HEIGHT - 20, Math.max(C.HUD_STRIP_HEIGHT + 30, D.y + Math.sin(mid) * r)),
+    });
+    const n = at(level.nearRadius * 0.6);
+    const f = at(level.nearRadius + 260);
+    ctx.fillText(`n${name}`, n.x, n.y);
+    ctx.fillText(`f${name}`, f.x, f.y);
+  });
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 8]);
+  for (const a of B) {
+    ctx.beginPath();
+    ctx.moveTo(D.x, D.y);
+    ctx.lineTo(D.x + Math.cos(rad(a)) * far, D.y + Math.sin(rad(a)) * far);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.arc(D.x, D.y, level.nearRadius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// All candidates (M1c §6.2): footprint and footprint + jitter circles around the
 // candidate, a line to this run's jittered position, index and role, and covered lanes for
 // turret slots (measured from the jittered position). Candidates failing start-up
 // validation are drawn red.
@@ -116,7 +176,7 @@ function drawCandidates(ctx, game, scene) {
 
     const x = c.x - C.LOCATION_RADIUS;
     let y = c.y + C.LOCATION_RADIUS + C.LOCATION_JITTER + 14;
-    label(ctx, `#${c.index} ${roleTag(game, role)} (${c.x}, ${c.y})`, x, y, color);
+    label(ctx, `#${c.index} ${roleTag(game, role, c.index)} (${c.x}, ${c.y})`, x, y, color);
     if (role.kind === 'slot') {
       y += 17;
       label(ctx, `covers ${placed.lanes.map((id) => laneNames[id]).join(', ') || 'none'}`, x, y, color);
@@ -127,7 +187,7 @@ function drawCandidates(ctx, game, scene) {
 
 function drawLane(ctx, lane) {
   const { path } = lane;
-  const half = C.CORRIDOR_WIDTH / 2;
+  const half = lane.corridorWidth / 2;
 
   // Sampled centreline.
   ctx.strokeStyle = COLOR;
@@ -298,16 +358,49 @@ function drawEnemies(ctx, game) {
   for (const w of game.enemies) {
     ctx.strokeStyle = ENEMY_COLOR;
     ctx.beginPath();
-    ctx.arc(w.x, w.y, w.radius, 0, Math.PI * 2); // collision radius (Bears: 26 px, M1e §6)
+    ctx.arc(w.x, w.y, w.radius, 0, Math.PI * 2); // drawn radius (Bears: 26 px, M1e §6)
     ctx.stroke();
+    // M2d §4: a smaller collision circle (the Ogre's 30 px) inside it, dashed.
+    if (w.collisionRadius !== w.radius) {
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.arc(w.x, w.y, w.collisionRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // M2d §4: passing through a slower enemy (unstick rule): small yellow outline.
+    if (w.passThroughId !== null) {
+      ctx.strokeStyle = UNSTICK_COLOR;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(w.x, w.y, w.collisionRadius + 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = ENEMY_COLOR;
+    }
     const tag = w.type === 'wolf' ? '' : `${C.ENEMY_TYPES[w.type].name} `;
     const slots = w.slots.length ? ` s${w.slots.join('+')}` : '';
     label(ctx, `${tag}#${w.id} ${w.blockedBy !== null ? 'blocked' : STATE_TAGS[w.state]}${slots}`, w.x - 14, w.y + w.radius + 14);
+    // Wind-up attackers (the Ogre, M2c §4): a line to each claimed melee slot and the wind-up timer.
+    const t = C.ENEMY_TYPES[w.type];
+    if (t.windupTime) {
+      for (const i of w.slots) {
+        const slot = game.meleeSlots[i];
+        ctx.beginPath();
+        ctx.moveTo(w.x, w.y);
+        ctx.lineTo(slot.x, slot.y);
+        ctx.stroke();
+      }
+      const timer = w.attack === AttackState.WINDUP
+        ? `wind-up ${w.windupElapsed.toFixed(2)}/${t.windupTime}s`
+        : `next wind-up in ${Math.max(0, t.attackInterval - t.windupTime - w.sinceBlow).toFixed(1)}s`;
+      label(ctx, timer, w.x - 14, w.y + w.radius + 30);
+    }
   }
 }
 
 function drawDruid(ctx, game) {
-  const d = C.DRUID_POS;
+  const d = game.scene.level.druidPos;
   ctx.strokeStyle = COLOR;
   cross(ctx, d.x, d.y, 8);
   label(ctx, `Druid (${d.x}, ${d.y})`, d.x + 12, d.y - 12);

@@ -7,8 +7,8 @@ import { laneWorldPos, enemyType } from '../entities/enemy.js';
 import { emptyResources } from '../resources.js';
 
 // Furthest an item's centre may sit from its lane's centreline, so everything drawn for it
-// (icon, bob and glow, which reaches 0.6 × icon size; see drawDrop) stays inside the corridor (§1.2).
-const MAX_DROP_OFFSET = C.CORRIDOR_WIDTH / 2 - C.RESOURCE_ICON_SIZE * C.DROP_ICON_SCALE * 0.6;
+// (icon, bob and glow, which reaches 0.6 × icon size; see drawDrop) stays inside its lane's corridor (§1.2, M2b §2).
+const maxDropOffset = (lane) => lane.corridorWidth / 2 - C.RESOURCE_ICON_SIZE * C.DROP_ICON_SCALE * 0.6;
 
 export function emptyDropStats() {
   return { dropped: emptyResources(), collected: emptyResources() };
@@ -35,28 +35,29 @@ function laneAnchor(lane, p) {
   const q = lane.path.closestPoint(p);
   const n = lane.path.normalAt(q.s);
   const offset = (p.x - q.x) * n.x + (p.y - q.y) * n.y;
-  return { s: q.s, offset: Math.max(-MAX_DROP_OFFSET, Math.min(MAX_DROP_OFFSET, offset)) };
+  const max = maxDropOffset(lane);
+  return { s: q.s, offset: Math.max(-max, Math.min(max, offset)) };
 }
 
-// Next position along the lane (dir ±1) at the same offset that is at least DROP_SPACING from
+// Next position along the lane (dir ±1) at the same offset that is at least `spacing` from
 // `from`, or null if the lane ends first.
-function nextAlong(lane, offset, from, dir) {
+function nextAlong(lane, offset, from, dir, spacing) {
   for (let s = from.s + dir * SEARCH_STEP; s >= 0 && s <= lane.path.length; s += dir * SEARCH_STEP) {
     const p = laneWorldPos(lane, s, offset);
-    if (Math.hypot(p.x - from.p.x, p.y - from.p.y) >= C.DROP_SPACING) return { s, p };
+    if (Math.hypot(p.x - from.p.x, p.y - from.p.y) >= spacing) return { s, p };
   }
   return null;
 }
 
 // n positions in a short row centred on the anchor, following the lane at a fixed offset so
-// every item is inside the corridor, each DROP_SPACING from its neighbour even on bends.
-function rowPositions(lane, anchor, n) {
+// every item is inside the corridor, each `spacing` from its neighbour even on bends.
+function rowPositions(lane, anchor, n, spacing) {
   const first = { s: anchor.s, p: laneWorldPos(lane, anchor.s, anchor.offset) };
   const out = [first.p];
   const ends = { 1: first, [-1]: first };
   let dir = 1;
   while (out.length < n) {
-    const next = nextAlong(lane, anchor.offset, ends[dir], dir) ?? nextAlong(lane, anchor.offset, ends[-dir], -dir);
+    const next = nextAlong(lane, anchor.offset, ends[dir], dir, spacing) ?? nextAlong(lane, anchor.offset, ends[-dir], -dir, spacing);
     if (!next) break; // cannot happen on a real lane: far longer than a few items
     const used = next.s > anchor.s ? 1 : -1;
     ends[used] = next;
@@ -80,7 +81,8 @@ export function dropLoot(game, enemy) {
     const shift = game.rng.range(C.DROP_SINGLE_OFFSET[0], C.DROP_SINGLE_OFFSET[1]) * (game.rng.next() < 0.5 ? -1 : 1);
     anchor.s = Math.max(0, Math.min(enemy.lane.path.length, anchor.s + shift));
   }
-  const positions = rowPositions(enemy.lane, anchor, units.length);
+  // DROP_SPACING apart, or the type's own dropSpacing (the Ogre's are a little wider, M2c §2.3).
+  const positions = rowPositions(enemy.lane, anchor, units.length, enemyType(enemy).dropSpacing ?? C.DROP_SPACING);
   units.forEach((resource, i) => {
     const p = positions[i];
     game.drops.push({

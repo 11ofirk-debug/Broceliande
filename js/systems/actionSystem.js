@@ -218,25 +218,26 @@ export function actionTargetPos(game) {
   return null;
 }
 
-// Where the Druid stands for a logical position: home, or beside a marker.
-function standPos(p) {
-  if (p.x === C.DRUID_POS.x && p.y === C.DRUID_POS.y) return C.DRUID_POS;
+// Where the Druid stands for a logical position: home (the level's druidPos), or beside a marker.
+function standPos(game, p) {
+  const home = game.scene.level.druidPos;
+  if (p.x === home.x && p.y === home.y) return home;
   return { x: p.x + C.DRUID_ACTION_OFFSET.x, y: p.y + C.DRUID_ACTION_OFFSET.y };
 }
 
-// Where the Druid is drawn (§7.3). Visual only: wolves always attack DRUID_POS.
+// Where the Druid is drawn (§7.3). Visual only: wolves always attack his home position.
 // In step mode he stays beside the last marker he visited (game.druidPos) and is
 // tweened between markers while TRAVELLING; in timed mode game.druidPos is always home.
 export function druidDisplayPos(game) {
   const a = game.action;
   if (a.state === ActionState.TRAVELLING) {
-    const from = standPos(a.from);
-    const to = standPos(markerPos(game, a.target));
+    const from = standPos(game, a.from);
+    const to = standPos(game, markerPos(game, a.target));
     const t = Math.min(1, a.elapsed / a.duration);
     const e = t * t * (3 - 2 * t); // smoothstep ease
     return { x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e };
   }
   const target = actionTargetPos(game);
-  if (!target) return standPos(game.druidPos);
+  if (!target) return standPos(game, game.druidPos);
   return { x: target.x + C.DRUID_ACTION_OFFSET.x, y: target.y + C.DRUID_ACTION_OFFSET.y };
 }

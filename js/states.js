@@ -2,6 +2,7 @@
 
 export const GameState = Object.freeze({
   START: 'START',
+  MAP: 'MAP',       // M2a §2: the level map between encounters; a node click starts its Prep
   PREP: 'PREP',
   COMBAT: 'COMBAT',
   ENDING: 'ENDING', // M1e §1: END_DELAY between Combat and the result; game.pendingResult holds it

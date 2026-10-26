@@ -1,17 +1,19 @@
 // Bootstrap, stage scaling and the fixed-timestep loop (spec §3.4, §3.5).
 
 import * as C from './config.js';
-import { GameState, createGame, startEncounter, startCombat, beginEnding, updateGame, validateConfig, killAllEnemies, spawnDebugBear, grantResources, togglePrepMode } from './game.js';
+import { GameState, createGame, startEncounter, startCombat, beginEnding, updateGame, validateConfig, killAllEnemies, spawnDebugBear, spawnDebugOgre, grantResources, togglePrepMode, newRun, restartEncounter, continueRun, winNow } from './game.js';
 import { createInput } from './input.js';
 import { createRenderer } from './renderer.js';
-import { createUI } from './ui.js';
-import { createScene, validateLayout } from './scene.js';
+import { createUI, checkLevelNameLabel, checkBossBar } from './ui.js';
+import { LEVEL_IDS, sceneFor, validateLevels } from './scene.js';
 import { createInteraction, isInteractive } from './interaction.js';
 import { pick } from './picking.js';
 import { ActionState } from './states.js';
 import { undoLastMove } from './systems/actionSystem.js';
 import { toggleDropMult } from './systems/dropSystem.js';
 import { initAudio, toggleMute } from './audio.js';
+import { isRunComplete, mapNode, availableNodeAt, validateMap } from './run.js';
+import { events } from './events.js';
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('game-canvas');
@@ -38,31 +40,65 @@ fitStage();
 // ---------------------------------------------------------------------------
 validateConfig();
 
-const scene = createScene();   // static layout: lane paths, decorative forest
-validateLayout(scene);
+validateLevels(); // every level's scene checks (M2a §5.1)
+validateMap();    // MAP_NODES links and levels (M2a §4.1)
 
-const game = createGame(scene);
+const game = createGame(mapNode(C.MAP_START_NODE).levelId);
 const clock = { speed: 1, paused: false };            // acts on simulation time only
 // UI-only state: never read by the simulation.
-const view = { debug: C.DEBUG_START_ENABLED, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null, menuHoverType: null }; // menuHoverType: build-menu card under the pointer (range preview)
+const view = { debug: C.DEBUG_START_ENABLED, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null, menuHoverType: null, mapHover: null }; // menuHoverType: build-menu card under the pointer (range preview); mapHover: available map node under the pointer
 const interaction = createInteraction(game, view);
+
+// UI state to clear whenever an encounter (re)starts or the map opens.
+function afterRestart() {
+  view.clickMarker = null;
+  view.mapHover = null;
+  interaction.closeMenu();
+}
 
 // options.newSeed: always a new seed, so a new layout even with DEBUG_SEED set (debug L).
 function restart(options) {
   startEncounter(game, options);
-  view.clickMarker = null;
-  interaction.closeMenu();
+  afterRestart();
+}
+
+// Start again / Shift+R (M2a §2.1, §8): a new run on the map.
+function startNewRun() {
+  newRun(game);
+  afterRestart();
+}
+
+// The Victory / Defeat overlay's button (M2a §4.4): Continue back to the map while the run goes
+// on, otherwise Start again.
+function endButton() {
+  const goOn = game.state === GameState.VICTORY && !isRunComplete(game.run);
+  if (goOn) continueRun(game);
+  else startNewRun();
+  afterRestart();
+}
+
+// Debug [ / ] (M2a §8): jump to the previous / next level in LEVELS, starting its Prep with the
+// resources the player has now. The run treats it as entering that level's map node, if any.
+function switchLevel(step) {
+  const i = LEVEL_IDS.indexOf(game.levelId);
+  const levelId = LEVEL_IDS[(i + step + LEVEL_IDS.length) % LEVEL_IDS.length];
+  const node = C.MAP_NODES.find((n) => n.levelId === levelId);
+  if (node) game.run.currentNodeId = node.id;
+  game.encounterStart = { levelId, resources: { ...game.resources } };
+  restart(game.encounterStart);
 }
 
 initAudio(); // M1g §3: subscribes to gameplay events; starts on the first click or key press
 
-const renderer = createRenderer(canvas, scene);
-const ui = createUI(scene, {
+const renderer = createRenderer(canvas);
+const ui = createUI({
   onStartCombat: () => interaction.onStartCombat(),
-  onRestart: restart,
+  onEndButton: endButton,
   onMenuAction: (option) => interaction.onMenuAction(option),
   onToggleMute: toggleMute,
 });
+checkLevelNameLabel(LEVEL_IDS.map(sceneFor)); // M2a §6: the label must not cover a candidate in any level
+checkBossBar(LEVEL_IDS.map(sceneFor));        // M2c §2.7: nor may the boss HP bar
 
 const input = createInput(stage, canvas, () => scale, {
   onPointerDown(world, button) {
@@ -73,7 +109,7 @@ const input = createInput(stage, canvas, () => scale, {
       interaction.onEscape();
     }
   },
-  onKeyDown(key) {
+  onKeyDown(key, e) {
     switch (key) {
       case 'd': view.debug = !view.debug; break;
       case 'p': clock.paused = !clock.paused; break;
@@ -81,12 +117,19 @@ const input = createInput(stage, canvas, () => scale, {
         if (C.SIM_SPEEDS.includes(Number(key))) clock.speed = Number(key);
         break;
       case 'n': if (game.state === GameState.PREP) startCombat(game); break;
-      case 'r': restart(); break;
-      case 'l': restart({ newSeed: true }); break;      // M1c §6.1: restart with a new layout
-      case 'm': togglePrepMode(game); restart(); break; // M1b §2: switch timed / steps Prep
+      case 'r': if (e.shiftKey) startNewRun(); else if (game.state !== GameState.MAP) { restartEncounter(game); afterRestart(); } break; // M2a §8: R this encounter again, Shift+R a new run
+      case 'w': winNow(game); break;                    // M2a §8: win the battle now (Combat only)
+      case 'l': if (game.state !== GameState.MAP) restart({ newSeed: true }); break; // M1c §6.1: restart with a new layout
+      case 'm': // M1b §2: switch timed / steps Prep, then restart this encounter
+        togglePrepMode(game);
+        if (game.state !== GameState.MAP) { restartEncounter(game); afterRestart(); }
+        break;
       case 'u': undoLastMove(game); break;              // M1b §8: undo last step-mode move
       case 'k': killAllEnemies(game); break; // extra debug key (not in §18.1): kill all living enemies
       case 'b': spawnDebugBear(game); break;  // M1e §6: spawn a Bear at the start of a random lane (Combat only)
+      case 'o': spawnDebugOgre(game); break;  // M2c §4: spawn an Ogre likewise (an error if the corridors are too narrow)
+      case '[': switchLevel(-1); break;                 // M2a §8: previous / next level in LEVELS,
+      case ']': switchLevel(1); break;                  //   starting its Prep with the current resources
       case 'g': grantResources(game); break;
       case 'v': toggleMute(); break;                    // M1g §3.6: mute / unmute sound
       case 'x': toggleDropMult(game); break;            // M1d §3: enemy drop chances ×1 / ×DEBUG_DROP_MULT
@@ -100,7 +143,7 @@ const input = createInput(stage, canvas, () => scale, {
 //   broceliande.forceEnd('VICTORY')  /  broceliande.forceEnd('DEFEAT')
 window.broceliande = { game, forceEnd: (result) => beginEnding(game, result) };
 
-startEncounter(game); // START → PREP on page load
+newRun(game); // START → MAP on page load (M2a §2.1)
 
 // ---------------------------------------------------------------------------
 // Loop: fixed simulation step via accumulator, one render per animation frame.
@@ -125,12 +168,24 @@ function frame(now) {
 
   // Hover is re-picked every frame so it stays correct when objects change under a still cursor.
   view.pointer = input.mouse.inside ? { x: input.mouse.x, y: input.mouse.y } : null;
-  view.hover = input.mouse.inside ? pick(game, input.mouse) : null;
-  // Placement: crosshair, except over a valid Bough Double target (pointer).
-  const placing = game.action.state === ActionState.SUMMON_PLACEMENT;
-  const interactive = isInteractive(game, view.hover) && (!placing || game.action.target === 'double');
-  canvas.style.cursor = interactive ? 'pointer' : placing ? 'crosshair' : 'default';
+  if (game.state === GameState.MAP) {
+    // Map (M2a §4.3): the available node under the pointer, with a soft tick on entering one.
+    view.hover = null;
+    const mapHover = input.mouse.inside ? availableNodeAt(game.run, input.mouse) : null;
+    if (mapHover && mapHover !== view.mapHover) events.emit('mapNodeHover', { nodeId: mapHover });
+    view.mapHover = mapHover;
+    canvas.style.cursor = mapHover ? 'pointer' : 'default';
+  } else {
+    view.mapHover = null;
+    view.hover = input.mouse.inside ? pick(game, input.mouse) : null;
+    // Placement: crosshair, except over a valid Bough Double target (pointer).
+    const placing = game.action.state === ActionState.SUMMON_PLACEMENT;
+    const interactive = isInteractive(game, view.hover) && (!placing || game.action.target === 'double');
+    canvas.style.cursor = interactive ? 'pointer' : placing ? 'crosshair' : 'default';
+  }
 
+  // M2d §2.2: HUD counter positions for the field sweep, measured at the start of each sweep.
+  view.resourceTargets = game.sweep ? (view.resourceTargets ?? ui.resourceTargets()) : null;
   renderer.render(game, view);
   ui.update(game, clock, view);
   requestAnimationFrame(frame);

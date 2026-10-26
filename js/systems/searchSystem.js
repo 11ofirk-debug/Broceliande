@@ -1,8 +1,8 @@
 // Searching features (spec §8.4): seeded yield roll on completion.
 
 import * as C from '../config.js';
-import { RESOURCE_KEYS, add, resourceName } from '../resources.js';
-import { addFloatingText } from '../effects.js';
+import { RESOURCE_KEYS, add } from '../resources.js';
+import { addResourceFloaters } from '../effects.js';
 import { events } from '../events.js';
 
 export function searchTime(feature) {
@@ -26,6 +26,5 @@ export function completeSearch(game, featureIndex) {
 
   const found = RESOURCE_KEYS.filter((k) => gained[k] > 0);
   if (found.length) events.emit('resourcesGained', { resources: found }); // one chime per resource found
-  const parts = RESOURCE_KEYS.filter((k) => gained[k] > 0).map((k) => `+${gained[k]} ${resourceName(k, gained[k])}`);
-  addFloatingText(game, parts.length ? parts.join('  ') : 'Nothing found', feature.x, feature.y - C.LOCATION_RADIUS - 20);
+  addResourceFloaters(game, gained, feature.x, feature.y - C.LOCATION_RADIUS - 20); // M2d §1
 }

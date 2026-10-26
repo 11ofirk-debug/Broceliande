@@ -1,9 +1,10 @@
 # Broceliande — Project Instructions
 
-Browser prototype of a survival tower-defence roguelite. Current goal: **Milestone 1**, one playable encounter.
+Browser prototype of a survival tower-defence roguelite. Current goal: **Milestone 2**, a run made of several encounters on a level map.
 
 ## Source of truth
 - The full specification is `docs/M1_SPEC.md`. Read the sections relevant to the current task before writing code.
+- The addenda in `docs/` extend and override it. Read them in order: M1, then M1B–M1J, then M2A. A later document overrides an earlier one where they differ.
 - If the spec and a prompt conflict, ask before proceeding.
 - If the spec is silent and no reasonable judgement call is possible, ask rather than guess. If you do make a judgement call, mention it in your summary.
 

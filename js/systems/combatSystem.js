@@ -3,13 +3,15 @@
 // Every enemy type goes through the same code; per-type values come from ENEMY_TYPES.
 
 import * as C from '../config.js';
-import { EnemyState, enemyType, remainingDistance } from '../entities/enemy.js';
+import { EnemyState, AttackState, enemyType, remainingDistance } from '../entities/enemy.js';
 import { turretType, turretRange, turretDamage, turretFireInterval, turretMuzzle } from '../entities/turret.js';
 import { createProjectile } from '../entities/projectile.js';
 import { dropLoot } from './dropSystem.js';
 import { createCloud, isInsideCloud } from './cloudSystem.js';
 import { isBeingUpgraded } from './doubleSystem.js';
 import { events } from '../events.js';
+
+const TIMER_EPSILON = 1e-9; // s, so timers built from 1/60 s steps fire on time
 
 // ---------------------------------------------------------------------------
 // Turrets (§10.2)
@@ -151,6 +153,7 @@ export function updateMelee(game, dt) {
     if (enemy.state !== EnemyState.BITING) continue;
     if (enemy.blockedBy !== null) continue; // attacking a Vulture instead; Druid attacks pause
     const t = enemyType(enemy);
+    if (t.windupTime) continue; // wind-up attackers: updateWindupAttacks
     enemy.biteTimer += dt;
     if (enemy.biteTimer >= t.attackInterval) {
       enemy.biteTimer -= t.attackInterval;
@@ -161,6 +164,77 @@ export function updateMelee(game, dt) {
       events.emit('enemyAttacked', { type: enemy.type, target: 'druid' });
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Wind-up attacks (M2c §2.5): enemies with a windupTime (the Ogre) attack the Druid and the
+// summons blocking them (Vultures, Squirrels) with one readable sequence: wind-up, then a blow
+// whose damage lands at that moment. The interval is measured between blows. Its target is the
+// blocker if held up, else the Druid if it stands at its melee slots. If that target dies or
+// leaves during the wind-up, the blow lands on nothing; the next wind-up picks the current one.
+// ---------------------------------------------------------------------------
+function currentAttackTarget(enemy) {
+  if (enemy.blockedBy !== null) return { kind: 'summon', id: enemy.blockedBy };
+  if (enemy.state === EnemyState.BITING) return { kind: 'druid' };
+  return null;
+}
+
+function summonById(game, id) {
+  return game.vultures.find((v) => v.id === id) ?? game.squirrels.find((s) => s.id === id) ?? null;
+}
+
+export function updateWindupAttacks(game, dt) {
+  for (const enemy of game.enemies) {
+    const t = enemyType(enemy);
+    if (!t.windupTime) continue;
+    if (enemy.attack === AttackState.READY) {
+      // Counts up to the moment it may wind up, then waits there for a target.
+      enemy.sinceBlow = Math.min(enemy.sinceBlow + dt, t.attackInterval - t.windupTime);
+      const target = currentAttackTarget(enemy);
+      if (!target || enemy.sinceBlow < t.attackInterval - t.windupTime - TIMER_EPSILON) continue;
+      enemy.attack = AttackState.WINDUP;
+      enemy.windupElapsed = 0;
+      enemy.windupTarget = target;
+      events.emit('enemyWindup', { type: enemy.type, x: enemy.x, y: enemy.y });
+      continue;
+    }
+    // WINDUP
+    enemy.windupElapsed += dt;
+    if (enemy.windupElapsed < t.windupTime - TIMER_EPSILON) continue;
+    blow(game, enemy, t);
+  }
+}
+
+// The blow: damage to the wind-up's target if it is still there and still this enemy's target.
+// Dust ring at the target (or in front of the club if it hit nothing), flash, screen shake.
+function blow(game, enemy, t) {
+  const aim = enemy.windupTarget;
+  const now = currentAttackTarget(enemy);
+  const same = now && now.kind === aim.kind && now.id === aim.id;
+  let at = { x: enemy.x + enemy.facing * enemy.radius * 1.1, y: enemy.y + enemy.radius * 0.4 };
+  if (same && aim.kind === 'druid') {
+    game.druidHp = Math.max(0, game.druidHp - t.damage);
+    game.druidLastHitTime = game.combatTime;
+    at = { ...game.scene.level.druidPos };
+    events.emit('enemyAttacked', { type: enemy.type, target: 'druid' });
+  } else if (same) {
+    const unit = summonById(game, aim.id);
+    if (unit && unit.hp > 0) {
+      unit.hp -= t.damage;
+      unit.lastHitTime = game.combatTime;
+      at = { x: unit.x, y: unit.y };
+      events.emit('enemyAttacked', { type: enemy.type, target: 'summon' });
+    }
+  }
+  if (!same) events.emit('enemyAttacked', { type: enemy.type, target: 'nothing' });
+  game.dustRings.push({ x: at.x, y: at.y, age: 0 });
+  game.shake = { age: 0 };
+  enemy.attack = AttackState.READY;
+  enemy.sinceBlow = 0;
+  enemy.windupTarget = null;
+  enemy.lastBlowTime = game.combatTime;
+  enemy.lastBiteTime = game.combatTime;
+  enemy.bites++;
 }
 
 // Remove an enemy immediately, release all its melee slots and roll its drops (§12.5, §13,

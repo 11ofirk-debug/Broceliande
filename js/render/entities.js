@@ -4,6 +4,7 @@
 import * as C from '../config.js';
 import { drawShadow } from './environment.js';
 import { resourceIconImage } from '../icons.js';
+import { AttackState } from '../entities/enemy.js';
 
 const COLORS = {
   slotFill: 'rgba(170, 160, 130, 0.35)',
@@ -59,6 +60,8 @@ const COLORS = {
   progress: '#f0d878',
   floatText: '#fff1c4',
   floatOutline: 'rgba(30, 20, 10, 0.85)',
+  floatMuted: '#b8b4a6',
+  floaterBacking: 'rgba(20, 14, 8, 0.45)',
   vulture: '#4a3326',
   vultureDark: '#2f2019',
   vultureHit: '#a8857a',
@@ -362,6 +365,43 @@ export function drawDoubleTargeting(ctx, targets, hovered, t) {
   ctx.restore();
 }
 
+// Wolf's head silhouette, front-on (M2a §4.2): pointed ears, broad cheeks, a narrowing muzzle,
+// with slanted eyes and a nose cut out in `cutColor`. Shared draw function, reusable anywhere.
+// (x, y): centre of the head; size: half its height in px. redEyes (Fell Wilds, M2c §1.2): the
+// eyes bright red with a very faint red glow instead of cut out; nothing else changes.
+export function drawWolfHead(ctx, x, y, size, color, cutColor, { redEyes = false } = {}) {
+  const s = size;
+  const half = [
+    [0, 0.82], [0.2, 0.62], [0.36, 0.38], [0.62, 0.16], [0.78, -0.02], [0.6, -0.22],
+    [0.66, -0.98], [0.24, -0.5], [0, -0.44],
+  ];
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  half.forEach(([px, py], i) => (i ? ctx.lineTo(x + px * s, y + py * s) : ctx.moveTo(x + px * s, y + py * s)));
+  for (let i = half.length - 2; i > 0; i--) ctx.lineTo(x - half[i][0] * s, y + half[i][1] * s);
+  ctx.closePath();
+  ctx.fill();
+  const eye = (side, grow) => {
+    ctx.beginPath();
+    ctx.ellipse(x + side * 0.27 * s, y - 0.06 * s, 0.13 * s * grow, 0.06 * s * grow, side * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  if (redEyes) {
+    ctx.fillStyle = COLORS.wolfEyeGlow;
+    for (const side of [-1, 1]) eye(side, 1.9);
+    ctx.fillStyle = COLORS.wolfEye;
+  } else {
+    ctx.fillStyle = cutColor;
+  }
+  for (const side of [-1, 1]) eye(side, 1);
+  ctx.fillStyle = cutColor;
+  ctx.beginPath();
+  ctx.ellipse(x, y + 0.6 * s, 0.11 * s, 0.07 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 // Druid strike swoosh (M1e §2.4, M1f §4): a bright, broad crescent sweeping across the
 // target's direction, with a soft glow, fading out. t: 0 … 1 over DRUID_SWIPE_TIME.
 export function drawSwipe(ctx, s, t) {
@@ -553,11 +593,13 @@ export function drawDruidHpBar(ctx, x, y, hp) {
 
 // Enemy HP bars (§13, M1e §3.4): hidden until first damage; sized to the sprite.
 // lift: bar height above the collision centre, × radius; width in px.
-const HP_BAR = { wolf: { lift: 2.9, width: 30 }, bear: { lift: 1.75, width: 48 } };
+const HP_BAR = { wolf: { lift: 2.9, width: 30 }, bear: { lift: 1.75, width: 48 }, ogre: { lift: 2.15, width: 90 } };
 
+// Mini-bosses (M2c §2.7) keep theirs visible all the time.
 export function drawEnemyHpBar(ctx, enemy) {
-  const maxHp = C.ENEMY_TYPES[enemy.type].hp;
-  if (enemy.hp >= maxHp) return;
+  const t = C.ENEMY_TYPES[enemy.type];
+  const maxHp = t.hp;
+  if (enemy.hp >= maxHp && !t.boss) return;
   const bar = HP_BAR[enemy.type];
   drawHpBar(ctx, enemy.x, enemy.y - enemy.radius * bar.lift, bar.width, enemy.hp / maxHp);
 }
@@ -619,6 +661,178 @@ export function drawBear(ctx, bear, hit, lunging) {
   ctx.arc(28, -30, 2.2, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+}
+
+// Club angles (rad; 0 = straight ahead, positive = downward) for the Ogre's poses (M2c §2.8).
+const OGRE_CLUB_WALK = 0.95;   // carried low in front
+const OGRE_CLUB_RAISED = -2.4; // wind-up: lifted overhead and back
+const OGRE_CLUB_DOWN = 1.35;   // blow: slammed down to the ground in front
+
+// The Ogre (M2c §2.8): a hulking, hunched side-view humanoid, twice the Bear's size, grey-green
+// skin, small head with the enemies' red eyes and a huge wooden club. Its body sways with each
+// heavy step. Pose from its attack: walk, wind-up (club rising overhead), blow (club down for
+// OGRE_BLOW_POSE_TIME). Drawn at radius 52 facing right, feet below its centre.
+export function drawOgre(ctx, ogre, hit, lunging, anim) {
+  const t = C.ENEMY_TYPES.ogre;
+  const r = ogre.radius;
+  const feet = ogre.y + r * 0.5;
+  drawShadow(ctx, ogre.x, feet, r * 1.05, r * 0.26);
+
+  let club = OGRE_CLUB_WALK;
+  if (ogre.attack === AttackState.WINDUP) {
+    const k = Math.min(1, ogre.windupElapsed / t.windupTime);
+    club = OGRE_CLUB_WALK + (OGRE_CLUB_RAISED - OGRE_CLUB_WALK) * (1 - (1 - k) * (1 - k));
+  } else if (anim - ogre.lastBlowTime < C.OGRE_BLOW_POSE_TIME) {
+    club = OGRE_CLUB_DOWN;
+  }
+  const step = Math.sin(ogre.stride * 0.07);
+
+  ctx.save();
+  ctx.translate(ogre.x, feet);
+  ctx.scale(ogre.facing * (r / 52), r / 52);
+  if (lunging) ctx.translate(4, 0);
+  ctx.rotate(step * 0.045); // heavy side-to-side sway
+
+  // Legs: thick, stepping in turn.
+  ctx.fillStyle = OGRE.skinDark;
+  for (const [x, dir] of [[-15, 1], [13, -1]]) {
+    ctx.beginPath();
+    ctx.roundRect(x - 10 + step * dir * 5, -46, 20, 46, 7);
+    ctx.fill();
+  }
+  // Loincloth.
+  ctx.fillStyle = OGRE.cloth;
+  ctx.beginPath();
+  ctx.moveTo(-28, -50);
+  ctx.lineTo(26, -50);
+  ctx.lineTo(18, -30);
+  ctx.lineTo(-22, -30);
+  ctx.closePath();
+  ctx.fill();
+
+  const skin = hit === 'strike' ? COLORS.strikeFlash : hit ? OGRE.skinHit : OGRE.skin;
+  // Back arm behind the body.
+  ctx.strokeStyle = OGRE.skinDark;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 15;
+  ctx.beginPath();
+  ctx.moveTo(-8, -84);
+  ctx.lineTo(-20 - step * 4, -52);
+  ctx.stroke();
+  // Body: big torso and belly, hunched back hump.
+  ctx.fillStyle = skin;
+  ctx.beginPath();
+  ctx.ellipse(0, -72, 34, 30, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(-12, -92, 24, 18, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = OGRE.belly;
+  ctx.beginPath();
+  ctx.ellipse(12, -64, 18, 20, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  // Small head, jutting forward from the hump, with tusks and red eyes.
+  ctx.fillStyle = skin;
+  ctx.beginPath();
+  ctx.ellipse(24, -98, 13, 12, 0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = OGRE.tusk;
+  ctx.beginPath();
+  ctx.moveTo(31, -91);
+  ctx.lineTo(34, -98);
+  ctx.lineTo(36, -90);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = COLORS.wolfEyeGlow;
+  ctx.beginPath();
+  ctx.arc(29, -102, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = COLORS.wolfEye;
+  ctx.beginPath();
+  ctx.arc(29, -102, 2.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Club arm and the club along one line from the shoulder: arm, fist, handle, knotted head.
+  const shoulder = { x: 10, y: -86 };
+  const dx = Math.cos(club);
+  const dy = Math.sin(club);
+  const hand = { x: shoulder.x + dx * 30, y: shoulder.y + dy * 30 };
+  ctx.strokeStyle = skin;
+  ctx.lineWidth = 15;
+  ctx.beginPath();
+  ctx.moveTo(shoulder.x, shoulder.y);
+  ctx.lineTo(hand.x, hand.y);
+  ctx.stroke();
+  ctx.save();
+  ctx.translate(hand.x, hand.y);
+  ctx.rotate(club);
+  ctx.fillStyle = OGRE.club;
+  ctx.fillRect(-6, -4.5, 34, 9); // handle
+  ctx.beginPath();               // head, widening to the end
+  ctx.moveTo(24, -6);
+  ctx.lineTo(62, -14);
+  ctx.quadraticCurveTo(74, 0, 62, 14);
+  ctx.lineTo(24, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = OGRE.clubDark;
+  for (const [x, y] of [[40, -6], [52, 5], [60, -8]]) {
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.fillStyle = skin; // fist over the handle
+  ctx.beginPath();
+  ctx.arc(hand.x, hand.y, 9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+const OGRE = {
+  skin: '#6f7f55',
+  skinDark: '#4d5a3a',
+  skinHit: '#b9c4a6',
+  belly: '#859468',
+  cloth: '#5a4430',
+  tusk: '#efe6cf',
+  club: '#6e4a2a',
+  clubDark: '#4a3019',
+};
+
+// Dust ring where an Ogre blow lands (M2c §2.5): a flattened ring spreading to OGRE_DUST_RADIUS
+// and fading, with a few puffs. progress 0 → 1.
+export function drawDustRing(ctx, d, progress) {
+  const r = C.OGRE_DUST_RADIUS * (0.35 + 0.65 * progress);
+  const a = 1 - progress;
+  ctx.save();
+  ctx.strokeStyle = `rgba(190, 170, 130, ${0.7 * a})`;
+  ctx.lineWidth = 6 * a + 1;
+  ctx.beginPath();
+  ctx.ellipse(d.x, d.y, r, r * 0.4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = `rgba(200, 182, 145, ${0.45 * a})`;
+  for (let i = 0; i < 6; i++) {
+    const ang = (i / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(d.x + Math.cos(ang) * r, d.y + Math.sin(ang) * r * 0.4 - progress * 8, 7 * (1 - progress * 0.5), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// A mini-boss's lane entrance pulsing red as it arrives (M2c §2.6). progress 0 → 1.
+export function drawLanePulse(ctx, p, progress) {
+  const pulse = 0.5 + 0.5 * Math.sin(progress * Math.PI * 2 * 3);
+  const a = (1 - progress) * (0.35 + 0.45 * pulse);
+  const R = C.BOSS_LANE_PULSE_RADIUS;
+  const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
+  g.addColorStop(0, `rgba(255, 40, 25, ${a})`);
+  g.addColorStop(1, 'rgba(255, 40, 25, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // Searchable feature, centred on its location (M1c §2.1). A soft glow filling the footprint
@@ -944,7 +1158,8 @@ export function drawProgressBar(ctx, x, y, fraction) {
 
 // Rising, fading text such as "+2 Pits". t: 0 → 1 over its lifetime.
 // small: Squirrel pickups (M1d §1.4), which come in quick bursts and must not drown each other out.
-export function drawFloatingText(ctx, text, x, y, t, small = false) {
+// muted: grey ("Nothing found", M2d §1.2).
+export function drawFloatingText(ctx, text, x, y, t, small = false, muted = false) {
   ctx.save();
   ctx.globalAlpha = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
   ctx.font = small ? 'bold 15px Georgia, serif' : 'bold 22px Georgia, serif';
@@ -952,9 +1167,45 @@ export function drawFloatingText(ctx, text, x, y, t, small = false) {
   ctx.lineWidth = small ? 3 : 4;
   ctx.strokeStyle = COLORS.floatOutline;
   ctx.strokeText(text, x, y);
-  ctx.fillStyle = COLORS.floatText;
+  ctx.fillStyle = muted ? COLORS.floatMuted : COLORS.floatText;
   ctx.fillText(text, x, y);
   ctx.restore();
+}
+
+// Resource floater (M2d §1.1): the resource's shared icon with "×N" beside it, rising
+// FLOATER_RISE_PX with an ease-out and fading over the last 40%. t: 0 → 1 over FLOATER_TIME.
+export function drawFloater(ctx, f, t) {
+  const img = resourceIconImage(f.resource);
+  const size = C.FLOATER_ICON_SIZE;
+  const rise = C.FLOATER_RISE_PX * (1 - (1 - t) * (1 - t));
+  const y = f.y - rise;
+  const text = `×${f.amount}`;
+  ctx.save();
+  ctx.globalAlpha = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.4;
+  ctx.font = 'bold 20px Georgia, serif';
+  const w = size + 4 + ctx.measureText(text).width;
+  const left = f.x - w / 2;
+  // Soft dark backing behind icon and text, so it reads on every palette.
+  ctx.fillStyle = COLORS.floaterBacking;
+  ctx.beginPath();
+  ctx.roundRect(left - 5, y - size / 2 - 3, w + 10, size + 6, 9);
+  ctx.fill();
+  if (img.complete) ctx.drawImage(img, left, y - size / 2, size, size);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = COLORS.floatOutline;
+  ctx.strokeText(text, left + size + 4, y + 1);
+  ctx.fillStyle = COLORS.floatText;
+  ctx.fillText(text, left + size + 4, y + 1);
+  ctx.restore();
+}
+
+// A swept drop (M2d §2.2) at (x, y), at `scale` of its size on the ground.
+export function drawSweepItem(ctx, resource, x, y, scale) {
+  const img = resourceIconImage(resource);
+  const size = C.RESOURCE_ICON_SIZE * C.DROP_ICON_SCALE * scale;
+  if (img.complete) ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
 }
 
 function drawPeachTree(ctx, x, y, R) {

@@ -75,8 +75,12 @@ export function toggleMute() {
 // Events → sounds
 // ---------------------------------------------------------------------------
 const TURRET_FIRE_SOUND = { sprinkler: 'sprinklerFire', toader: 'toaderFire' };
-const ENEMY_ATTACK_SOUND = { wolf: 'wolfBite', bear: 'bearAttack' };
-const ENEMY_DEATH_SOUND = { wolf: 'wolfDie', bear: 'bearDie' };
+const ENEMY_ATTACK_SOUND = { wolf: 'wolfBite', bear: 'bearAttack', ogre: 'ogreBlow' };
+const ENEMY_DEATH_SOUND = { wolf: 'wolfDie', bear: 'bearDie', ogre: 'ogreDies' };
+// M2c §2.9: a mini-boss's arrival, footsteps and wind-up (none for wolves and Bears).
+const ENEMY_SPAWN_SOUND = { ogre: 'ogreSpawns' };
+const ENEMY_STEP_SOUND = { ogre: 'ogreStep' };
+const ENEMY_WINDUP_SOUND = { ogre: 'ogreWindup' };
 
 function subscribe() {
   events.on('turretFired', (e) => play(TURRET_FIRE_SOUND[e.type], e));
@@ -87,9 +91,15 @@ function subscribe() {
   events.on('vulturePecked', (e) => play('vulturePeck', e));
   events.on('squirrelStrikes', (e) => play('squirrelScratch', e));
   events.on('enemyDied', (e) => play(ENEMY_DEATH_SOUND[e.type], e));
+  events.on('enemySpawned', (e) => play(ENEMY_SPAWN_SOUND[e.type], e));
+  events.on('enemyStep', (e) => play(ENEMY_STEP_SOUND[e.type], e));
+  events.on('enemyWindup', (e) => play(ENEMY_WINDUP_SOUND[e.type], e));
   events.on('resourcesGained', (e) => play('resourceChime', e));
   events.on('searchStarted', (e) => play('searchRustle', e));
   events.on('turretBuilt', (e) => play('build', e));
+  events.on('mapNodeHover', (e) => play('mapNodeHover', e));
+  events.on('mapNodeChosen', (e) => play('mapNodeChosen', e));
+  events.on('runComplete', (e) => play('runComplete', e));
   events.on('doubleAppears', (e) => play('doubleAppears', e));
   events.on('doubleCraftHit', (e) => play('doubleCraftHit', e));
   events.on('doubleCancelled', (e) => play('doubleCancelled', e));
@@ -200,6 +210,37 @@ function noise(t, out, { filter = 'bandpass', freq, to = freq, q = 1, dur, attac
   env.connect(out);
   src.start(start, rng.range(0, 0.5));
   src.stop(start + dur + 0.02);
+  return delay + dur;
+}
+
+// Growl: a sawtooth gliding from freq to `to` through a lowpass at `cutoff` Hz, with a fast
+// tremolo at `trem` Hz (the Ogre's voice).
+function growl(t, out, { freq, to, dur, attack = 0.04, cutoff, trem, gain = 1, delay = 0 }) {
+  const start = t + delay;
+  const osc = ctx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(freq, start);
+  osc.frequency.exponentialRampToValueAtTime(to, start + dur);
+  const lowpass = ctx.createBiquadFilter();
+  lowpass.type = 'lowpass';
+  lowpass.frequency.value = cutoff;
+  const tremolo = ctx.createGain();
+  tremolo.gain.value = 0.6;
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = trem;
+  const depth = ctx.createGain();
+  depth.gain.value = 0.4;
+  lfo.connect(depth);
+  depth.connect(tremolo.gain);
+  const env = envelope(start, attack, dur, gain);
+  osc.connect(lowpass);
+  lowpass.connect(tremolo);
+  tremolo.connect(env);
+  env.connect(out);
+  osc.start(start);
+  lfo.start(start);
+  osc.stop(start + dur + 0.02);
+  lfo.stop(start + dur + 0.02);
   return delay + dur;
 }
 
@@ -330,6 +371,44 @@ const RECIPES = {
     return dur;
   },
 
+  // The Ogre (M2c §2.9). Deep, long roar: two detuned growls swelling and falling, with breath.
+  ogreSpawns(t, out, p) {
+    growl(t, out, { freq: 95 * p, to: 52 * p, dur: 1.6, attack: 0.25, cutoff: 600, trem: 14, gain: 1 });
+    growl(t, out, { freq: 71 * p, to: 40 * p, dur: 1.5, attack: 0.3, cutoff: 420, trem: 9, gain: 0.8, delay: 0.05 });
+    noise(t, out, { filter: 'lowpass', freq: 700 * p, to: 250 * p, dur: 1.4, attack: 0.2, gain: 0.35 });
+    return 1.65;
+  },
+
+  // Very low, short thud per heavy step.
+  ogreStep(t, out, p) {
+    tone(t, out, { freq: 62 * p, to: 34 * p, dur: 0.16, gain: 1 });
+    return noise(t, out, { filter: 'lowpass', freq: 260 * p, dur: 0.07, gain: 0.5 });
+  },
+
+  // Short low creak and groan as the club goes up.
+  ogreWindup(t, out, p) {
+    creak(t, out, 38 * p, 62 * p, 0.35, 0.9);
+    growl(t, out, { freq: 82 * p, to: 110 * p, dur: 0.4, attack: 0.08, cutoff: 500, trem: 18, gain: 0.5 });
+    return 0.42;
+  },
+
+  // Heavy thump plus crunch: deeper, longer and louder than the Bear's attack.
+  ogreBlow(t, out, p) {
+    tone(t, out, { freq: 85 * p, to: 28 * p, dur: 0.42, gain: 1.4 });
+    noise(t, out, { filter: 'lowpass', freq: 650 * p, dur: 0.22, gain: 1.1 });
+    noise(t, out, { freq: 420 * p, q: 1.5, dur: 0.12, gain: 0.9, delay: 0.05 });
+    noise(t, out, { freq: 900 * p, q: 2, dur: 0.07, gain: 0.6, delay: 0.1 });
+    return 0.45;
+  },
+
+  // Long falling groan, then a heavy thud as it hits the ground.
+  ogreDies(t, out, p) {
+    growl(t, out, { freq: 120 * p, to: 38 * p, dur: 1.5, attack: 0.06, cutoff: 650, trem: 20, gain: 1 });
+    tone(t, out, { freq: 70 * p, to: 26 * p, dur: 0.5, gain: 1.5, delay: 1.35 });
+    noise(t, out, { filter: 'lowpass', freq: 400 * p, dur: 0.35, gain: 1, delay: 1.35 });
+    return 1.9;
+  },
+
   // Bright chime per resource gained, pitched by resource; several resources ring in turn.
   // Boughs (M1i §1.3) are the lowest and woody: a hollow knock rather than a bell.
   resourceChime(t, out, p, data) {
@@ -371,6 +450,27 @@ const RECIPES = {
       noise(t, out, { freq: 1600 * p, q: 3, dur: 0.03, gain: 0.5, delay });
     }
     return 0.17;
+  },
+
+  // Map (M2a §7): hovering an available node — a very soft tick.
+  mapNodeHover(t, out, p) {
+    tone(t, out, { type: 'triangle', freq: 1400 * p, to: 1150 * p, dur: 0.035, gain: 0.5, attack: 0.002 });
+    return 0.04;
+  },
+
+  // Choosing a node: a low, warm drum hit and a short rising tone.
+  mapNodeChosen(t, out, p) {
+    tone(t, out, { freq: 120 * p, to: 55 * p, dur: 0.3, gain: 1.1, attack: 0.004 });
+    noise(t, out, { filter: 'lowpass', freq: 400 * p, dur: 0.12, gain: 0.5 });
+    return tone(t, out, { type: 'triangle', freq: 330 * p, to: 660 * p, dur: 0.35, gain: 0.35, attack: 0.04, delay: 0.08 });
+  },
+
+  // Run complete: a short triumphant three-note phrase (rising major arpeggio, last note held).
+  runComplete(t, out, p) {
+    bell(t, out, 523 * p, 0, 0.3, 0.7);
+    bell(t, out, 659 * p, 0.16, 0.3, 0.7);
+    tone(t, out, { type: 'triangle', freq: 784 * p, dur: 0.8, gain: 0.5, delay: 0.32, attack: 0.01 });
+    return bell(t, out, 784 * p, 0.32, 0.8, 0.8);
   },
 
   // Bough Double arrives (M1i §2.8): a soft woody creak with a low shimmer under it.

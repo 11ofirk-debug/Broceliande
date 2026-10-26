@@ -14,7 +14,8 @@ import {
 import { isStepMode, canVisit } from './systems/stepSystem.js';
 import { isDoubleTargeting, isDoubleTarget, doubleOnSlot, startDoubleJob, cancelDoubleJob } from './systems/doubleSystem.js';
 import { TURRET_TYPE_KEYS } from './entities/turret.js';
-import { startCombat } from './game.js';
+import { startCombat, enterNode } from './game.js';
+import { availableNodeAt } from './run.js';
 
 export function createInteraction(game, view) {
   function closeMenu() {
@@ -22,6 +23,12 @@ export function createInteraction(game, view) {
   }
 
   function onLeftClick(world) {
+    // Map (M2a §4.3): clicking an available node starts its Prep; anything else does nothing.
+    if (game.state === GameState.MAP) {
+      const nodeId = availableNodeAt(game.run, world);
+      if (nodeId && enterNode(game, nodeId)) closeMenu();
+      return;
+    }
     if (game.state !== GameState.PREP && game.state !== GameState.COMBAT) return;
     const hit = pick(game, world);
     // Bough Double targeting (M1i §2.4 step 3): a turret starts its upgrade job at once; an empty
