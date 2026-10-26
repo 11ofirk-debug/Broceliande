@@ -1,6 +1,6 @@
-// Equipment panel drawing (M2e §4.2): a large, static Druid facing the viewer, his staff in his
-// right hand (on the viewer's left), and thin connector lines from each slot to its part of the
-// staff or body. Placeholder art in the Druid's colours; it never changes with equipment.
+// Equipment area drawing (M2e §4.2, as revised): a large, static Druid facing the viewer, his staff
+// in his right hand (on the viewer's left), his hood pulled down over his eyes. Placeholder art in
+// the Druid's colours; it never changes with equipment.
 // Drawn in panel coordinates (the panel's own canvas).
 
 import * as C from '../config.js';
@@ -14,34 +14,17 @@ const P = {
   skinShade: '#c39a74',
   beard: '#e8e4d8',
   beardShade: '#c9c4b6',
-  eye: '#2a2420',
+  hoodShadow: 'rgba(20, 30, 22, 0.92)',
   belt: '#6b4a2c',
   boot: '#4a3324',
   staff: '#7a5530',
   staffDark: '#5a3d22',
   gem: '#9fe8a8',
-  connector: 'rgba(225, 210, 170, 0.55)',
-  slotSpot: 'rgba(255, 236, 170, 0.85)',
 };
 
 export function drawEquipmentPortrait(ctx) {
   const { x, y, w, h } = C.EQUIP_PORTRAIT;
   ctx.save();
-  // Connector lines first, under the Druid.
-  ctx.strokeStyle = P.connector;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 5]);
-  for (const slot of Object.keys(C.SLOT_TYPES)) {
-    const s = C.EQUIP_SLOT_POS[slot];
-    const a = C.EQUIP_SLOT_ANCHOR[slot];
-    const fromX = s.x + Math.sign(a.x - s.x) * C.EQUIP_SLOT_SIZE / 2;
-    ctx.beginPath();
-    ctx.moveTo(fromX, s.y);
-    ctx.lineTo(a.x, a.y);
-    ctx.stroke();
-  }
-  ctx.setLineDash([]);
-
   const cx = x + w * 0.5 + 12; // body centre, a little right of the box centre (the staff is on the left)
   // Feet (boots), under the robe hem.
   ctx.fillStyle = P.boot;
@@ -126,12 +109,26 @@ export function drawEquipmentPortrait(ctx) {
   ctx.beginPath();
   ctx.ellipse(cx, y + 118, 6, 9, 0, 0, Math.PI * 2); // nose
   ctx.fill();
-  ctx.fillStyle = P.eye;
-  for (const dx of [-12, 12]) {
-    ctx.beginPath();
-    ctx.ellipse(cx + dx, y + 104, 3.5, 2.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // The hood comes down over his eyes: its brim covers the upper face, and its shadow fades out
+  // just above the nose, so only his face from the nose down shows.
+  const shade = ctx.createLinearGradient(0, y + 96, 0, y + 116);
+  shade.addColorStop(0, P.hoodShadow);
+  shade.addColorStop(1, 'rgba(20, 30, 22, 0)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(cx - 32, y + 96, 64, 20);
+  ctx.fillStyle = P.hood;
+  ctx.beginPath();
+  ctx.moveTo(cx - 44, y + 104);
+  ctx.quadraticCurveTo(cx, y + 86, cx + 44, y + 104);
+  ctx.quadraticCurveTo(cx + 34, y + 60, cx, y + 56);
+  ctx.quadraticCurveTo(cx - 34, y + 60, cx - 44, y + 104);
+  ctx.fill();
+  ctx.fillStyle = P.hoodShadow;
+  ctx.beginPath(); // the brim's underside, darkest just over the eyes
+  ctx.moveTo(cx - 40, y + 102);
+  ctx.quadraticCurveTo(cx, y + 86, cx + 40, y + 102);
+  ctx.quadraticCurveTo(cx, y + 96, cx - 40, y + 102);
+  ctx.fill();
   ctx.fillStyle = P.beard;
   ctx.beginPath();
   ctx.moveTo(cx - 30, y + 118);
@@ -146,14 +143,6 @@ export function drawEquipmentPortrait(ctx) {
     ctx.moveTo(cx + dx, y + 140);
     ctx.quadraticCurveTo(cx + dx * 1.2, y + 175, cx + dx * 0.4, y + 205);
     ctx.stroke();
-  }
-  // Small marks where each slot's line meets the Druid.
-  ctx.fillStyle = P.slotSpot;
-  for (const slot of Object.keys(C.SLOT_TYPES)) {
-    const a = C.EQUIP_SLOT_ANCHOR[slot];
-    ctx.beginPath();
-    ctx.arc(a.x, a.y, 4, 0, Math.PI * 2);
-    ctx.fill();
   }
   ctx.restore();
 }

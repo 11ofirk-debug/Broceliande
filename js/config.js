@@ -1153,7 +1153,8 @@ export const NODE_TYPES = {
   fell:  { label: 'Fell Wilds', icon: 'wolfHead', redEyes: true  },
 };
 
-// M2e §4.6: the map lies right of the equipment panel (x ≥ EQUIP_PANEL_WIDTH) and doesn't scroll.
+// M2e §4.6 (as revised): the map's ground runs across the whole screen; its nodes use the right
+// half (x ≥ EQUIP_PANEL_WIDTH), and it doesn't scroll.
 // Rows are MAP_ROW_SPACING apart from MAP_BOTTOM_ROW_Y up, so MAP_ROW_CAPACITY rows fit below the
 // HUD strip; the 3 current rows sit at the bottom, slightly off-symmetric (Barrow centred between
 // Gallows and Blackthorn).
@@ -1164,14 +1165,14 @@ export const MAP_LABEL_FONT_PX = 18;      // node names; a name wider than MAP_L
 export const MAP_LABEL_MAX_WIDTH = 170;   // px
 export const MAP_NODES = [
   // Row 1
-  { id: 'tornville',  name: 'Tornville Haunt',    type: 'wilds', levelId: 'tornville',  pos: { x: 1240, y: 985 }, next: ['gallows', 'blackthorn'] },
+  { id: 'tornville',  name: 'Tornville Haunt',    type: 'wilds', levelId: 'tornville',  pos: { x: 1440, y: 985 }, next: ['gallows', 'blackthorn'] },
   // Row 2
-  { id: 'gallows',    name: 'Gallows Copse',      type: 'wilds', levelId: 'gallows',    pos: { x: 985,  y: 879 }, next: ['wychwood', 'barrow'] },
-  { id: 'blackthorn', name: 'Blackthorn Hollow',  type: 'wilds', levelId: 'blackthorn', pos: { x: 1505, y: 873 }, next: ['barrow', 'drowned'] },
+  { id: 'gallows',    name: 'Gallows Copse',      type: 'wilds', levelId: 'gallows',    pos: { x: 1278, y: 879 }, next: ['wychwood', 'barrow'] },
+  { id: 'blackthorn', name: 'Blackthorn Hollow',  type: 'wilds', levelId: 'blackthorn', pos: { x: 1598, y: 873 }, next: ['barrow', 'drowned'] },
   // Row 3 (M2b §1, §3)
-  { id: 'wychwood',   name: 'Wychwood Circle',    type: 'wilds', levelId: 'wychwood',   pos: { x: 755,  y: 771 }, next: [] },
-  { id: 'barrow',     name: 'Forgotten Barrow',   type: 'fell',  levelId: 'barrow',     pos: { x: 1245, y: 765 }, next: [] },
-  { id: 'drowned',    name: 'The Drowned Hamlet', type: 'wilds', levelId: 'drowned',    pos: { x: 1735, y: 769 }, next: [] },
+  { id: 'wychwood',   name: 'Wychwood Circle',    type: 'wilds', levelId: 'wychwood',   pos: { x: 1142, y: 771 }, next: [] },
+  { id: 'barrow',     name: 'Forgotten Barrow',   type: 'fell',  levelId: 'barrow',     pos: { x: 1440, y: 765 }, next: [] },
+  { id: 'drowned',    name: 'The Drowned Hamlet', type: 'wilds', levelId: 'drowned',    pos: { x: 1742, y: 769 }, next: [] },
 ];
 export const MAP_START_NODE = 'tornville';
 export const MAP_NODE_RADIUS = 30;        // px (M2e §4.6, was 44)
@@ -1273,27 +1274,33 @@ export const ITEMS_PER_BATTLE = 1;        // 0 turns hidden items off
 export const ITEM_FOUND_TIME = 2.5;       // s the "You found a …!" message stays, fading over its last third
 export const ITEM_FLOATER_SIZE = 40;      // px, the slot-type silhouette floater rising from the spot
 
-// Equipment panel on the map (M2e §4): left of the map, below the HUD strip.
-export const EQUIP_PANEL_WIDTH = 560;     // px of the 1920 px stage
+// Equipment area on the map (M2e §4, as revised): about the left half of the screen, below the HUD
+// strip, drawn straight over the map's ground (no panel background). Panel px: x from the stage's
+// left edge, y from the HUD strip's bottom. The portrait's centre is at about mid-screen height.
+export const EQUIP_PANEL_WIDTH = 960;     // px of the 1920 px stage: the equipment half; the map nodes use the rest
 export const EQUIP_SLOT_SIZE = 88;        // px, slot circle diameter
-export const EQUIP_PORTRAIT = { x: 150, y: 40, w: 260, h: 400 }; // px in the panel: the Druid portrait's box
+export const EQUIP_PORTRAIT = { x: 350, y: 260, w: 260, h: 400 }; // px in the panel: the Druid portrait's box
 // Slot centres in the panel (px). Staff slots on the viewer's left, level with their part of the
 // staff (held in the Druid's right hand, on the viewer's left); personal slots on the right, level
 // with neck, waist and feet.
 export const EQUIP_SLOT_POS = {
-  crown:    { x: 56,  y: 76 },
-  grip:     { x: 56,  y: 250 },
-  ferrule:  { x: 56,  y: 424 },
-  necklace: { x: 504, y: 156 },
-  belt:     { x: 504, y: 282 },
-  shoes:    { x: 504, y: 418 },
+  crown:    { x: 256, y: 296 },
+  grip:     { x: 256, y: 470 },
+  ferrule:  { x: 256, y: 644 },
+  necklace: { x: 704, y: 376 },
+  belt:     { x: 704, y: 502 },
+  shoes:    { x: 704, y: 638 },
 };
-// Where each slot's connector line meets the portrait (panel px).
+// The staff and body points each slot is level with (panel px): the staff's x, and the slot rows.
 export const EQUIP_SLOT_ANCHOR = {
-  crown:    { x: 178, y: 62 },
-  grip:     { x: 178, y: 250 },
-  ferrule:  { x: 178, y: 432 },
-  necklace: { x: 296, y: 156 },
-  belt:     { x: 318, y: 282 },
-  shoes:    { x: 316, y: 418 },
+  crown:    { x: 378, y: 282 },
+  grip:     { x: 378, y: 470 },
+  ferrule:  { x: 378, y: 652 },
+  necklace: { x: 496, y: 376 },
+  belt:     { x: 518, y: 502 },
+  shoes:    { x: 516, y: 638 },
 };
+// Where the map's tree clusters thin out to a natural clearing round the equipment (stage px): an
+// ellipse; clusters stop at a ragged edge (±EQUIP_CLEARING_RAGGED of its size) rather than a line.
+export const EQUIP_CLEARING = { x: 480, y: 640, rx: 380, ry: 470 };
+export const EQUIP_CLEARING_RAGGED = 0.2;

@@ -21,7 +21,10 @@ export function createEquipmentPanel(callbacks) {
   panel.style.width = `${C.EQUIP_PANEL_WIDTH}px`;
   panel.style.top = `${C.HUD_STRIP_HEIGHT}px`;
   panel.style.height = `${C.STAGE_HEIGHT - C.HUD_STRIP_HEIGHT}px`;
-  drawEquipmentPortrait(document.getElementById('equip-portrait').getContext('2d'));
+  const portrait = document.getElementById('equip-portrait');
+  portrait.width = C.EQUIP_PANEL_WIDTH;
+  portrait.height = C.EQUIP_PORTRAIT.y + C.EQUIP_PORTRAIT.h + 20;
+  drawEquipmentPortrait(portrait.getContext('2d'));
 
   const popover = document.getElementById('equip-popover');
   const tip = document.getElementById('equip-tip');
@@ -57,8 +60,9 @@ export function createEquipmentPanel(callbacks) {
     panel.querySelector('#equip-slots').append(btn);
     slotEls[slot] = { btn, icon, badge };
   }
-  panel.addEventListener('click', (e) => {
-    if (!popover.contains(e.target)) closePopover();
+  // A click anywhere outside the popover closes it (the panel itself lets clicks through to the map).
+  window.addEventListener('click', (e) => {
+    if (!popover.contains(e.target) && !e.target.closest?.('.equip-slot')) closePopover();
   });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePopover(); });
 

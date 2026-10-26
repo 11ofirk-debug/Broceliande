@@ -31,12 +31,15 @@ function mapClusters() {
   if (clusters) return clusters;
   const rng = createRng(C.MAP_DECOR_SEED);
   clusters = [];
-  for (let i = 0; i < 90; i++) {
-    const x = rng.range(C.EQUIP_PANEL_WIDTH, C.STAGE_WIDTH); // the map area, right of the equipment panel (M2e §4.1)
+  for (let i = 0; i < 150; i++) { // over the whole screen, minus the clearing
+    const x = rng.range(0, C.STAGE_WIDTH);
     const y = rng.range(C.HUD_STRIP_HEIGHT, C.STAGE_HEIGHT);
     const blobs = Array.from({ length: rng.int(3, 7) }, () => ({ dx: rng.range(-34, 34), dy: rng.range(-18, 18), r: rng.range(10, 24) }));
     const clear = C.MAP_NODES.every((n) => Math.hypot(n.pos.x - x, n.pos.y + 20 - y) > C.MAP_NODE_RADIUS + 80);
-    if (clear) clusters.push({ x, y, blobs });
+    // M2e (revised): a natural clearing round the equipment, its edge ragged rather than a line.
+    const e = C.EQUIP_CLEARING;
+    const inClearing = Math.hypot((x - e.x) / e.rx, (y - e.y) / e.ry) < 1 + rng.range(-C.EQUIP_CLEARING_RAGGED, C.EQUIP_CLEARING_RAGGED);
+    if (clear && !inClearing) clusters.push({ x, y, blobs });
   }
   return clusters;
 }
@@ -148,7 +151,7 @@ function drawDruidToken(ctx, run) {
 
 // hoverId: the available node under the pointer, or null. t: s (real time) for the pulse.
 export function drawMap(ctx, run, hoverId, t, debug) {
-  const mx = (C.EQUIP_PANEL_WIDTH + C.STAGE_WIDTH) / 2; // centre of the map area (M2e §4.1)
+  const mx = C.STAGE_WIDTH / 2; // the ground runs across the whole screen (M2e, revised)
   const g = ctx.createRadialGradient(mx, C.STAGE_HEIGHT * 0.6, 100, mx, C.STAGE_HEIGHT * 0.6, C.STAGE_WIDTH * 0.6);
   g.addColorStop(0, COLORS.groundLight);
   g.addColorStop(1, COLORS.ground);
