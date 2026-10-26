@@ -34,6 +34,8 @@
               <span id="res-boughs">0</span>
             </span>
           </div>
+          <!-- M2e §3.2: reminder that an item was found this battle (its slot type only). -->
+          <span id="hud-item" hidden title="You found an item this battle"><canvas id="hud-item-icon" width="34" height="34"></canvas></span>
         </div>
         <div class="hud-center">
           <span id="hud-phase"></span>
@@ -65,6 +67,8 @@
         <div class="end-panel">
           <div id="end-title"></div>
           <div id="end-stats"></div>
+          <!-- M2e §3.3: the slot type found this battle (Victory only). -->
+          <div id="end-found" hidden><div id="end-found-line"></div><div class="end-found-hint">Check your equipment on the map.</div></div>
           <!-- M2a §4.4: what carries over (Victory, run goes on) or the closing line (run complete). -->
           <!-- M2d §2.3: what the field sweep collected on Victory (omitted if nothing). -->
           <div id="end-gathered" hidden><div class="end-carry-title">Gathered from the field:</div><div id="end-gathered-rows"></div></div>
@@ -79,6 +83,8 @@
            centred arrival banner. Neither blocks clicks. -->
       <div id="boss-bar" hidden><span id="boss-name"></span><div id="boss-bar-track"><div id="boss-bar-fill"></div></div><span id="boss-hp"></span></div>
       <div id="boss-banner" hidden></div>
+      <!-- M2e §3.2: "You found a Crown Charm!" with the slot silhouette; never blocks input. -->
+      <div id="item-found" hidden><canvas id="item-found-icon" width="64" height="64"></canvas><span id="item-found-text"></span></div>
 
       <div id="mode-banner" hidden></div>
 

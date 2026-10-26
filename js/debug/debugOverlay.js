@@ -16,6 +16,7 @@ const COLOR = 'rgba(120, 220, 255, 0.9)';
 const EDGE_COLOR = 'rgba(120, 220, 255, 0.45)';
 const SPAWN_COLOR = 'rgba(255, 110, 110, 0.95)';
 const ENEMY_COLOR = 'rgba(255, 150, 90, 0.95)';
+const ITEM_COLOR = 'rgba(255, 215, 60, 1)'; // the hidden item's spot (M2e §6)
 const UNSTICK_COLOR = 'rgba(255, 230, 40, 0.95)'; // enemies passing through a slower one (M2d §4)
 const TARGET_COLOR = 'rgba(255, 235, 120, 0.9)';
 const VULTURE_COLOR = 'rgba(255, 140, 220, 0.9)';
@@ -51,7 +52,8 @@ function cross(ctx, x, y, size) {
   ctx.stroke();
 }
 
-export function drawDebugOverlay(ctx, game, scene) {
+// revealItem: debug key I in battle (M2e §6) marks the spot holding the hidden item.
+export function drawDebugOverlay(ctx, game, scene, revealItem = false) {
   ctx.save();
   ctx.strokeStyle = COLOR;
   ctx.fillStyle = COLOR;
@@ -70,6 +72,7 @@ export function drawDebugOverlay(ctx, game, scene) {
   drawSquirrelTargets(ctx, game);
   drawCloudsAndPellets(ctx, game);
   drawDoubleJobs(ctx, game);
+  if (revealItem) drawHiddenItem(ctx, game);
   ctx.font = '11px monospace';
   ctx.fillStyle = TARGET_COLOR;
   for (const p of game.projectiles) ctx.fillText(`#${p.id}`, p.x + 7, p.y - 6);
@@ -459,4 +462,24 @@ function drawDoubleJobs(ctx, game) {
     const time = d.state === 'WISP' ? 'wisp' : `${Math.max(0, d.duration - d.elapsed).toFixed(1)}s left`;
     label(ctx, `D#${d.id} ${what} ${time}`, p.x - 60, p.y + 34, DOUBLE_COLOR);
   }
+}
+
+// M2e §6: a gold double ring round the resource spot holding the battle's hidden item, with the
+// item's ID (or "found" once searched); "no item" when none was hidden.
+function drawHiddenItem(ctx, game) {
+  const h = game.hiddenItem;
+  if (!h) {
+    label(ctx, 'Hidden item: none this battle', 24, C.HUD_STRIP_HEIGHT + 24, ITEM_COLOR);
+    return;
+  }
+  const f = game.features[h.featureIndex];
+  ctx.strokeStyle = ITEM_COLOR;
+  ctx.lineWidth = 3;
+  for (const r of [C.LOCATION_RADIUS + 6, C.LOCATION_RADIUS + 12]) {
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.lineWidth = 1.5;
+  label(ctx, `ITEM: ${h.itemId}${h.found ? ' (found)' : ''}`, f.x - 60, f.y - C.LOCATION_RADIUS - 20, ITEM_COLOR);
 }

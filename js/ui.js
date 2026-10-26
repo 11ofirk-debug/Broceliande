@@ -24,6 +24,7 @@ import { enemyTotals, waveCounts } from './game.js';
 import { isMuted, soundStats, audioStatus } from './audio.js';
 import { isRunComplete, mapNode } from './run.js';
 import { resolveStats, changedStats, STAT_LABELS } from './stats.js';
+import { drawSlotIcon } from './render/items.js';
 
 const RESOURCE_LABELS = { pits: 'Peach Pits', reeds: 'Reeds', feathers: 'Feathers', boughs: 'Mossy Boughs' };
 // "Pits 3  Reeds 0  Feathers 2  Boughs 1": every resource, in display order (debug panel).
@@ -266,6 +267,13 @@ export function createUI(callbacks) {
     bossFill: document.getElementById('boss-bar-fill'),
     bossHp: document.getElementById('boss-hp'),
     bossBanner: document.getElementById('boss-banner'),
+    itemFound: document.getElementById('item-found'),
+    itemFoundIcon: document.getElementById('item-found-icon'),
+    itemFoundText: document.getElementById('item-found-text'),
+    hudItem: document.getElementById('hud-item'),
+    hudItemIcon: document.getElementById('hud-item-icon'),
+    endFound: document.getElementById('end-found'),
+    endFoundLine: document.getElementById('end-found-line'),
     debugPanel: document.getElementById('debug-panel'),
   };
 
@@ -321,6 +329,7 @@ export function createUI(callbacks) {
     updateEndOverlay(el, game);
     updateLevelName(el, game);
     updateBoss(el, game);
+    updateFoundItem(el, game);
     updateDebugPanel(el, game, clock, view, layoutLinesFor(game.scene), game.scene);
   }
 
@@ -345,6 +354,38 @@ function updateLevelName(el, game) {
   const shown = game.state !== GameState.START && game.state !== GameState.MAP;
   el.levelName.hidden = !shown;
   if (shown) setText(el.levelName, game.scene.level.name);
+}
+
+// "a Crown Charm", but "Shoes" (a plural slot label takes no article).
+const withArticle = (label) => (label.endsWith('s') ? label : `a ${label}`);
+
+// Draw a slot-type silhouette into a small canvas, only when the slot changes.
+function paintSlotIcon(canvas, slot) {
+  if (canvas.dataset.slot === slot) return;
+  canvas.dataset.slot = slot;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawSlotIcon(ctx, slot, canvas.width / 2, canvas.height / 2, canvas.width * 0.92);
+}
+
+// Found items (M2e §3.2–3.3): the centred "You found a …!" message fading over its last third,
+// the HUD reminder for the rest of the battle, and the Victory overlay line. Only the slot type is
+// ever named, never the item.
+function updateFoundItem(el, game) {
+  const inBattle = [GameState.PREP, GameState.COMBAT, GameState.ENDING].includes(game.state);
+  const m = inBattle ? game.itemMessage : null;
+  el.itemFound.hidden = !m;
+  if (m) {
+    paintSlotIcon(el.itemFoundIcon, m.slot);
+    setText(el.itemFoundText, `You found ${withArticle(C.SLOT_TYPES[m.slot].label)}!`);
+    el.itemFound.style.opacity = String(Math.min(1, (C.ITEM_FOUND_TIME - m.age) / (C.ITEM_FOUND_TIME / 3)));
+  }
+  const found = game.hiddenItem?.found ? C.ITEMS[game.hiddenItem.itemId].slot : null;
+  el.hudItem.hidden = !(inBattle && found);
+  if (inBattle && found) paintSlotIcon(el.hudItemIcon, found);
+  const shownOnVictory = game.state === GameState.VICTORY && found;
+  el.endFound.hidden = !shownOnVictory;
+  if (shownOnVictory) setText(el.endFoundLine, `Found: ${C.SLOT_TYPES[found].label}`);
 }
 
 // The living mini-boss, if any (M2c §2.7): the first one spawned.

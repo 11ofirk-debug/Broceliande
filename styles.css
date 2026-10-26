@@ -641,3 +641,42 @@ html, body {
   font: 15px/1.35 'Consolas', monospace;
   border-radius: 6px;
 }
+
+/* ---------- Found items (M2e §3.2–3.3) ---------- */
+#hud-item {
+  display: flex;
+  align-items: center;
+  margin-left: 16px;
+  filter: drop-shadow(0 0 5px rgba(255, 225, 130, 0.8));
+}
+#item-found {
+  position: absolute;
+  top: 26%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 30px;
+  background: rgba(30, 24, 8, 0.65);
+  border: 2px solid rgba(255, 220, 120, 0.7);
+  border-radius: 14px;
+  color: #fff0c4;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 34px;
+  font-style: italic;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+  pointer-events: none;
+}
+#end-found {
+  margin: -12px 0 26px;
+  font-size: 24px;
+  color: #ffe9a6;
+}
+.end-found-hint {
+  margin-top: 4px;
+  font-size: 18px;
+  font-style: italic;
+  color: #d8cfae;
+}

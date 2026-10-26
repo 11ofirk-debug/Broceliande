@@ -19,6 +19,7 @@ import { isStepMode, routePreview } from './systems/stepSystem.js';
 import { drawFootsteps, drawTrail } from './render/footsteps.js';
 import { animationTime } from './game.js';
 import { drawMap } from './render/map.js';
+import { drawSlotFloater } from './render/items.js';
 
 const HIT_FLASH_TIME = 0.15; // s of hit flash on the Druid (bite) or an enemy (pebble); visual only
 // Draw function per enemy type (M1e §3.4): ENEMY_TYPES holds the data, this holds the look.
@@ -149,7 +150,8 @@ export function createRenderer(canvas) {
     }
     // Resource floaters (M2d §1), above all entities; each waits for its stagger.
     for (const f of game.floaters) {
-      if (f.age >= f.delay) drawFloater(ctx, f, (f.age - f.delay) / C.FLOATER_TIME);
+      if (f.age < f.delay) continue;
+      (f.slot ? drawSlotFloater : drawFloater)(ctx, f, (f.age - f.delay) / C.FLOATER_TIME); // M2e §3.2: slot floater
     }
 
     // Summon placement ghost of the chosen summon under the cursor (§15.1, M1d §2.1). The Bough
@@ -168,7 +170,7 @@ export function createRenderer(canvas) {
     if (game.sweep) drawSweep(ctx, game, view);
 
     if (view.debug) {
-      drawDebugOverlay(ctx, game, scene);
+      drawDebugOverlay(ctx, game, scene, view.revealItem);
       if (view.clickMarker) drawClickMarker(ctx, view.clickMarker);
     }
   }

@@ -100,6 +100,7 @@ function subscribe() {
   events.on('mapNodeHover', (e) => play('mapNodeHover', e));
   events.on('mapNodeChosen', (e) => play('mapNodeChosen', e));
   events.on('runComplete', (e) => play('runComplete', e));
+  events.on('magicFound', (e) => play('magicFound', e));
   events.on('doubleAppears', (e) => play('doubleAppears', e));
   events.on('doubleCraftHit', (e) => play('doubleCraftHit', e));
   events.on('doubleCancelled', (e) => play('doubleCancelled', e));
@@ -369,6 +370,17 @@ const RECIPES = {
     lfo.stop(t + dur + 0.02);
     noise(t, out, { filter: 'lowpass', freq: 300 * p, dur: 0.5, attack: 0.05, gain: 0.4 });
     return dur;
+  },
+
+  // Magic find (M2e §3.2): a bright shimmer, a quick rising run of high bell tones over a soft
+  // airy sparkle; brighter and longer than the resource chime.
+  magicFound(t, out, p) {
+    [1318, 1661, 1976, 2637, 3322].forEach((f, i) => {
+      tone(t, out, { type: 'sine', freq: f * p, dur: 0.6, gain: 0.5, delay: i * 0.06, attack: 0.004 });
+      tone(t, out, { type: 'triangle', freq: f * 2 * p, dur: 0.25, gain: 0.12, delay: i * 0.06, attack: 0.003 });
+    });
+    noise(t, out, { filter: 'highpass', freq: 6000 * p, dur: 0.9, attack: 0.05, gain: 0.25 });
+    return 0.95;
   },
 
   // The Ogre (M2c §2.9). Deep, long roar: two detuned growls swelling and falling, with breath.

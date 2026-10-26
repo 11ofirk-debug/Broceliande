@@ -216,3 +216,21 @@ const MARKS = {
     }
   },
 };
+
+// The "item found" floater (M2e §3.2): the slot-type silhouette with a soft golden glow, rising
+// and fading like the resource floaters. t: 0 → 1 over FLOATER_TIME.
+export function drawSlotFloater(ctx, f, t) {
+  const size = C.ITEM_FLOATER_SIZE;
+  const y = f.y - C.FLOATER_RISE_PX * (1 - (1 - t) * (1 - t));
+  ctx.save();
+  ctx.globalAlpha = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.4;
+  const g = ctx.createRadialGradient(f.x, y, 0, f.x, y, size * 0.8);
+  g.addColorStop(0, 'rgba(255, 230, 140, 0.7)');
+  g.addColorStop(1, 'rgba(255, 230, 140, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(f.x, y, size * 0.8, 0, Math.PI * 2);
+  ctx.fill();
+  drawSlotIcon(ctx, f.slot, f.x, y, size);
+  ctx.restore();
+}

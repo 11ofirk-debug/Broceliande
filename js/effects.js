@@ -12,19 +12,25 @@ export function addFloatingText(game, text, x, y, small = false, muted = false) 
 // Resource floaters (M2d §1), the one component for every resource gain: one rising icon + "×N"
 // per resource gained, in resource order, FLOATER_STAGGER apart, each starting FLOATER_STACK_PX
 // higher than the last. Zero amounts are not shown; nothing at all shows "Nothing found".
+// Returns how many floaters it launched (so others can follow them, M2e §3.2).
 export function addResourceFloaters(game, gained, x, y) {
   const found = RESOURCE_KEYS.filter((k) => (gained[k] ?? 0) > 0);
   if (found.length === 0) {
     addFloatingText(game, 'Nothing found', x, y, true, true);
-    return;
+    return 0;
   }
   found.forEach((resource, i) => {
     game.floaters.push({ resource, amount: gained[resource], x, y: y - i * C.FLOATER_STACK_PX, delay: i * C.FLOATER_STAGGER, age: 0 });
   });
+  return found.length;
 }
 
 export function updateEffects(game, dt) {
   for (const f of game.floaters) f.age += dt;
+  if (game.itemMessage) {
+    game.itemMessage.age += dt;
+    if (game.itemMessage.age >= C.ITEM_FOUND_TIME) game.itemMessage = null;
+  }
   game.floaters = game.floaters.filter((f) => f.age < f.delay + C.FLOATER_TIME);
   for (const t of game.floatingTexts) t.age += dt;
   game.floatingTexts = game.floatingTexts.filter((t) => t.age < C.FLOATING_TEXT_TIME);

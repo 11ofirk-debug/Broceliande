@@ -32,5 +32,22 @@ export function completeSearch(game, featureIndex) {
 
   const found = RESOURCE_KEYS.filter((k) => gained[k] > 0);
   if (found.length) events.emit('resourcesGained', { resources: found }); // one chime per resource found
-  addResourceFloaters(game, gained, feature.x, feature.y - C.LOCATION_RADIUS - 20); // M2d §1
+  const shown = addResourceFloaters(game, gained, feature.x, feature.y - C.LOCATION_RADIUS - 20); // M2d §1
+  if (game.hiddenItem && game.hiddenItem.featureIndex === featureIndex && !game.hiddenItem.found) {
+    findItem(game, feature, shown);
+  }
+}
+
+// M2e §3.2: the spot held the battle's hidden item. A message names its slot type (not the item),
+// a slot-silhouette floater rises after the resource floaters, a "magic find" sound plays, and the
+// HUD shows a reminder (from hiddenItem.found). The item joins the run only on Victory.
+function findItem(game, feature, floatersBefore) {
+  game.hiddenItem.found = true;
+  const slot = C.ITEMS[game.hiddenItem.itemId].slot;
+  game.itemMessage = { slot, age: 0 };
+  game.floaters.push({
+    slot, x: feature.x, y: feature.y - C.LOCATION_RADIUS - 20 - floatersBefore * C.FLOATER_STACK_PX,
+    delay: floatersBefore * C.FLOATER_STAGGER, age: 0,
+  });
+  events.emit('magicFound', { slot });
 }

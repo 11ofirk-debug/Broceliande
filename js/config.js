@@ -371,6 +371,7 @@ export const SOUNDS = {
   mapNodeHover:  { volume: 0.2,  pitch: 1, minGap: 0.08, maxVoices: 1, enabled: true }, // TUNING — very soft tick (M2a §7)
   mapNodeChosen: { volume: 0.6,  pitch: 1, minGap: 0.2,  maxVoices: 1, enabled: true }, // TUNING — warm drum hit + rising tone
   runComplete:   { volume: 0.6,  pitch: 1, minGap: 1,    maxVoices: 1, enabled: true }, // TUNING — short triumphant phrase
+  magicFound:    { volume: 0.6,  pitch: 1, minGap: 0.5,  maxVoices: 1, enabled: true }, // TUNING — bright shimmer on finding a hidden item (M2e §3.2)
   // The Ogre (M2c §2.9)
   ogreSpawns:    { volume: 0.9,  pitch: 1, minGap: 1,    maxVoices: 1, enabled: true }, // TUNING — deep, long roar
   ogreStep:      { volume: 0.3,  pitch: 1, minGap: 0.3,  maxVoices: 2, enabled: true }, // TUNING — very low thud, quiet
@@ -1257,3 +1258,8 @@ export const ITEMS = {
     colors: ['#a08a6e', '#f2ece0'], mark: 'ears',
   },
 };
+
+// Finding items (M2e §3): one hidden in a random resource spot of each battle.
+export const ITEMS_PER_BATTLE = 1;        // 0 turns hidden items off
+export const ITEM_FOUND_TIME = 2.5;       // s the "You found a …!" message stays, fading over its last third
+export const ITEM_FLOATER_SIZE = 40;      // px, the slot-type silhouette floater rising from the spot

@@ -49,7 +49,7 @@ validateItems();  // ITEMS slots, stats and ops (M2e §2)
 const game = createGame(mapNode(C.MAP_START_NODE).levelId);
 const clock = { speed: 1, paused: false };            // acts on simulation time only
 // UI-only state: never read by the simulation.
-const view = { debug: C.DEBUG_START_ENABLED, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null, menuHoverType: null, mapHover: null }; // menuHoverType: build-menu card under the pointer (range preview); mapHover: available map node under the pointer
+const view = { debug: C.DEBUG_START_ENABLED, revealItem: false, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null, menuHoverType: null, mapHover: null }; // menuHoverType: build-menu card under the pointer (range preview); mapHover: available map node under the pointer
 const interaction = createInteraction(game, view);
 
 // UI state to clear whenever an encounter (re)starts or the map opens.
@@ -136,7 +136,10 @@ const input = createInput(stage, canvas, () => scale, {
       case 'g': grantResources(game); break;
       case 'v': toggleMute(); break;                    // M1g §3.6: mute / unmute sound
       case 'x': toggleDropMult(game); break;            // M1d §3: enemy drop chances ×1 / ×DEBUG_DROP_MULT
-      case 'i': debugAddItem(); break;                  // M2e §6: on the map, add a random unowned item to the run
+      case 'i': // M2e §6: on the map, add a random unowned item; in battle, reveal the hidden item's spot (debug overlay)
+        if (game.state === GameState.MAP) debugAddItem();
+        else view.revealItem = !view.revealItem;
+        break;
       case 'Escape': interaction.onEscape(); break;
       default: break;
     }

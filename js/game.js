@@ -18,7 +18,7 @@ import { updateSquirrels, updateSquirrelStrikes, expireSquirrels } from './syste
 import { isStepMode } from './systems/stepSystem.js';
 import { GameState, PrepMode, ActionState } from './states.js';
 import { sceneFor } from './scene.js';
-import { createRun, mapNode, nodeState, encounterSeed, recordVictory, isRunComplete, startingDruidHp } from './run.js';
+import { createRun, mapNode, nodeState, encounterSeed, recordVictory, isRunComplete, startingDruidHp, randomUnownedItem, addItem } from './run.js';
 import { resolveStats } from './stats.js';
 import { events } from './events.js';
 import { updateDruidMelee } from './systems/druidMeleeSystem.js';
@@ -167,6 +167,8 @@ export function startEncounter(game, { newSeed = false, levelId = null, resource
   game.druidStrike = null;
   game.resources = resources ? { ...emptyResources(), ...resources } : emptyResources();
   game.features = createFeatures(game.layout);
+  game.hiddenItem = hideItem(game); // M2e §3.1: chosen from the encounter's seed, after its layout
+  game.itemMessage = null;          // M2e §3.2: { slot, age } of the "You found a …!" message
   game.turrets = [];
   game.projectiles = [];
   game.clouds = [];
@@ -237,6 +239,8 @@ function finishEnding(game) {
   game.action = createIdleAction();
   if (game.state === GameState.VICTORY) {
     finishSweep(game); // every swept item counted before the carry-over is saved (M2d §2.1)
+    // M2e §3.3: a found item joins the run only now, on Victory.
+    if (game.hiddenItem?.found) addItem(game.run, game.hiddenItem.itemId);
     recordVictory(game.run, game.resources, game.druidHp);
     if (isRunComplete(game.run)) events.emit('runComplete', {});
   }
@@ -298,6 +302,17 @@ function checkEndConditions(game) {
   } else if (allEnemiesDefeated(game)) {
     beginEnding(game, GameState.VICTORY);
   }
+}
+
+// M2e §3.1: hide one item the run doesn't own yet in one random resource spot, both with the
+// encounter's seeded RNG. Nothing in the spot's look or tooltip shows it. Null when there is no
+// run (direct starts), no spot, or the run owns every item.
+// hiddenItem: { featureIndex, itemId, found }
+function hideItem(game) {
+  if (!game.run || C.ITEMS_PER_BATTLE < 1 || game.features.length === 0) return null;
+  const itemId = randomUnownedItem(game.run, game.rng);
+  if (!itemId) return null;
+  return { featureIndex: game.rng.int(0, game.features.length - 1), itemId, found: false };
 }
 
 // Equipment HP regen (M2e §2.3, Sap Pendant): druid.regenAmount HP every DRUID_REGEN_INTERVAL of
