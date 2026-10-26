@@ -314,7 +314,10 @@ function themedDecor(scene) {
       flats.push({ kind: F.kind, x, y, rx, ry, rot });
       blocked.push({ x, y, r: rx });
       const s = Math.min(1, rx / 70);
-      items.push({ kind: flats.length % 2 ? 'sunkenRoof' : 'brokenFence', x: x + rx * 0.1, y: y + ry * 0.3, size: s, variant });
+      // The water's prop: flats.props cycles through its own list (M2f: sunken causeway stones), else
+      // a sunken roof or broken fence, alternating.
+      const kinds = F.props ?? ['brokenFence', 'sunkenRoof'];
+      items.push({ kind: kinds[flats.length % kinds.length], x: x + rx * 0.1, y: y + ry * 0.3, size: s, variant });
       for (const t of [0.1, 0.42, 0.62, 0.85]) {
         const a = t * Math.PI * 2;
         items.push({ kind: 'reeds', x: x + Math.cos(a) * rx * 0.92, y: y + Math.sin(a) * ry * 0.92 + 4, size: 0.9, variant });

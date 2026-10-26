@@ -3,7 +3,7 @@
 import * as C from './config.js';
 import { GameState, ActionState } from './states.js';
 import { drawDebugOverlay } from './debug/debugOverlay.js';
-import { drawFloor, drawCorridors, drawFlats, drawDecor } from './render/environment.js';
+import { drawFloor, drawCorridors, drawFlats, drawDecor, drawStream } from './render/environment.js';
 import {
   drawTurretSlot, drawDruid, drawFeature, drawWolf, drawBear, drawOgre, drawEnemyHpBar, drawDruidHpBar, drawDustRing, drawLanePulse,
   drawTurret, drawToader, toaderMouthOpen, drawPellet, drawCloud, drawRange, drawProgressBar, drawFloatingText, drawPebble,
@@ -69,6 +69,7 @@ export function createRenderer(canvas) {
 
     // Ground layer.
     drawFloor(ctx, scene);
+    drawStream(ctx, scene); // M2f §4.2: under the corridors, which cross it as fords
     drawCorridors(ctx, scene);
     drawFlats(ctx, scene);
     // A mini-boss's lane entrance pulsing red as it arrives (M2c §2.6).

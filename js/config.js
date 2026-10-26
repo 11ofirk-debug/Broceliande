@@ -285,6 +285,8 @@ export const DECOR = {
     standingStone: { lift: 30, r: 34 },
     gravestone: { lift: 14, r: 17 },
     slab: { lift: 4, r: 22 },
+    kiln: { lift: 8, r: 26 },          // M2f §4.1
+    sunkenStones: { lift: 8, r: 36 },  // M2f §4.4
   },
   clearingRadius: 120,        // px, open dirt clearing around the Druid
   groundPatches: 70,          // subtle floor colour blobs
@@ -1139,6 +1141,529 @@ export const LEVELS = {
     enemyCounts: { wolf: 44, bear: 3, ogre: 1 },
     stepBudget: 106,                      // TUNING — feature route median 112, 90% ≤ 116 (≤ 1.10 × budget)
   },
+  // Rows 4–5 (M2f §4.1–4.5). Geometry (lanes, Druid, sectors, candidates) mirrored from earlier
+  // levels for speed; everything else is their own.
+  // charcoal: geometry mirrored from tornville (horizontally).
+  charcoal: {
+    druidPos: { x: 910, y: 600 },
+    lanes: [
+      {
+        id: 'upperRight',
+        name: 'Upper-right',
+        waypoints: [
+          { x: 1960, y: 250 }, { x: 1740, y: 280 }, { x: 1560, y: 205 }, { x: 1380, y: 210 }, { x: 1295, y: 290 },
+          { x: 1320, y: 385 }, { x: 1420, y: 425 }, { x: 1465, y: 490 }, { x: 1430, y: 570 }, { x: 1320, y: 615 },
+          { x: 1200, y: 580 }, { x: 1145, y: 470 }, { x: 1150, y: 340 }, { x: 1115, y: 255 }, { x: 1045, y: 215 },
+          { x: 972, y: 258 }, { x: 940, y: 345 }, { x: 930, y: 450 }, { x: 919, y: 549 },
+        ],
+      },
+      {
+        id: 'left',
+        name: 'Left',
+        waypoints: [
+          { x: -60, y: 430 }, { x: 160, y: 460 }, { x: 300, y: 340 }, { x: 480, y: 330 }, { x: 570, y: 375 },
+          { x: 580, y: 470 }, { x: 500, y: 560 }, { x: 375, y: 605 }, { x: 315, y: 700 }, { x: 360, y: 800 },
+          { x: 540, y: 860 }, { x: 700, y: 760 }, { x: 770, y: 650 }, { x: 861, y: 618 },
+        ],
+      },
+      {
+        id: 'bottomRight',
+        name: 'Bottom-right',
+        waypoints: [
+          { x: 1670, y: 1140 }, { x: 1650, y: 975 }, { x: 1780, y: 880 }, { x: 1795, y: 755 }, { x: 1635, y: 660 },
+          { x: 1430, y: 740 }, { x: 1325, y: 955 }, { x: 1180, y: 1000 }, { x: 1030, y: 980 }, { x: 945, y: 895 },
+          { x: 930, y: 790 }, { x: 919, y: 651 },
+        ],
+      },
+    ],
+    sectorBoundaryAngles: [4, 115, 220], // TUNING
+    sectorNames: ['SE', 'W', 'NE'],
+    nearRadius: 460,                      // TUNING
+    zoneQuotas: {
+      near: { turret: 2, feature: 1 },
+      far:  { turret: 2, feature: 2 },
+    },
+    zoneQuotaOverrides: {
+      fSE: { turret: 2, feature: 0 }, // TUNING
+      nSE: { turret: 2, feature: 2 }, // TUNING
+      fW: { turret: 2, feature: 3 }, // TUNING
+    },
+    candidateLocations: [
+      { x: 810 , y: 370 , zone: 'nNE' },
+      { x: 1045, y: 570 , zone: 'nNE' },
+      { x: 750 , y: 210 , zone: 'nNE' },
+      { x: 900 , y: 150 , zone: 'nNE' },
+      { x: 1710, y: 405 , zone: 'fNE' },
+      { x: 1500, y: 325 , zone: 'fNE' },
+      { x: 1590, y: 535 , zone: 'fNE' },
+      { x: 1220, y: 165 , zone: 'fNE' },
+      { x: 1820, y: 605 , zone: 'fNE' },
+      { x: 1820, y: 150 , zone: 'fNE' },
+      { x: 695 , y: 520 , zone: 'nW' },
+      { x: 500 , y: 715 , zone: 'nW' },
+      { x: 640 , y: 970 , zone: 'nW' },
+      { x: 385 , y: 465 , zone: 'fW' },
+      { x: 200 , y: 610 , zone: 'fW' },
+      { x: 220 , y: 880 , zone: 'fW' },
+      { x: 140 , y: 300 , zone: 'fW' },
+      { x: 100 , y: 750 , zone: 'fW' },
+      { x: 1190, y: 845 , zone: 'nSE' },
+      { x: 805 , y: 855 , zone: 'nSE' },
+      { x: 850 , y: 1010, zone: 'nSE' },
+      { x: 1055, y: 740 , zone: 'nSE' },
+      { x: 1545, y: 870 , zone: 'fSE' },
+      { x: 1455, y: 1005, zone: 'fSE' },
+    ],
+    name: "Charcoal Burner's Camp",
+    description: 'Smoke hangs low over the old kilns.',
+    featureMix: { tree: 1, reedPatch: 1, shrub: 1, ruins: 4, pond: 2 }, // TUNING
+    enemyHpMult: 1.1,                     // TUNING — row 4 (M2f §3.2)
+    decorSeed: 7001,
+    decorDensity: 0.9,                    // TUNING
+    decorProps: { kiln: 0.08 },           // TUNING — signature: charcoal kilns, per cell
+    palette: {                            // soot grey ground, dull orange embers, charred trees
+      floor: '#38372f',
+      floorAccent: { dark: 'rgba(12, 10, 8, 0.4)', light: 'rgba(150, 110, 70, 0.14)' },
+      corridor: { base: '#5c5248', worn: 'rgba(150, 135, 115, 0.3)' },
+      corridorEdge: '#28241f',
+      treeDark: { trunk: '#221c18', canopy: ['#2e2b26', '#363129', '#2a2722'] },
+      treeLight: ['#45403a', '#4c4640', '#403b35'],
+      rock: { base: '#6b6862', light: '#8a8680', dark: '#4a4743' },
+      vegetation: { base: '#4a4636', light: '#8a5a2a' },
+      kiln: { dark: '#3d342c', light: '#5a4c3e' },
+      ember: 'rgba(255, 140, 40, 0.75)',
+      mapTint: '#8a6a4a',
+    },
+    // TUNING — 48 wolves; pressure alternates: two lanes busy while the third is quiet, rotating
+    // every 15 s (upperRight + left, left + bottomRight, bottomRight + upperRight, then again).
+    // Each Bear comes in a quiet spell (lanes shuffled at random each run, M2a §5.4).
+    wave: {
+      upperRight:  [{ time: 0, count: 3 }, { time: 7, count: 3 }, { time: 27, count: 1, type: 'bear' }, { time: 32, count: 3 }, { time: 39, count: 3 }, { time: 45, count: 3 }, { time: 52, count: 3 }],
+      left:        [{ time: 2, count: 3 }, { time: 9, count: 3 }, { time: 15, count: 3 }, { time: 22, count: 3 }, { time: 42, count: 1, type: 'bear' }, { time: 47, count: 3 }, { time: 54, count: 3 }],
+      bottomRight: [{ time: 12, count: 1, type: 'bear' }, { time: 17, count: 3 }, { time: 24, count: 3 }, { time: 30, count: 3 }, { time: 37, count: 3 }, { time: 57, count: 1, type: 'bear' }],
+    },
+    bosses: [],
+    enemyCounts: { wolf: 48, bear: 4 },
+    stepBudget: 114,                      // TUNING — feature route 90% ≤ 125 (≤ 1.10 × budget)
+  },
+  // stags: geometry mirrored from wychwood (vertically).
+  stags: {
+    druidPos: { x: 1120, y: 620 },
+    lanes: [
+      {
+        id: 'south',
+        name: 'South',
+        waypoints: [
+          { x: 380, y: 1200 }, { x: 400, y: 1030 }, { x: 560, y: 950 }, { x: 740, y: 1000 }, { x: 920, y: 940 },
+          { x: 1100, y: 1000 }, { x: 1300, y: 1020 }, { x: 1480, y: 970 }, { x: 1580, y: 840 }, { x: 1460, y: 750 },
+          { x: 1300, y: 800 }, { x: 1170, y: 780 }, { x: 1129, y: 671 },
+        ],
+      },
+      {
+        id: 'west',
+        name: 'West',
+        waypoints: [
+          { x: -40, y: 780 }, { x: 140, y: 780 }, { x: 260, y: 680 }, { x: 230, y: 540 }, { x: 140, y: 410 },
+          { x: 220, y: 290 }, { x: 380, y: 300 }, { x: 480, y: 410 }, { x: 560, y: 540 }, { x: 520, y: 680 },
+          { x: 640, y: 780 }, { x: 800, y: 760 }, { x: 880, y: 640 }, { x: 990, y: 590 }, { x: 1068, y: 620 },
+        ],
+      },
+      {
+        id: 'east',
+        name: 'East',
+        waypoints: [
+          { x: 1960, y: 300 }, { x: 1820, y: 310 }, { x: 1710, y: 420 }, { x: 1560, y: 420 }, { x: 1490, y: 290 },
+          { x: 1530, y: 160 }, { x: 1390, y: 150 }, { x: 1250, y: 200 }, { x: 1090, y: 160 }, { x: 940, y: 150 },
+          { x: 840, y: 240 }, { x: 880, y: 370 }, { x: 1010, y: 400 }, { x: 1100, y: 480 }, { x: 1133, y: 570 },
+        ],
+      },
+    ],
+    sectorBoundaryAngles: [355, 160, 212], // TUNING
+    sectorNames: ['S', 'W', 'E'],
+    nearRadius: 480,                      // TUNING
+    zoneQuotas: {
+      near: { turret: 2, feature: 1 },
+      far:  { turret: 2, feature: 2 },
+    },
+    zoneQuotaOverrides: {
+      nW: { turret: 2, feature: 0 }, // TUNING
+      nS: { turret: 2, feature: 0 }, // TUNING
+      fE: { turret: 2, feature: 3 }, // TUNING
+      fW: { turret: 2, feature: 3 }, // TUNING
+      // fS lost its corner candidate (under the level-name label): one resource spot moves to nE.
+      fS: { turret: 2, feature: 1 }, // TUNING
+      nE: { turret: 2, feature: 2 }, // TUNING
+    },
+    candidateLocations: [
+      { x: 1470, y: 580 , zone: 'nE' },
+      { x: 1275, y: 505 , zone: 'nE' },
+      { x: 720 , y: 370 , zone: 'nE' },
+      { x: 1315, y: 340 , zone: 'nE' },
+      { x: 1660, y: 570 , zone: 'fE' },
+      { x: 1825, y: 510 , zone: 'fE' },
+      { x: 1635, y: 290 , zone: 'fE' },
+      { x: 570 , y: 205 , zone: 'fE' },
+      { x: 725 , y: 150 , zone: 'fE' },
+      { x: 1730, y: 150 , zone: 'fE' },
+      { x: 690 , y: 605 , zone: 'nW' },
+      { x: 815 , y: 500 , zone: 'nW' },
+      { x: 355 , y: 885 , zone: 'fW' },
+      { x: 390 , y: 720 , zone: 'fW' },
+      { x: 90  , y: 635 , zone: 'fW' },
+      { x: 335 , y: 440 , zone: 'fW' },
+      { x: 80  , y: 230 , zone: 'fW' },
+      { x: 1005, y: 800 , zone: 'nS' },
+      { x: 1270, y: 665 , zone: 'nS' },
+      { x: 1640, y: 1010, zone: 'fS' },
+      { x: 1745, y: 870 , zone: 'fS' },
+      { x: 1750, y: 705 , zone: 'fS' },
+    ],
+    name: "Stag's Crossing",
+    description: 'Where the old ford cuts through the forest.',
+    corridorWidth: 130,                   // TUNING — wide
+    featureMix: { tree: 2, reedPatch: 2, shrub: 1, ruins: 1, pond: 3 }, // TUNING
+    enemyHpMult: 1.1,                     // TUNING — row 4
+    decorSeed: 7002,
+    decorDensity: 1,                      // TUNING
+    // Signature: a shallow stream across the map, crossed by the corridors as fords (drawn under them).
+    stream: {                             // TUNING — threads between the candidates, crossing the lanes
+      width: 46,
+      points: [{ x: 1560, y: 60 }, { x: 1500, y: 170 }, { x: 1455, y: 320 }, { x: 1375, y: 470 }, { x: 1370, y: 600 }, { x: 1420, y: 740 }, { x: 1460, y: 880 }, { x: 1520, y: 1000 }, { x: 1540, y: 1100 }],
+    },
+    palette: {                            // fresh greens, blue water
+      floor: '#3a6630',
+      floorAccent: { dark: 'rgba(18, 40, 14, 0.3)', light: 'rgba(150, 200, 90, 0.18)' },
+      corridor: { base: '#7a6646', worn: 'rgba(170, 150, 110, 0.32)' },
+      corridorEdge: '#423624',
+      treeDark: { trunk: '#4a3524', canopy: ['#2a5a24', '#336a28', '#2a6030'] },
+      treeLight: ['#4a8a34', '#56963a', '#4a8a44'],
+      rock: { base: '#787a70', light: '#989a90', dark: '#55574f' },
+      vegetation: { base: '#3a7030', light: '#6aa040' },
+      water: { deep: '#2e6a8c', rim: '#3a5e3a', ripple: 'rgba(205, 232, 245, 0.45)' },
+      mapTint: '#7aaa6a',
+    },
+    // TUNING — 52 wolves: fast, frequent small bursts (2 wolves every 6 s per lane, lanes 2 s apart);
+    // Bears at 20 / 35 / 50 s.
+    wave: {
+      south: [{ time: 0, count: 2 }, { time: 6, count: 2 }, { time: 12, count: 2 }, { time: 18, count: 2 }, { time: 20, count: 1, type: 'bear' }, { time: 24, count: 2 }, { time: 30, count: 2 }, { time: 36, count: 2 }, { time: 42, count: 2 }, { time: 48, count: 2 }],
+      west:  [{ time: 2, count: 2 }, { time: 8, count: 2 }, { time: 14, count: 2 }, { time: 20, count: 2 }, { time: 26, count: 2 }, { time: 32, count: 2 }, { time: 35, count: 1, type: 'bear' }, { time: 38, count: 2 }, { time: 44, count: 2 }, { time: 50, count: 2 }],
+      east:  [{ time: 4, count: 2 }, { time: 10, count: 2 }, { time: 16, count: 2 }, { time: 22, count: 2 }, { time: 28, count: 2 }, { time: 34, count: 2 }, { time: 40, count: 2 }, { time: 46, count: 2 }, { time: 50, count: 1, type: 'bear' }],
+    },
+    bosses: [],
+    enemyCounts: { wolf: 52, bear: 3 },
+    stepBudget: 127,                      // TUNING — feature route 90% ≤ 139 (≤ 1.10 × budget)
+  },
+  // briar: geometry mirrored from blackthorn (both axes).
+  briar: {
+    druidPos: { x: 800, y: 680 },
+    lanes: [
+      {
+        id: 'southEast',
+        name: 'South-east',
+        waypoints: [
+          { x: 1620, y: 1200 }, { x: 1630, y: 1000 }, { x: 1750, y: 890 }, { x: 1730, y: 740 }, { x: 1580, y: 670 },
+          { x: 1440, y: 740 }, { x: 1360, y: 870 }, { x: 1220, y: 940 }, { x: 1070, y: 970 }, { x: 930, y: 1010 },
+          { x: 840, y: 950 }, { x: 810, y: 840 }, { x: 805, y: 732 },
+        ],
+      },
+      {
+        id: 'north',
+        name: 'North',
+        waypoints: [
+          { x: 1400, y: 40 }, { x: 1380, y: 190 }, { x: 1520, y: 260 }, { x: 1590, y: 400 }, { x: 1480, y: 510 },
+          { x: 1330, y: 500 }, { x: 1260, y: 380 }, { x: 1140, y: 280 }, { x: 990, y: 230 }, { x: 850, y: 280 },
+          { x: 800, y: 400 }, { x: 860, y: 510 }, { x: 820, y: 590 }, { x: 809, y: 629 },
+        ],
+      },
+      {
+        id: 'west',
+        name: 'West',
+        waypoints: [
+          { x: -40, y: 340 }, { x: 120, y: 300 }, { x: 260, y: 360 }, { x: 300, y: 500 }, { x: 200, y: 600 },
+          { x: 80, y: 700 }, { x: 120, y: 840 }, { x: 260, y: 910 }, { x: 420, y: 870 }, { x: 480, y: 750 },
+          { x: 440, y: 630 }, { x: 540, y: 560 }, { x: 660, y: 620 }, { x: 750, y: 667 },
+        ],
+      },
+    ],
+    sectorBoundaryAngles: [240, 352, 120], // TUNING
+    sectorNames: ['N', 'SE', 'W'],
+    nearRadius: 400,                      // TUNING
+    zoneQuotas: {
+      near: { turret: 2, feature: 1 },
+      far:  { turret: 2, feature: 2 },
+    },
+    zoneQuotaOverrides: {},
+    candidateLocations: [
+      { x: 1000, y: 570 , zone: 'nN' },
+      { x: 1160, y: 550 , zone: 'nN' },
+      { x: 1050, y: 415 , zone: 'nN' },
+      { x: 625 , y: 330 , zone: 'nN' },
+      { x: 1645, y: 550 , zone: 'fN' },
+      { x: 1780, y: 450 , zone: 'fN' },
+      { x: 1445, y: 375 , zone: 'fN' },
+      { x: 1720, y: 290 , zone: 'fN' },
+      { x: 705 , y: 190 , zone: 'fN' },
+      { x: 1235, y: 175 , zone: 'fN' },
+      { x: 685 , y: 910 , zone: 'nSE' },
+      { x: 955 , y: 875 , zone: 'nSE' },
+      { x: 1080, y: 775 , zone: 'nSE' },
+      { x: 930 , y: 715 , zone: 'nSE' },
+      { x: 1825, y: 1005, zone: 'fSE' },
+      { x: 1445, y: 965 , zone: 'fSE' },
+      { x: 1560, y: 810 , zone: 'fSE' },
+      { x: 1300, y: 670 , zone: 'fSE' },
+      { x: 1840, y: 620 , zone: 'fSE' },
+      { x: 515 , y: 955 , zone: 'nW' },
+      { x: 625 , y: 745 , zone: 'nW' },
+      { x: 685 , y: 485 , zone: 'nW' },
+      { x: 490 , y: 430 , zone: 'nW' },
+      { x: 290 , y: 740 , zone: 'fW' },
+      { x: 140 , y: 435 , zone: 'fW' },
+      { x: 425 , y: 240 , zone: 'fW' },
+      { x: 125 , y: 160 , zone: 'fW' },
+      { x: 285 , y: 155 , zone: 'fW' },
+    ],
+    name: 'Briar Chapel',
+    description: 'Thorns have swallowed the old chapel.',
+    corridorWidth: 95,                    // TUNING — narrow
+    stuckTime: 1.8,                       // TUNING — s: Bears jam the narrow lanes for a while (M2f §4.3)
+    featureMix: { tree: 2, reedPatch: 1, shrub: 3, ruins: 2, pond: 1 }, // TUNING
+    enemyHpMult: 1.2,                     // TUNING — row 5
+    decorSeed: 7003,
+    decorDensity: 1.1,                    // TUNING
+    thornBushes: true,
+    // Signature: a ruined chapel wall overgrown with briars (base centre; size = half-width).
+    landmarks: [{ kind: 'chapelWall', x: 710, y: 1050, size: 110 }], // TUNING — nearest clear spot to the Druid
+    palette: {                            // dark green, deep red berries, grey stone
+      floor: '#22361f',
+      floorAccent: { dark: 'rgba(8, 16, 8, 0.4)', light: 'rgba(110, 140, 90, 0.14)' },
+      corridor: { base: '#5a5246', worn: 'rgba(140, 130, 115, 0.3)' },
+      corridorEdge: '#262620',
+      treeDark: { trunk: '#3a2a20', canopy: ['#1c3a1c', '#22441f', '#1e3a26'] },
+      treeLight: ['#2e5a2a', '#36622e', '#2e5a36'],
+      rock: { base: '#7a7a76', light: '#9a9a94', dark: '#555552' },
+      vegetation: { base: '#2c4a26', light: '#8a2030' },
+      berry: '#b0202e',
+      mapTint: '#6a3a3a',
+    },
+    // TUNING — 48 wolves, moderate; Bears spread evenly from 15 s (15 / 24 / 33 / 42 / 51 s).
+    wave: {
+      southEast: [{ time: 0, count: 3 }, { time: 11, count: 3 }, { time: 15, count: 1, type: 'bear' }, { time: 22, count: 4 }, { time: 33, count: 3 }, { time: 42, count: 1, type: 'bear' }, { time: 44, count: 3 }],
+      north:     [{ time: 4, count: 3 }, { time: 15, count: 3 }, { time: 24, count: 1, type: 'bear' }, { time: 26, count: 3 }, { time: 37, count: 4 }, { time: 48, count: 3 }, { time: 51, count: 1, type: 'bear' }],
+      west:      [{ time: 8, count: 3 }, { time: 19, count: 3 }, { time: 30, count: 3 }, { time: 33, count: 1, type: 'bear' }, { time: 41, count: 3 }, { time: 52, count: 4 }],
+    },
+    bosses: [],
+    enemyCounts: { wolf: 48, bear: 5 },
+    stepBudget: 117,                      // TUNING — feature route 90% ≤ 128 (≤ 1.10 × budget)
+  },
+  // causeway: geometry mirrored from drowned (horizontally).
+  causeway: {
+    druidPos: { x: 1160, y: 330 },
+    lanes: [
+      {
+        id: 'west',
+        name: 'West',
+        waypoints: [
+          { x: -40, y: 780 }, { x: 110, y: 800 }, { x: 220, y: 700 }, { x: 170, y: 580 }, { x: 240, y: 460 },
+          { x: 160, y: 350 }, { x: 220, y: 220 }, { x: 360, y: 200 }, { x: 450, y: 300 }, { x: 420, y: 430 },
+          { x: 490, y: 560 }, { x: 620, y: 600 }, { x: 740, y: 520 }, { x: 770, y: 400 }, { x: 880, y: 330 },
+          { x: 1000, y: 360 }, { x: 1108, y: 330 },
+        ],
+      },
+      {
+        id: 'south',
+        name: 'South',
+        waypoints: [
+          { x: 300, y: 1120 }, { x: 280, y: 980 }, { x: 360, y: 870 }, { x: 500, y: 850 }, { x: 580, y: 960 },
+          { x: 710, y: 1000 }, { x: 820, y: 920 }, { x: 960, y: 980 }, { x: 1100, y: 970 }, { x: 1200, y: 860 },
+          { x: 1120, y: 740 }, { x: 960, y: 700 }, { x: 900, y: 590 }, { x: 980, y: 500 }, { x: 1100, y: 480 },
+          { x: 1169, y: 381 },
+        ],
+      },
+      {
+        id: 'southEast',
+        name: 'South-east',
+        waypoints: [
+          { x: 1960, y: 900 }, { x: 1800, y: 910 }, { x: 1680, y: 850 }, { x: 1540, y: 920 }, { x: 1410, y: 850 },
+          { x: 1440, y: 720 }, { x: 1580, y: 660 }, { x: 1660, y: 560 }, { x: 1590, y: 450 }, { x: 1630, y: 330 },
+          { x: 1760, y: 300 }, { x: 1780, y: 190 }, { x: 1660, y: 130 }, { x: 1500, y: 170 }, { x: 1360, y: 190 },
+          { x: 1240, y: 250 }, { x: 1205, y: 304 },
+        ],
+      },
+    ],
+    sectorBoundaryAngles: [150, 240, 75], // TUNING
+    sectorNames: ['W', 'SE', 'S'],
+    nearRadius: 460,                      // TUNING
+    zoneQuotas: {
+      near: { turret: 2, feature: 1 },
+      far:  { turret: 2, feature: 2 },
+    },
+    zoneQuotaOverrides: {
+      nS: { turret: 2, feature: 0 }, // TUNING
+      fS: { turret: 2, feature: 3 }, // TUNING
+    },
+    candidateLocations: [
+      { x: 1090, y: 605 , zone: 'nS' },
+      { x: 1235, y: 675 , zone: 'nS' },
+      { x: 830 , y: 750 , zone: 'fS' },
+      { x: 580 , y: 745 , zone: 'fS' },
+      { x: 1035, y: 835 , zone: 'fS' },
+      { x: 680 , y: 875 , zone: 'fS' },
+      { x: 150 , y: 915 , zone: 'fS' },
+      { x: 1330, y: 985 , zone: 'fS' },
+      { x: 1125, y: 155 , zone: 'nSE' },
+      { x: 1495, y: 290 , zone: 'nSE' },
+      { x: 1355, y: 395 , zone: 'nSE' },
+      { x: 1490, y: 565 , zone: 'nSE' },
+      { x: 1770, y: 430 , zone: 'fSE' },
+      { x: 1825, y: 605 , zone: 'fSE' },
+      { x: 1675, y: 735 , zone: 'fSE' },
+      { x: 1830, y: 785 , zone: 'fSE' },
+      { x: 790 , y: 150 , zone: 'nW' },
+      { x: 945 , y: 205 , zone: 'nW' },
+      { x: 710 , y: 290 , zone: 'nW' },
+      { x: 520 , y: 150 , zone: 'fW' },
+      { x: 75  , y: 165 , zone: 'fW' },
+      { x: 305 , y: 345 , zone: 'fW' },
+      { x: 555 , y: 385 , zone: 'fW' },
+      { x: 70  , y: 490 , zone: 'fW' },
+      { x: 410 , y: 670 , zone: 'fW' },
+    ],
+    name: 'Sunken Causeway',
+    description: 'An old road drowned in black water.',
+    corridorWidth: 90,                    // TUNING — narrow
+    stuckTime: 2.5,                       // TUNING — s (M2f §4.4)
+    featureMix: { tree: 1, reedPatch: 2, shrub: 1, ruins: 1, pond: 4 }, // TUNING
+    enemyHpMult: 1.2,                     // TUNING — row 5
+    decorSeed: 7004,
+    decorDensity: 0.8,                    // TUNING
+    // Signature: broken causeway stones half under water, in the water patches.
+    flats: { kind: 'water', count: 12, rx: [42, 80], ry: [24, 42], edge: 8, props: ['sunkenStones'] }, // TUNING
+    decorProps: { reeds: 0.15 },          // TUNING
+    palette: {                            // dark teal water, grey-green stone
+      floor: '#20383a',
+      floorAccent: { dark: 'rgba(6, 18, 20, 0.45)', light: 'rgba(100, 150, 140, 0.14)' },
+      corridor: { base: '#5a645c', worn: 'rgba(140, 160, 150, 0.3)' },
+      corridorEdge: '#1e2a28',
+      treeDark: { trunk: '#2e2c26', canopy: ['#1e3634', '#24403c', '#1c3230'] },
+      treeLight: ['#335450', '#3a5c56', '#30504c'],
+      rock: { base: '#6a786e', light: '#8a988e', dark: '#48544c' },
+      vegetation: { base: '#2e4e44', light: '#6a8a5e' },
+      water: { deep: '#0e2a2e', rim: '#22403c', ripple: 'rgba(150, 210, 200, 0.35)' },
+      roof: { dark: '#3a2c22', light: '#5e4a36' },
+      mapTint: '#4a8a86',
+    },
+    // TUNING — 52 wolves in a steady even stream (2–3 wolves every 9 s per lane, lanes 3 s apart);
+    // Bears at 16 / 28 / 40 / 52 s.
+    wave: {
+      west:      [{ time: 0, count: 3 }, { time: 9, count: 3 }, { time: 16, count: 1, type: 'bear' }, { time: 18, count: 3 }, { time: 27, count: 3 }, { time: 36, count: 3 }, { time: 45, count: 3 }],
+      south:     [{ time: 3, count: 3 }, { time: 12, count: 3 }, { time: 21, count: 3 }, { time: 28, count: 1, type: 'bear' }, { time: 30, count: 3 }, { time: 39, count: 2 }, { time: 48, count: 3 }],
+      southEast: [{ time: 6, count: 3 }, { time: 15, count: 2 }, { time: 24, count: 3 }, { time: 33, count: 3 }, { time: 40, count: 1, type: 'bear' }, { time: 42, count: 3 }, { time: 51, count: 3 }, { time: 52, count: 1, type: 'bear' }],
+    },
+    bosses: [],
+    enemyCounts: { wolf: 52, bear: 4 },
+    stepBudget: 110,                      // TUNING — feature route 90% ≤ 121 (≤ 1.10 × budget)
+  },
+  // widows: geometry mirrored from wychwood (horizontally).
+  widows: {
+    druidPos: { x: 800, y: 540 },
+    lanes: [
+      {
+        id: 'north',
+        name: 'North',
+        waypoints: [
+          { x: 1540, y: -40 }, { x: 1520, y: 130 }, { x: 1360, y: 210 }, { x: 1180, y: 160 }, { x: 1000, y: 220 },
+          { x: 820, y: 160 }, { x: 620, y: 140 }, { x: 440, y: 190 }, { x: 340, y: 320 }, { x: 460, y: 410 },
+          { x: 620, y: 360 }, { x: 750, y: 380 }, { x: 791, y: 489 },
+        ],
+      },
+      {
+        id: 'east',
+        name: 'East',
+        waypoints: [
+          { x: 1960, y: 380 }, { x: 1780, y: 380 }, { x: 1660, y: 480 }, { x: 1690, y: 620 }, { x: 1780, y: 750 },
+          { x: 1700, y: 870 }, { x: 1540, y: 860 }, { x: 1440, y: 750 }, { x: 1360, y: 620 }, { x: 1400, y: 480 },
+          { x: 1280, y: 380 }, { x: 1120, y: 400 }, { x: 1040, y: 520 }, { x: 930, y: 570 }, { x: 852, y: 540 },
+        ],
+      },
+      {
+        id: 'west',
+        name: 'West',
+        waypoints: [
+          { x: -40, y: 860 }, { x: 100, y: 850 }, { x: 210, y: 740 }, { x: 360, y: 740 }, { x: 430, y: 870 },
+          { x: 390, y: 1000 }, { x: 530, y: 1010 }, { x: 670, y: 960 }, { x: 830, y: 1000 }, { x: 980, y: 1010 },
+          { x: 1080, y: 920 }, { x: 1040, y: 790 }, { x: 910, y: 760 }, { x: 820, y: 680 }, { x: 787, y: 590 },
+        ],
+      },
+    ],
+    sectorBoundaryAngles: [175, 340, 32], // TUNING
+    sectorNames: ['N', 'E', 'W'],
+    nearRadius: 480,                      // TUNING
+    zoneQuotas: {
+      near: { turret: 2, feature: 1 },
+      far:  { turret: 2, feature: 2 },
+    },
+    zoneQuotaOverrides: {
+      nE: { turret: 2, feature: 0 }, // TUNING
+      nN: { turret: 2, feature: 0 }, // TUNING
+      fW: { turret: 2, feature: 3 }, // TUNING
+      fE: { turret: 2, feature: 3 }, // TUNING
+    },
+    candidateLocations: [
+      { x: 450 , y: 580 , zone: 'nW' },
+      { x: 645 , y: 655 , zone: 'nW' },
+      { x: 1200, y: 790 , zone: 'nW' },
+      { x: 605 , y: 820 , zone: 'nW' },
+      { x: 260 , y: 590 , zone: 'fW' },
+      { x: 95  , y: 650 , zone: 'fW' },
+      { x: 285 , y: 870 , zone: 'fW' },
+      { x: 1350, y: 955 , zone: 'fW' },
+      { x: 1195, y: 1010, zone: 'fW' },
+      { x: 1230, y: 555 , zone: 'nE' },
+      { x: 1105, y: 660 , zone: 'nE' },
+      { x: 1845, y: 195 , zone: 'fE' },
+      { x: 1565, y: 275 , zone: 'fE' },
+      { x: 1530, y: 440 , zone: 'fE' },
+      { x: 1830, y: 525 , zone: 'fE' },
+      { x: 1585, y: 720 , zone: 'fE' },
+      { x: 1840, y: 930 , zone: 'fE' },
+      { x: 915 , y: 360 , zone: 'nN' },
+      { x: 650 , y: 495 , zone: 'nN' },
+      { x: 1690, y: 150 , zone: 'fN' },
+      { x: 280 , y: 150 , zone: 'fN' },
+      { x: 175 , y: 290 , zone: 'fN' },
+      { x: 170 , y: 455 , zone: 'fN' },
+    ],
+    name: "Widow's Orchard",
+    description: 'Gnarled fruit trees, and something hungry beneath them.',
+    corridorWidth: 115,                   // TUNING
+    featureMix: { tree: 4, reedPatch: 1, shrub: 1, ruins: 2, pond: 1 }, // TUNING — Bough-rich
+    enemyHpMult: 1.2,                     // TUNING — row 5
+    decorSeed: 7005,
+    decorDensity: 1.15,                   // TUNING
+    gnarledTrees: true,                   // signature: gnarled orchard trees
+    palette: {                            // autumn browns and muted gold, dark twisted trunks
+      floor: '#4a4026',
+      floorAccent: { dark: 'rgba(30, 20, 8, 0.35)', light: 'rgba(200, 160, 80, 0.16)' },
+      corridor: { base: '#7a6440', worn: 'rgba(190, 160, 110, 0.3)' },
+      corridorEdge: '#3a2c1a',
+      treeDark: { trunk: '#2a1e16', canopy: ['#6a5226', '#7a5a28', '#5a4a24'] },
+      treeLight: ['#a07a34', '#b08a3a', '#8a6a2e'],
+      rock: { base: '#7a7262', light: '#9a927e', dark: '#565044' },
+      vegetation: { base: '#6a5a2a', light: '#b08a3a' },
+      mapTint: '#b08a4a',
+    },
+    // TUNING — 56 wolves: two big surges (7 into each lane at about 15 and 40 s) with scattered
+    // single wolves between; Bears at 20 / 30 / 45 / 55 s.
+    wave: {
+      north: [{ time: 2, count: 1 }, { time: 8, count: 1 }, { time: 15, count: 7 }, { time: 20, count: 1, type: 'bear' }, { time: 26, count: 1 }, { time: 32, count: 1 }, { time: 40, count: 7 }, { time: 52, count: 1 }],
+      east:  [{ time: 4, count: 1 }, { time: 10, count: 1 }, { time: 16, count: 7 }, { time: 24, count: 1 }, { time: 30, count: 1 }, { time: 30, count: 1, type: 'bear' }, { time: 41, count: 7 }, { time: 50, count: 1 }],
+      west:  [{ time: 6, count: 1 }, { time: 17, count: 7 }, { time: 22, count: 1 }, { time: 34, count: 1 }, { time: 42, count: 7 }, { time: 45, count: 1, type: 'bear' }, { time: 48, count: 1 }, { time: 55, count: 1, type: 'bear' }],
+    },
+    bosses: [],
+    enemyCounts: { wolf: 56, bear: 4 },
+    stepBudget: 126,                      // TUNING — feature route 90% ≤ 138 (≤ 1.10 × budget)
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -1180,12 +1705,12 @@ export const MAP_NODES = [
   { id: 'drowned',    name: 'The Drowned Hamlet', type: 'wilds', levelId: 'drowned',    pos: { x: 1742, y: 769 }, next: ['stags'] },
   // Rows 4–8 (M2f §1). levelId: placeholders (existing levels) until their own levels exist.
   // Row 4
-  { id: 'charcoal',   name: "Charcoal Burner's Camp", type: 'wilds', levelId: 'tornville', pos: { x: 1288, y: 663 }, next: ['briar', 'causeway'] },
-  { id: 'stags',      name: "Stag's Crossing",    type: 'wilds', levelId: 'tornville',  pos: { x: 1594, y: 657 }, next: ['causeway', 'widows'] },
+  { id: 'charcoal',   name: "Charcoal Burner's Camp", type: 'wilds', levelId: 'charcoal', pos: { x: 1288, y: 663 }, next: ['briar', 'causeway'] },
+  { id: 'stags',      name: "Stag's Crossing",    type: 'wilds', levelId: 'stags',  pos: { x: 1594, y: 657 }, next: ['causeway', 'widows'] },
   // Row 5
-  { id: 'briar',      name: 'Briar Chapel',       type: 'wilds', levelId: 'tornville',  pos: { x: 1134, y: 555 }, next: ['mossbound'] },
-  { id: 'causeway',   name: 'Sunken Causeway',    type: 'wilds', levelId: 'tornville',  pos: { x: 1444, y: 549 }, next: ['mossbound', 'ashen'] },
-  { id: 'widows',     name: "Widow's Orchard",    type: 'wilds', levelId: 'tornville',  pos: { x: 1748, y: 553 }, next: ['ashen'] },
+  { id: 'briar',      name: 'Briar Chapel',       type: 'wilds', levelId: 'briar',  pos: { x: 1134, y: 555 }, next: ['mossbound'] },
+  { id: 'causeway',   name: 'Sunken Causeway',    type: 'wilds', levelId: 'causeway',  pos: { x: 1444, y: 549 }, next: ['mossbound', 'ashen'] },
+  { id: 'widows',     name: "Widow's Orchard",    type: 'wilds', levelId: 'widows',  pos: { x: 1748, y: 553 }, next: ['ashen'] },
   // Row 6
   { id: 'mossbound',  name: 'Mossbound Cairn',    type: 'wilds', levelId: 'tornville',  pos: { x: 1284, y: 447 }, next: ['bone', 'weeping'] },
   { id: 'ashen',      name: 'The Ashen Glade',    type: 'fell',  levelId: 'barrow',     pos: { x: 1600, y: 441 }, next: ['weeping', 'bells'] },

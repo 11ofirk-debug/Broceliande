@@ -124,7 +124,118 @@ const THEMED = {
   gravestone: drawGravestone,
   slab: drawSlab,
   mound: drawMound,
+  kiln: drawKiln,
+  chapelWall: drawChapelWall,
+  sunkenStones: drawSunkenStones,
 };
+
+// M2f §4.2: a shallow stream across the map, drawn before the corridors so they cross it as
+// fords. level.stream: { points: [{ x, y }, …], width }. Decoration only.
+export function drawStream(ctx, scene) {
+  const s = scene.level.stream;
+  if (!s) return;
+  const P = scene.level.palette;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const [w, color] of [[s.width + 10, P.water.rim], [s.width, P.water.deep], [s.width * 0.35, P.water.ripple]]) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    s.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// M2f §4.1: a charcoal kiln, a low domed mound of earth with a faint orange glow at its vent.
+function drawKiln(ctx, { x, y, size: s, variant }, P) {
+  drawShadow(ctx, x, y, 26 * s, 7 * s);
+  ctx.fillStyle = P.kiln.dark;
+  ctx.beginPath();
+  ctx.ellipse(x, y, 24 * s, 20 * s, 0, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = P.kiln.light;
+  ctx.beginPath();
+  ctx.ellipse(x - 5 * s, y - 4 * s, 15 * s, 12 * s, 0, Math.PI * 1.05, Math.PI * 1.8);
+  ctx.fill();
+  const vx = x + (variant - 1) * 6 * s;
+  const g = ctx.createRadialGradient(vx, y - 3 * s, 0, vx, y - 3 * s, 12 * s);
+  g.addColorStop(0, P.ember);
+  g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(vx, y - 3 * s, 12 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1a120c';
+  ctx.beginPath();
+  ctx.ellipse(vx, y - 2 * s, 4 * s, 3 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// M2f §4.3: a ruined chapel wall with a pointed window, overgrown with briars. size = half-width.
+function drawChapelWall(ctx, { x, y, size: w }, P) {
+  const h = w * 0.45;
+  drawShadow(ctx, x, y, w * 1.02, h * 0.18);
+  ctx.fillStyle = P.rock.dark;
+  ctx.beginPath();
+  ctx.moveTo(x - w, y);
+  ctx.lineTo(x - w, y - h * 0.55);
+  ctx.lineTo(x - w * 0.55, y - h * 0.8);
+  ctx.lineTo(x - w * 0.2, y - h * 1.05);
+  ctx.lineTo(x + w * 0.25, y - h * 0.7);
+  ctx.lineTo(x + w * 0.7, y - h * 0.45);
+  ctx.lineTo(x + w, y - h * 0.2);
+  ctx.lineTo(x + w, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = P.rock.base;
+  ctx.fillRect(x - w * 0.95, y - h * 0.5, w * 1.9, h * 0.08);
+  // Pointed window, dark inside.
+  ctx.fillStyle = '#141a12';
+  ctx.beginPath();
+  ctx.moveTo(x - w * 0.12, y - h * 0.15);
+  ctx.lineTo(x - w * 0.12, y - h * 0.6);
+  ctx.quadraticCurveTo(x - w * 0.02, y - h * 0.85, x + w * 0.08, y - h * 0.6);
+  ctx.lineTo(x + w * 0.08, y - h * 0.15);
+  ctx.closePath();
+  ctx.fill();
+  // Briars climbing it, with red berries.
+  ctx.strokeStyle = P.vegetation.base;
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  for (const [sx, top] of [[-0.85, 0.65], [-0.45, 0.85], [0.35, 0.6], [0.8, 0.35]]) {
+    ctx.beginPath();
+    ctx.moveTo(x + w * sx, y);
+    ctx.quadraticCurveTo(x + w * (sx + 0.15), y - h * top * 0.5, x + w * (sx - 0.05), y - h * top);
+    ctx.stroke();
+  }
+  ctx.fillStyle = P.berry;
+  for (const [bx, by] of [[-0.8, 0.4], [-0.4, 0.6], [0.4, 0.45], [0.75, 0.25], [-0.55, 0.2]]) {
+    ctx.beginPath();
+    ctx.arc(x + w * bx, y - h * by, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// M2f §4.4: broken causeway stones half under water: three tilted slabs with a water line.
+function drawSunkenStones(ctx, { x, y, size: s, variant }, P) {
+  for (const [dx, dy, rot] of [[-20, 2, -0.2], [0, -2, 0.1], [20, 3, 0.3]]) {
+    ctx.save();
+    ctx.translate(x + dx * s, y + dy * s);
+    ctx.rotate(rot + (variant - 1) * 0.1);
+    ctx.fillStyle = P.rock.dark;
+    ctx.fillRect(-9 * s, -12 * s, 18 * s, 12 * s);
+    ctx.fillStyle = P.rock.base;
+    ctx.fillRect(-8 * s, -12 * s, 16 * s, 5 * s);
+    ctx.restore();
+  }
+  ctx.strokeStyle = P.water.ripple;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(x, y, 34 * s, 5 * s, 0, 0, Math.PI);
+  ctx.stroke();
+}
 
 // A cottage roof poking out of dark water at a slant: the gable, its ridge and the water line.
 function drawSunkenRoof(ctx, { x, y, size: s, variant }, P) {
