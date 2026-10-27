@@ -488,6 +488,9 @@ export const STRIKE_KNOCKBACK_TIME = 0.15; // s for that visual knock-back to se
 //   wave, enemyCounts       TUNING — bursts per lane id; time = seconds since Combat began; type:
 //                           an ENEMY_TYPES key, default 'wolf'. enemyCounts: the expected totals
 //                           per type (bosses included), validated at start-up against the bursts.
+//                           Stirge flocks (M2h §4.1, TUNING): 3–5 each, from row 3, timed to the
+//                           level's pacing (with the surges, or in a lane's quiet spell); their
+//                           lanes are as written (only Bears' are shuffled).
 //   bosses                  mini-bosses (M2c §3): { type, time, lane: a lane id or 'random' (seeded) }
 //   stepBudget              TUNING — steps available in step-mode Prep
 //   enemyHpMult             optional (M2f §3.1): every enemy's HP × this in the level; default 1
@@ -937,12 +940,12 @@ export const LEVELS = {
     // TUNING — 46 wolves in a steady stream of 2–3 wolf bursts, each lane every 9 s, the lanes
     // 3 s apart (a burst somewhere every 3 s), the last at 55 s; Bears at 16 / 28 / 40 / 52 s.
     wave: {
-      east:      [{ time: 0, count: 3 }, { time: 9, count: 2 }, { time: 18, count: 3 }, { time: 27, count: 2 }, { time: 28, count: 1, type: 'bear' }, { time: 36, count: 3 }, { time: 45, count: 3 }],
+      east:      [{ time: 0, count: 3 }, { time: 9, count: 2 }, { time: 18, count: 3 }, { time: 27, count: 2 }, { time: 28, count: 1, type: 'bear' }, { time: 36, count: 3 }, { time: 45, count: 3 }, { time: 20, count: 3, type: 'stirge' }],
       south:     [{ time: 3, count: 2 }, { time: 12, count: 3 }, { time: 16, count: 1, type: 'bear' }, { time: 21, count: 2 }, { time: 30, count: 3 }, { time: 39, count: 2 }, { time: 48, count: 3 }, { time: 52, count: 1, type: 'bear' }],
-      southWest: [{ time: 6, count: 3 }, { time: 15, count: 2 }, { time: 24, count: 3 }, { time: 33, count: 2 }, { time: 40, count: 1, type: 'bear' }, { time: 42, count: 3 }, { time: 55, count: 2 }],
+      southWest: [{ time: 6, count: 3 }, { time: 15, count: 2 }, { time: 24, count: 3 }, { time: 33, count: 2 }, { time: 40, count: 1, type: 'bear' }, { time: 42, count: 3 }, { time: 55, count: 2 }, { time: 44, count: 3, type: 'stirge' }],
     },
     bosses: [],                           // M2c §3: none yet
-    enemyCounts: { wolf: 46, bear: 4 },
+    enemyCounts: { wolf: 46, bear: 4, stirge: 6 },
     stepBudget: 110,                      // TUNING — feature route median 114, 90% ≤ 119 (≤ 1.10 × budget)
   },
   // Level 3 (M2b §3.3): huge wolf surges down wide corridors. Lanes enter from the top, the left
@@ -1055,12 +1058,12 @@ export const LEVELS = {
     // TUNING — 54 wolves: three surges (5, 5, 6 wolves into each lane, the lanes 1 s apart) at
     // about 8, 28 and 48 s, with single wolves between; Bears at 20 / 38 / 56 s.
     wave: {
-      north: [{ time: 8, count: 5 }, { time: 22, count: 1 }, { time: 28, count: 5 }, { time: 38, count: 1, type: 'bear' }, { time: 40, count: 1 }, { time: 48, count: 6 }],
+      north: [{ time: 8, count: 5 }, { time: 22, count: 1 }, { time: 28, count: 5 }, { time: 38, count: 1, type: 'bear' }, { time: 40, count: 1 }, { time: 48, count: 6 }, { time: 28, count: 4, type: 'stirge' }],
       west:  [{ time: 9, count: 5 }, { time: 17, count: 1 }, { time: 20, count: 1, type: 'bear' }, { time: 29, count: 5 }, { time: 42, count: 1 }, { time: 49, count: 6 }],
-      east:  [{ time: 10, count: 5 }, { time: 19, count: 1 }, { time: 30, count: 5 }, { time: 37, count: 1 }, { time: 50, count: 6 }, { time: 56, count: 1, type: 'bear' }],
+      east:  [{ time: 10, count: 5 }, { time: 19, count: 1 }, { time: 30, count: 5 }, { time: 37, count: 1 }, { time: 50, count: 6 }, { time: 56, count: 1, type: 'bear' }, { time: 50, count: 4, type: 'stirge' }],
     },
     bosses: [],                           // M2c §3: none yet
-    enemyCounts: { wolf: 54, bear: 3 },
+    enemyCounts: { wolf: 54, bear: 3, stirge: 8 },
     stepBudget: 126,                      // TUNING — feature route median 134, 90% ≤ 138 (≤ 1.10 × budget)
   },
   // Level 3 (M2b §3.4), a Fell Wilds since M2c §1.4: its Ogre is the main threat. Lanes enter from the left, the top and the top of the
@@ -1279,11 +1282,11 @@ export const LEVELS = {
     // Each Bear comes in a quiet spell (lanes shuffled at random each run, M2a §5.4).
     wave: {
       upperRight:  [{ time: 0, count: 3 }, { time: 7, count: 3 }, { time: 27, count: 1, type: 'bear' }, { time: 32, count: 3 }, { time: 39, count: 3 }, { time: 45, count: 3 }, { time: 52, count: 3 }],
-      left:        [{ time: 2, count: 3 }, { time: 9, count: 3 }, { time: 15, count: 3 }, { time: 22, count: 3 }, { time: 42, count: 1, type: 'bear' }, { time: 47, count: 3 }, { time: 54, count: 3 }],
-      bottomRight: [{ time: 12, count: 1, type: 'bear' }, { time: 17, count: 3 }, { time: 24, count: 3 }, { time: 30, count: 3 }, { time: 37, count: 3 }, { time: 57, count: 1, type: 'bear' }],
+      left:        [{ time: 2, count: 3 }, { time: 9, count: 3 }, { time: 15, count: 3 }, { time: 22, count: 3 }, { time: 42, count: 1, type: 'bear' }, { time: 47, count: 3 }, { time: 54, count: 3 }, { time: 34, count: 4, type: 'stirge' }],
+      bottomRight: [{ time: 12, count: 1, type: 'bear' }, { time: 17, count: 3 }, { time: 24, count: 3 }, { time: 30, count: 3 }, { time: 37, count: 3 }, { time: 57, count: 1, type: 'bear' }, { time: 6, count: 4, type: 'stirge' }],
     },
     bosses: [],
-    enemyCounts: { wolf: 48, bear: 4 },
+    enemyCounts: { wolf: 48, bear: 4, stirge: 8 },
     stepBudget: 114,                      // TUNING — feature route 90% ≤ 125 (≤ 1.10 × budget)
   },
   // stags: geometry mirrored from wychwood (vertically).
@@ -1385,12 +1388,12 @@ export const LEVELS = {
     // TUNING — 52 wolves: fast, frequent small bursts (2 wolves every 6 s per lane, lanes 2 s apart);
     // Bears at 20 / 35 / 50 s.
     wave: {
-      south: [{ time: 0, count: 2 }, { time: 6, count: 2 }, { time: 12, count: 2 }, { time: 18, count: 2 }, { time: 20, count: 1, type: 'bear' }, { time: 24, count: 2 }, { time: 30, count: 2 }, { time: 36, count: 2 }, { time: 42, count: 2 }, { time: 48, count: 2 }],
-      west:  [{ time: 2, count: 2 }, { time: 8, count: 2 }, { time: 14, count: 2 }, { time: 20, count: 2 }, { time: 26, count: 2 }, { time: 32, count: 2 }, { time: 35, count: 1, type: 'bear' }, { time: 38, count: 2 }, { time: 44, count: 2 }, { time: 50, count: 2 }],
-      east:  [{ time: 4, count: 2 }, { time: 10, count: 2 }, { time: 16, count: 2 }, { time: 22, count: 2 }, { time: 28, count: 2 }, { time: 34, count: 2 }, { time: 40, count: 2 }, { time: 46, count: 2 }, { time: 50, count: 1, type: 'bear' }],
+      south: [{ time: 0, count: 2 }, { time: 6, count: 2 }, { time: 12, count: 2 }, { time: 18, count: 2 }, { time: 20, count: 1, type: 'bear' }, { time: 24, count: 2 }, { time: 30, count: 2 }, { time: 36, count: 2 }, { time: 42, count: 2 }, { time: 48, count: 2 }, { time: 15, count: 3, type: 'stirge' }],
+      west:  [{ time: 2, count: 2 }, { time: 8, count: 2 }, { time: 14, count: 2 }, { time: 20, count: 2 }, { time: 26, count: 2 }, { time: 32, count: 2 }, { time: 35, count: 1, type: 'bear' }, { time: 38, count: 2 }, { time: 44, count: 2 }, { time: 50, count: 2 }, { time: 30, count: 3, type: 'stirge' }],
+      east:  [{ time: 4, count: 2 }, { time: 10, count: 2 }, { time: 16, count: 2 }, { time: 22, count: 2 }, { time: 28, count: 2 }, { time: 34, count: 2 }, { time: 40, count: 2 }, { time: 46, count: 2 }, { time: 50, count: 1, type: 'bear' }, { time: 45, count: 4, type: 'stirge' }],
     },
     bosses: [],
-    enemyCounts: { wolf: 52, bear: 3 },
+    enemyCounts: { wolf: 52, bear: 3, stirge: 10 },
     stepBudget: 127,                      // TUNING — feature route 90% ≤ 139 (≤ 1.10 × budget)
   },
   // briar: geometry mirrored from blackthorn (both axes).
@@ -1489,11 +1492,11 @@ export const LEVELS = {
     // TUNING — 48 wolves, moderate; Bears spread evenly from 15 s (15 / 24 / 33 / 42 / 51 s).
     wave: {
       southEast: [{ time: 0, count: 3 }, { time: 11, count: 3 }, { time: 15, count: 1, type: 'bear' }, { time: 22, count: 4 }, { time: 33, count: 3 }, { time: 42, count: 1, type: 'bear' }, { time: 44, count: 3 }],
-      north:     [{ time: 4, count: 3 }, { time: 15, count: 3 }, { time: 24, count: 1, type: 'bear' }, { time: 26, count: 3 }, { time: 37, count: 4 }, { time: 48, count: 3 }, { time: 51, count: 1, type: 'bear' }],
-      west:      [{ time: 8, count: 3 }, { time: 19, count: 3 }, { time: 30, count: 3 }, { time: 33, count: 1, type: 'bear' }, { time: 41, count: 3 }, { time: 52, count: 4 }],
+      north:     [{ time: 4, count: 3 }, { time: 15, count: 3 }, { time: 24, count: 1, type: 'bear' }, { time: 26, count: 3 }, { time: 37, count: 4 }, { time: 48, count: 3 }, { time: 51, count: 1, type: 'bear' }, { time: 20, count: 4, type: 'stirge' }],
+      west:      [{ time: 8, count: 3 }, { time: 19, count: 3 }, { time: 30, count: 3 }, { time: 33, count: 1, type: 'bear' }, { time: 41, count: 3 }, { time: 52, count: 4 }, { time: 46, count: 4, type: 'stirge' }],
     },
     bosses: [],
-    enemyCounts: { wolf: 48, bear: 5 },
+    enemyCounts: { wolf: 48, bear: 5, stirge: 8 },
     stepBudget: 117,                      // TUNING — feature route 90% ≤ 128 (≤ 1.10 × budget)
   },
   // causeway: geometry mirrored from drowned (horizontally).
@@ -1596,12 +1599,12 @@ export const LEVELS = {
     // TUNING — 52 wolves in a steady even stream (2–3 wolves every 9 s per lane, lanes 3 s apart);
     // Bears at 16 / 28 / 40 / 52 s.
     wave: {
-      west:      [{ time: 0, count: 3 }, { time: 9, count: 3 }, { time: 16, count: 1, type: 'bear' }, { time: 18, count: 3 }, { time: 27, count: 3 }, { time: 36, count: 3 }, { time: 45, count: 3 }],
-      south:     [{ time: 3, count: 3 }, { time: 12, count: 3 }, { time: 21, count: 3 }, { time: 28, count: 1, type: 'bear' }, { time: 30, count: 3 }, { time: 39, count: 2 }, { time: 48, count: 3 }],
-      southEast: [{ time: 6, count: 3 }, { time: 15, count: 2 }, { time: 24, count: 3 }, { time: 33, count: 3 }, { time: 40, count: 1, type: 'bear' }, { time: 42, count: 3 }, { time: 51, count: 3 }, { time: 52, count: 1, type: 'bear' }],
+      west:      [{ time: 0, count: 3 }, { time: 9, count: 3 }, { time: 16, count: 1, type: 'bear' }, { time: 18, count: 3 }, { time: 27, count: 3 }, { time: 36, count: 3 }, { time: 45, count: 3 }, { time: 12, count: 3, type: 'stirge' }],
+      south:     [{ time: 3, count: 3 }, { time: 12, count: 3 }, { time: 21, count: 3 }, { time: 28, count: 1, type: 'bear' }, { time: 30, count: 3 }, { time: 39, count: 2 }, { time: 48, count: 3 }, { time: 33, count: 3, type: 'stirge' }],
+      southEast: [{ time: 6, count: 3 }, { time: 15, count: 2 }, { time: 24, count: 3 }, { time: 33, count: 3 }, { time: 40, count: 1, type: 'bear' }, { time: 42, count: 3 }, { time: 51, count: 3 }, { time: 52, count: 1, type: 'bear' }, { time: 47, count: 4, type: 'stirge' }],
     },
     bosses: [],
-    enemyCounts: { wolf: 52, bear: 4 },
+    enemyCounts: { wolf: 52, bear: 4, stirge: 10 },
     stepBudget: 110,                      // TUNING — feature route 90% ≤ 121 (≤ 1.10 × budget)
   },
   // widows: geometry mirrored from wychwood (horizontally).
@@ -1696,12 +1699,12 @@ export const LEVELS = {
     // TUNING — 56 wolves: two big surges (7 into each lane at about 15 and 40 s) with scattered
     // single wolves between; Bears at 20 / 30 / 45 / 55 s.
     wave: {
-      north: [{ time: 2, count: 1 }, { time: 8, count: 1 }, { time: 15, count: 7 }, { time: 20, count: 1, type: 'bear' }, { time: 26, count: 1 }, { time: 32, count: 1 }, { time: 40, count: 7 }, { time: 52, count: 1 }],
+      north: [{ time: 2, count: 1 }, { time: 8, count: 1 }, { time: 15, count: 7 }, { time: 20, count: 1, type: 'bear' }, { time: 26, count: 1 }, { time: 32, count: 1 }, { time: 40, count: 7 }, { time: 52, count: 1 }, { time: 16, count: 4, type: 'stirge' }],
       east:  [{ time: 4, count: 1 }, { time: 10, count: 1 }, { time: 16, count: 7 }, { time: 24, count: 1 }, { time: 30, count: 1 }, { time: 30, count: 1, type: 'bear' }, { time: 41, count: 7 }, { time: 50, count: 1 }],
-      west:  [{ time: 6, count: 1 }, { time: 17, count: 7 }, { time: 22, count: 1 }, { time: 34, count: 1 }, { time: 42, count: 7 }, { time: 45, count: 1, type: 'bear' }, { time: 48, count: 1 }, { time: 55, count: 1, type: 'bear' }],
+      west:  [{ time: 6, count: 1 }, { time: 17, count: 7 }, { time: 22, count: 1 }, { time: 34, count: 1 }, { time: 42, count: 7 }, { time: 45, count: 1, type: 'bear' }, { time: 48, count: 1 }, { time: 55, count: 1, type: 'bear' }, { time: 41, count: 4, type: 'stirge' }],
     },
     bosses: [],
-    enemyCounts: { wolf: 56, bear: 4 },
+    enemyCounts: { wolf: 56, bear: 4, stirge: 8 },
     stepBudget: 126,                      // TUNING — feature route 90% ≤ 138 (≤ 1.10 × budget)
   },
   // Rows 6–8 (M2f §4.6–4.11). Geometry mirrored from earlier levels for speed, as rows 4–5.
@@ -1797,12 +1800,12 @@ export const LEVELS = {
     },
     // TUNING — 56 wolves, balanced like Tornville scaled up; Bears at 18 / 26 / 34 / 42 / 50 s.
     wave: {
-      east:  [{ time: 0, count: 4 }, { time: 11, count: 4 }, { time: 18, count: 1, type: 'bear' }, { time: 22, count: 4 }, { time: 33, count: 4 }, { time: 42, count: 1, type: 'bear' }, { time: 44, count: 3 }],
-      north: [{ time: 4, count: 4 }, { time: 15, count: 4 }, { time: 26, count: 4 }, { time: 26, count: 1, type: 'bear' }, { time: 37, count: 3 }, { time: 48, count: 4 }, { time: 50, count: 1, type: 'bear' }],
-      west:  [{ time: 8, count: 3 }, { time: 19, count: 4 }, { time: 30, count: 4 }, { time: 34, count: 1, type: 'bear' }, { time: 41, count: 4 }, { time: 52, count: 3 }],
+      east:  [{ time: 0, count: 4 }, { time: 11, count: 4 }, { time: 18, count: 1, type: 'bear' }, { time: 22, count: 4 }, { time: 33, count: 4 }, { time: 42, count: 1, type: 'bear' }, { time: 44, count: 3 }, { time: 14, count: 3, type: 'stirge' }],
+      north: [{ time: 4, count: 4 }, { time: 15, count: 4 }, { time: 26, count: 4 }, { time: 26, count: 1, type: 'bear' }, { time: 37, count: 3 }, { time: 48, count: 4 }, { time: 50, count: 1, type: 'bear' }, { time: 44, count: 4, type: 'stirge' }],
+      west:  [{ time: 8, count: 3 }, { time: 19, count: 4 }, { time: 30, count: 4 }, { time: 34, count: 1, type: 'bear' }, { time: 41, count: 4 }, { time: 52, count: 3 }, { time: 28, count: 3, type: 'stirge' }],
     },
     bosses: [],
-    enemyCounts: { wolf: 56, bear: 5 },
+    enemyCounts: { wolf: 56, bear: 5, stirge: 10 },
     stepBudget: 110,                      // TUNING — feature route 90% ≤ 121 (≤ 1.10 × budget)
   },
   // ashen: geometry mirrored from wychwood (both axes).
@@ -1903,12 +1906,12 @@ export const LEVELS = {
     },
     // TUNING — 50 wolves, moderate; Bears at 25 / 35 / 45 / 55 s; the Ogre at 15 s on a random lane.
     wave: {
-      south: [{ time: 0, count: 3 }, { time: 10, count: 3 }, { time: 20, count: 3 }, { time: 25, count: 1, type: 'bear' }, { time: 30, count: 4 }, { time: 42, count: 4 }],
-      east:  [{ time: 3, count: 3 }, { time: 13, count: 3 }, { time: 23, count: 4 }, { time: 34, count: 3 }, { time: 35, count: 1, type: 'bear' }, { time: 46, count: 4 }, { time: 55, count: 1, type: 'bear' }],
+      south: [{ time: 0, count: 3 }, { time: 10, count: 3 }, { time: 20, count: 3 }, { time: 25, count: 1, type: 'bear' }, { time: 30, count: 4 }, { time: 42, count: 4 }, { time: 38, count: 4, type: 'stirge' }],
+      east:  [{ time: 3, count: 3 }, { time: 13, count: 3 }, { time: 23, count: 4 }, { time: 34, count: 3 }, { time: 35, count: 1, type: 'bear' }, { time: 46, count: 4 }, { time: 55, count: 1, type: 'bear' }, { time: 18, count: 4, type: 'stirge' }],
       west:  [{ time: 6, count: 3 }, { time: 16, count: 3 }, { time: 27, count: 3 }, { time: 38, count: 4 }, { time: 45, count: 1, type: 'bear' }, { time: 50, count: 3 }],
     },
     bosses: [{ type: 'ogre', time: 15, lane: 'random' }], // TUNING
-    enemyCounts: { wolf: 50, bear: 4, ogre: 1 },
+    enemyCounts: { wolf: 50, bear: 4, ogre: 1, stirge: 8 },
     stepBudget: 115,                      // TUNING — feature route 90% ≤ 126 (≤ 1.10 × budget)
   },
   // bone: geometry mirrored from gallows (horizontally).
@@ -2002,12 +2005,12 @@ export const LEVELS = {
     // TUNING — 60 wolves: three surges (5 into each lane at about 10, 30 and 50 s) with single
     // wolves between; Bears at 15 / 22 / 36 / 42 / 55 s.
     wave: {
-      north:     [{ time: 3, count: 1 }, { time: 10, count: 5 }, { time: 15, count: 1, type: 'bear' }, { time: 18, count: 1 }, { time: 25, count: 1 }, { time: 30, count: 5 }, { time: 40, count: 1 }, { time: 50, count: 5 }, { time: 56, count: 1 }],
-      east:      [{ time: 5, count: 1 }, { time: 11, count: 5 }, { time: 20, count: 1 }, { time: 22, count: 1, type: 'bear' }, { time: 31, count: 5 }, { time: 38, count: 1 }, { time: 42, count: 1, type: 'bear' }, { time: 44, count: 1 }, { time: 51, count: 5 }, { time: 57, count: 1 }],
-      southWest: [{ time: 7, count: 1 }, { time: 12, count: 5 }, { time: 22, count: 1 }, { time: 32, count: 5 }, { time: 36, count: 1 }, { time: 36, count: 1, type: 'bear' }, { time: 46, count: 1 }, { time: 52, count: 5 }, { time: 55, count: 1, type: 'bear' }, { time: 58, count: 1 }],
+      north:     [{ time: 3, count: 1 }, { time: 10, count: 5 }, { time: 15, count: 1, type: 'bear' }, { time: 18, count: 1 }, { time: 25, count: 1 }, { time: 30, count: 5 }, { time: 40, count: 1 }, { time: 50, count: 5 }, { time: 56, count: 1 }, { time: 11, count: 4, type: 'stirge' }],
+      east:      [{ time: 5, count: 1 }, { time: 11, count: 5 }, { time: 20, count: 1 }, { time: 22, count: 1, type: 'bear' }, { time: 31, count: 5 }, { time: 38, count: 1 }, { time: 42, count: 1, type: 'bear' }, { time: 44, count: 1 }, { time: 51, count: 5 }, { time: 57, count: 1 }, { time: 31, count: 4, type: 'stirge' }],
+      southWest: [{ time: 7, count: 1 }, { time: 12, count: 5 }, { time: 22, count: 1 }, { time: 32, count: 5 }, { time: 36, count: 1 }, { time: 36, count: 1, type: 'bear' }, { time: 46, count: 1 }, { time: 52, count: 5 }, { time: 55, count: 1, type: 'bear' }, { time: 58, count: 1 }, { time: 51, count: 4, type: 'stirge' }],
     },
     bosses: [],
-    enemyCounts: { wolf: 60, bear: 5 },
+    enemyCounts: { wolf: 60, bear: 5, stirge: 12 },
     stepBudget: 117,                      // TUNING — feature route 90% ≤ 128 (≤ 1.10 × budget)
   },
   // weeping: geometry mirrored from tornville (vertically).
@@ -2105,11 +2108,11 @@ export const LEVELS = {
     // from 12 s (12 / 19 / 26 / 33 / 40 / 47 / 54 s).
     wave: {
       lowerLeft: [{ time: 0, count: 3 }, { time: 9, count: 3 }, { time: 12, count: 1, type: 'bear' }, { time: 18, count: 3 }, { time: 27, count: 3 }, { time: 33, count: 1, type: 'bear' }, { time: 36, count: 3 }, { time: 45, count: 3 }, { time: 54, count: 1, type: 'bear' }],
-      right:     [{ time: 3, count: 3 }, { time: 12, count: 3 }, { time: 19, count: 1, type: 'bear' }, { time: 21, count: 3 }, { time: 30, count: 3 }, { time: 39, count: 3 }, { time: 40, count: 1, type: 'bear' }, { time: 48, count: 3 }],
-      topLeft:   [{ time: 6, count: 3 }, { time: 15, count: 3 }, { time: 24, count: 3 }, { time: 26, count: 1, type: 'bear' }, { time: 33, count: 3 }, { time: 42, count: 3 }, { time: 47, count: 1, type: 'bear' }, { time: 51, count: 3 }],
+      right:     [{ time: 3, count: 3 }, { time: 12, count: 3 }, { time: 19, count: 1, type: 'bear' }, { time: 21, count: 3 }, { time: 30, count: 3 }, { time: 39, count: 3 }, { time: 40, count: 1, type: 'bear' }, { time: 48, count: 3 }, { time: 16, count: 4, type: 'stirge' }],
+      topLeft:   [{ time: 6, count: 3 }, { time: 15, count: 3 }, { time: 24, count: 3 }, { time: 26, count: 1, type: 'bear' }, { time: 33, count: 3 }, { time: 42, count: 3 }, { time: 47, count: 1, type: 'bear' }, { time: 51, count: 3 }, { time: 38, count: 4, type: 'stirge' }],
     },
     bosses: [],
-    enemyCounts: { wolf: 54, bear: 7 },
+    enemyCounts: { wolf: 54, bear: 7, stirge: 8 },
     stepBudget: 112,                      // TUNING — feature route 90% ≤ 123 (≤ 1.10 × budget)
   },
   // bells: geometry mirrored from barrow (both axes).
@@ -2209,12 +2212,12 @@ export const LEVELS = {
     // TUNING — 64 wolves: every 14 s a toll and a big synchronised surge (5 into each lane at
     // about 10, 24, 38 and 52 s); few wolves between. Bears at 18 / 30 / 44 / 56 s.
     wave: {
-      east:  [{ time: 10, count: 5 }, { time: 17, count: 1 }, { time: 18, count: 1, type: 'bear' }, { time: 24, count: 5 }, { time: 38, count: 5 }, { time: 52, count: 5 }],
-      south: [{ time: 10, count: 5 }, { time: 24, count: 5 }, { time: 30, count: 1, type: 'bear' }, { time: 31, count: 1 }, { time: 38, count: 5 }, { time: 52, count: 5 }],
-      west:  [{ time: 10, count: 5 }, { time: 24, count: 5 }, { time: 38, count: 5 }, { time: 44, count: 1, type: 'bear' }, { time: 45, count: 1 }, { time: 52, count: 5 }, { time: 56, count: 1, type: 'bear' }, { time: 58, count: 1 }],
+      east:  [{ time: 10, count: 5 }, { time: 17, count: 1 }, { time: 18, count: 1, type: 'bear' }, { time: 24, count: 5 }, { time: 38, count: 5 }, { time: 52, count: 5 }, { time: 10, count: 3, type: 'stirge' }, { time: 52, count: 4, type: 'stirge' }],
+      south: [{ time: 10, count: 5 }, { time: 24, count: 5 }, { time: 30, count: 1, type: 'bear' }, { time: 31, count: 1 }, { time: 38, count: 5 }, { time: 52, count: 5 }, { time: 24, count: 3, type: 'stirge' }],
+      west:  [{ time: 10, count: 5 }, { time: 24, count: 5 }, { time: 38, count: 5 }, { time: 44, count: 1, type: 'bear' }, { time: 45, count: 1 }, { time: 52, count: 5 }, { time: 56, count: 1, type: 'bear' }, { time: 58, count: 1 }, { time: 38, count: 4, type: 'stirge' }],
     },
     bosses: [],
-    enemyCounts: { wolf: 64, bear: 4 },
+    enemyCounts: { wolf: 64, bear: 4, stirge: 14 },
     stepBudget: 113,                      // TUNING — feature route 90% ≤ 124 (≤ 1.10 × budget)
   },
   // heartwood: geometry mirrored from blackthorn (vertically).
@@ -2315,12 +2318,12 @@ export const LEVELS = {
     // TUNING — 60 wolves building steadily to a final heavy push at 50–60 s; Bears at 20 / 28 / 36 /
     // 44 / 50 / 56 s; two Ogres, at 15 s (south-west lane) and 40 s (east lane).
     wave: {
-      southWest: [{ time: 0, count: 2 }, { time: 9, count: 2 }, { time: 18, count: 3 }, { time: 20, count: 1, type: 'bear' }, { time: 27, count: 3 }, { time: 36, count: 3 }, { time: 44, count: 1, type: 'bear' }, { time: 45, count: 3 }, { time: 52, count: 4 }],
-      north:     [{ time: 3, count: 2 }, { time: 12, count: 2 }, { time: 21, count: 3 }, { time: 28, count: 1, type: 'bear' }, { time: 30, count: 3 }, { time: 39, count: 3 }, { time: 48, count: 3 }, { time: 50, count: 1, type: 'bear' }, { time: 55, count: 4 }],
-      east:      [{ time: 6, count: 2 }, { time: 15, count: 2 }, { time: 24, count: 3 }, { time: 33, count: 3 }, { time: 36, count: 1, type: 'bear' }, { time: 42, count: 3 }, { time: 50, count: 3 }, { time: 56, count: 1, type: 'bear' }, { time: 57, count: 4 }],
+      southWest: [{ time: 0, count: 2 }, { time: 9, count: 2 }, { time: 18, count: 3 }, { time: 20, count: 1, type: 'bear' }, { time: 27, count: 3 }, { time: 36, count: 3 }, { time: 44, count: 1, type: 'bear' }, { time: 45, count: 3 }, { time: 52, count: 4 }, { time: 25, count: 4, type: 'stirge' }],
+      north:     [{ time: 3, count: 2 }, { time: 12, count: 2 }, { time: 21, count: 3 }, { time: 28, count: 1, type: 'bear' }, { time: 30, count: 3 }, { time: 39, count: 3 }, { time: 48, count: 3 }, { time: 50, count: 1, type: 'bear' }, { time: 55, count: 4 }, { time: 42, count: 4, type: 'stirge' }],
+      east:      [{ time: 6, count: 2 }, { time: 15, count: 2 }, { time: 24, count: 3 }, { time: 33, count: 3 }, { time: 36, count: 1, type: 'bear' }, { time: 42, count: 3 }, { time: 50, count: 3 }, { time: 56, count: 1, type: 'bear' }, { time: 57, count: 4 }, { time: 54, count: 4, type: 'stirge' }],
     },
     bosses: [{ type: 'ogre', time: 15, lane: 'southWest' }, { type: 'ogre', time: 40, lane: 'east' }], // TUNING
-    enemyCounts: { wolf: 60, bear: 6, ogre: 2 },
+    enemyCounts: { wolf: 60, bear: 6, ogre: 2, stirge: 12 },
     stepBudget: 111,                      // TUNING — feature route 90% ≤ 122 (≤ 1.10 × budget)
   },
 };
