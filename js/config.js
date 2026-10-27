@@ -327,7 +327,6 @@ export const DECOR = {
 // 17.8 Wave
 // ---------------------------------------------------------------------------
 export const BURST_STAGGER = 0.6;        // TUNING — s between enemies in one burst
-export const RANDOMISE_BEAR_LANES = true; // M1e §3.6: old schedules (rows 4–8 until M2i I2): spread their Bears across lanes at random
 export const FIRST_WAVE_DELAY = 3;      // TUNING — s of countdown before wave 1 (M2i §3.1)
 export const WAVE_ICON_SIZE = 30;       // px, enemy images in the wave preview (M2i §4.2)
 
@@ -495,10 +494,6 @@ export const STRIKE_KNOCKBACK_TIME = 0.15; // s for that visual knock-back to se
 //                           'random' (seeded, spread over the lanes per type, M2a §5.4); count > 1
 //                           spawns with the type's stagger. gapAfter: s of gap once the wave is
 //                           cleared (ignored on the last). tolls: optional bell tolls (s, wave time).
-//   wave, enemyCounts,      OLD schedule, rows 4–8 only until M2i I2 migrates them (run as one wave,
-//   bosses, tolls           levelSettings.js levelWaves): bursts per lane id; time = s since the
-//                           wave began; Bears' lanes are spread at random; bosses
-//                           { type, time, lane: a lane id or 'random' }; tolls: bell toll times.
 //   stepBudget              TUNING — steps available in step-mode Prep
 //   enemyHpMult             optional (M2f §3.1): every enemy's HP × this in the level; default 1
 //   stuckTime               optional (M2f §4): the level's STUCK_TIME (unstick rule); default STUCK_TIME
@@ -1499,16 +1494,63 @@ export const LEVELS = {
       ember: 'rgba(255, 140, 40, 0.75)',
       mapTint: '#8a6a4a',
     },
-    // TUNING — 48 wolves; pressure alternates: two lanes busy while the third is quiet, rotating
-    // every 15 s (upperRight + left, left + bottomRight, bottomRight + upperRight, then again).
-    // Each Bear comes in a quiet spell (lanes shuffled at random each run, M2a §5.4).
-    wave: {
-      upperRight:  [{ time: 0, count: 3 }, { time: 7, count: 3 }, { time: 27, count: 1, type: 'bear' }, { time: 32, count: 3 }, { time: 39, count: 3 }, { time: 45, count: 3 }, { time: 52, count: 3 }],
-      left:        [{ time: 2, count: 3 }, { time: 9, count: 3 }, { time: 15, count: 3 }, { time: 22, count: 3 }, { time: 42, count: 1, type: 'bear' }, { time: 47, count: 3 }, { time: 54, count: 3 }, { time: 34, count: 4, type: 'stirge' }],
-      bottomRight: [{ time: 12, count: 1, type: 'bear' }, { time: 17, count: 3 }, { time: 24, count: 3 }, { time: 30, count: 3 }, { time: 37, count: 3 }, { time: 57, count: 1, type: 'bear' }, { time: 6, count: 4, type: 'stirge' }],
-    },
-    bosses: [],
-    enemyCounts: { wolf: 48, bear: 4, stirge: 8 },
+    // TUNING (M2i §5–6) — 4 waves; in each, two lanes are busy and one is quiet, the quiet lane
+    // changing each wave (bottomRight, upperRight, left, bottomRight). Bears have fixed lanes so
+    // they keep to the busy ones.
+    waves: [
+      { // Wave 1 — 12W 4S (bottomRight quiet)
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'upperRight',  type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'left',        type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'upperRight',  type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'left',        type: 'wolf',   count: 3 },
+          { t: 9,  lane: 'upperRight',  type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 2 — 14W 6S 1B (upperRight quiet)
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'left',        type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'bottomRight', type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'left',        type: 'wolf',   count: 2 },
+          { t: 6,  lane: 'bottomRight', type: 'bear',   count: 1 },
+          { t: 8,  lane: 'bottomRight', type: 'wolf',   count: 3 },
+          { t: 10, lane: 'left',        type: 'stirge', count: 3 },
+          { t: 11, lane: 'left',        type: 'wolf',   count: 3 },
+          { t: 13, lane: 'bottomRight', type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 3 — 16W 8S 2B (left quiet)
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'bottomRight', type: 'wolf',   count: 4 },
+          { t: 2,  lane: 'upperRight',  type: 'wolf',   count: 4 },
+          { t: 5,  lane: 'upperRight',  type: 'bear',   count: 1 },
+          { t: 7,  lane: 'bottomRight', type: 'wolf',   count: 4 },
+          { t: 9,  lane: 'bottomRight', type: 'stirge', count: 4 },
+          { t: 10, lane: 'upperRight',  type: 'wolf',   count: 4 },
+          { t: 12, lane: 'bottomRight', type: 'bear',   count: 1 },
+          { t: 14, lane: 'upperRight',  type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 4 — 18W 10S 2B (bottomRight quiet)
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'upperRight',  type: 'wolf',   count: 4 },
+          { t: 1,  lane: 'left',        type: 'wolf',   count: 4 },
+          { t: 4,  lane: 'left',        type: 'bear',   count: 1 },
+          { t: 6,  lane: 'upperRight',  type: 'stirge', count: 3 },
+          { t: 7,  lane: 'upperRight',  type: 'wolf',   count: 3 },
+          { t: 8,  lane: 'left',        type: 'wolf',   count: 3 },
+          { t: 11, lane: 'upperRight',  type: 'bear',   count: 1 },
+          { t: 12, lane: 'left',        type: 'stirge', count: 4 },
+          { t: 14, lane: 'upperRight',  type: 'wolf',   count: 2 },
+          { t: 15, lane: 'left',        type: 'wolf',   count: 2 },
+          { t: 17, lane: 'upperRight',  type: 'stirge', count: 3 },
+        ],
+      },
+    ],
     stepBudget: 114,                      // TUNING — feature route 90% ≤ 125 (≤ 1.10 × budget)
   },
   // stags: geometry mirrored from wychwood (vertically).
@@ -1607,15 +1649,78 @@ export const LEVELS = {
       water: { deep: '#2e6a8c', rim: '#3a5e3a', ripple: 'rgba(205, 232, 245, 0.45)' },
       mapTint: '#7aaa6a',
     },
-    // TUNING — 52 wolves: fast, frequent small bursts (2 wolves every 6 s per lane, lanes 2 s apart);
-    // Bears at 20 / 35 / 50 s.
-    wave: {
-      south: [{ time: 0, count: 2 }, { time: 6, count: 2 }, { time: 12, count: 2 }, { time: 18, count: 2 }, { time: 20, count: 1, type: 'bear' }, { time: 24, count: 2 }, { time: 30, count: 2 }, { time: 36, count: 2 }, { time: 42, count: 2 }, { time: 48, count: 2 }, { time: 15, count: 3, type: 'stirge' }],
-      west:  [{ time: 2, count: 2 }, { time: 8, count: 2 }, { time: 14, count: 2 }, { time: 20, count: 2 }, { time: 26, count: 2 }, { time: 32, count: 2 }, { time: 35, count: 1, type: 'bear' }, { time: 38, count: 2 }, { time: 44, count: 2 }, { time: 50, count: 2 }, { time: 30, count: 3, type: 'stirge' }],
-      east:  [{ time: 4, count: 2 }, { time: 10, count: 2 }, { time: 16, count: 2 }, { time: 22, count: 2 }, { time: 28, count: 2 }, { time: 34, count: 2 }, { time: 40, count: 2 }, { time: 46, count: 2 }, { time: 50, count: 1, type: 'bear' }, { time: 45, count: 4, type: 'stirge' }],
-    },
-    bosses: [],
-    enemyCounts: { wolf: 52, bear: 3, stirge: 10 },
+    // TUNING (M2i §5–6) — 4 waves of fast, frequent small bursts (2 wolves every 1–1.5 s, the
+    // lanes in turn); Bears at 'random' lanes.
+    waves: [
+      { // Wave 1 — 14W 6S
+        gapAfter: 5,
+        spawns: [
+          { t: 0,   lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 1.5, lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 3,   lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 4.5, lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 6,   lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 7,   lane: 'east',   type: 'stirge', count: 3 },
+          { t: 7.5, lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 9,   lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 10,  lane: 'west',   type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 2 — 16W 8S 1B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,    lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 1.5,  lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 3,    lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 4,    lane: 'random', type: 'bear',   count: 1 },
+          { t: 4.5,  lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 6,    lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 6,    lane: 'west',   type: 'stirge', count: 4 },
+          { t: 7.5,  lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 9,    lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 10.5, lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 11,   lane: 'east',   type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 3 — 18W 10S 1B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,    lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 1.5,  lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 3,    lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 3,    lane: 'south',  type: 'stirge', count: 3 },
+          { t: 4.5,  lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 6,    lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 6,    lane: 'random', type: 'bear',   count: 1 },
+          { t: 7.5,  lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 8,    lane: 'west',   type: 'stirge', count: 4 },
+          { t: 9,    lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 10.5, lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 12,   lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 12,   lane: 'east',   type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 4 — 22W 12S 2B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 1,  lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 3,  lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 3,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 4,  lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 4,  lane: 'west',   type: 'stirge', count: 4 },
+          { t: 5,  lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 6,  lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 8,  lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 8,  lane: 'east',   type: 'stirge', count: 4 },
+          { t: 10, lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 10, lane: 'random', type: 'bear',   count: 1 },
+          { t: 11, lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 12, lane: 'south',  type: 'stirge', count: 4 },
+        ],
+      },
+    ],
     stepBudget: 127,                      // TUNING — feature route 90% ≤ 139 (≤ 1.10 × budget)
   },
   // briar: geometry mirrored from blackthorn (both axes).
@@ -1711,14 +1816,67 @@ export const LEVELS = {
       berry: '#b0202e',
       mapTint: '#6a3a3a',
     },
-    // TUNING — 48 wolves, moderate; Bears spread evenly from 15 s (15 / 24 / 33 / 42 / 51 s).
-    wave: {
-      southEast: [{ time: 0, count: 3 }, { time: 11, count: 3 }, { time: 15, count: 1, type: 'bear' }, { time: 22, count: 4 }, { time: 33, count: 3 }, { time: 42, count: 1, type: 'bear' }, { time: 44, count: 3 }],
-      north:     [{ time: 4, count: 3 }, { time: 15, count: 3 }, { time: 24, count: 1, type: 'bear' }, { time: 26, count: 3 }, { time: 37, count: 4 }, { time: 48, count: 3 }, { time: 51, count: 1, type: 'bear' }, { time: 20, count: 4, type: 'stirge' }],
-      west:      [{ time: 8, count: 3 }, { time: 19, count: 3 }, { time: 30, count: 3 }, { time: 33, count: 1, type: 'bear' }, { time: 41, count: 3 }, { time: 52, count: 4 }, { time: 46, count: 4, type: 'stirge' }],
-    },
-    bosses: [],
-    enemyCounts: { wolf: 48, bear: 5, stirge: 8 },
+    // TUNING (M2i §5–6) — 4 waves; Bears spread through each wave (at 'random' lanes) to jam the
+    // narrow lanes, wolves in bursts of 2–3 around them.
+    waves: [
+      { // Wave 1 — 12W 4S 1B
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'southEast', type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 5,  lane: 'west',      type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'north',     type: 'stirge', count: 4 },
+          { t: 9,  lane: 'southEast', type: 'wolf',   count: 3 },
+        ],
+      },
+      { // Wave 2 — 14W 6S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 3,  lane: 'west',      type: 'wolf',   count: 3 },
+          { t: 6,  lane: 'southEast', type: 'wolf',   count: 3 },
+          { t: 8,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 9,  lane: 'southEast', type: 'stirge', count: 3 },
+          { t: 10, lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 13, lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 13, lane: 'west',      type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 3 — 16W 8S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'west',      type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'southEast', type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 5,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'west',      type: 'stirge', count: 4 },
+          { t: 8,  lane: 'west',      type: 'wolf',   count: 3 },
+          { t: 10, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 11, lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 13, lane: 'north',     type: 'stirge', count: 4 },
+          { t: 14, lane: 'north',     type: 'wolf',   count: 2 },
+        ],
+      },
+      { // Wave 4 — 18W 10S 3B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'southEast', type: 'wolf',   count: 3 },
+          { t: 1,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 3,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'west',      type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 7,  lane: 'southEast', type: 'stirge', count: 3 },
+          { t: 9,  lane: 'southEast', type: 'wolf',   count: 3 },
+          { t: 11, lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 12, lane: 'west',      type: 'stirge', count: 4 },
+          { t: 13, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 15, lane: 'west',      type: 'wolf',   count: 3 },
+          { t: 16, lane: 'north',     type: 'stirge', count: 3 },
+        ],
+      },
+    ],
     stepBudget: 117,                      // TUNING — feature route 90% ≤ 128 (≤ 1.10 × budget)
   },
   // causeway: geometry mirrored from drowned (horizontally).
@@ -1818,15 +1976,79 @@ export const LEVELS = {
       roof: { dark: '#3a2c22', light: '#5e4a36' },
       mapTint: '#4a8a86',
     },
-    // TUNING — 52 wolves in a steady even stream (2–3 wolves every 9 s per lane, lanes 3 s apart);
-    // Bears at 16 / 28 / 40 / 52 s.
-    wave: {
-      west:      [{ time: 0, count: 3 }, { time: 9, count: 3 }, { time: 16, count: 1, type: 'bear' }, { time: 18, count: 3 }, { time: 27, count: 3 }, { time: 36, count: 3 }, { time: 45, count: 3 }, { time: 12, count: 3, type: 'stirge' }],
-      south:     [{ time: 3, count: 3 }, { time: 12, count: 3 }, { time: 21, count: 3 }, { time: 28, count: 1, type: 'bear' }, { time: 30, count: 3 }, { time: 39, count: 2 }, { time: 48, count: 3 }, { time: 33, count: 3, type: 'stirge' }],
-      southEast: [{ time: 6, count: 3 }, { time: 15, count: 2 }, { time: 24, count: 3 }, { time: 33, count: 3 }, { time: 40, count: 1, type: 'bear' }, { time: 42, count: 3 }, { time: 51, count: 3 }, { time: 52, count: 1, type: 'bear' }, { time: 47, count: 4, type: 'stirge' }],
-    },
-    bosses: [],
-    enemyCounts: { wolf: 52, bear: 4, stirge: 10 },
+    // TUNING (M2i §5–6) — 4 waves, each a steady ground stream (2 wolves every 1.5–2 s, the lanes
+    // in turn); the Stirge flocks come mid-wave and later, over the jams. Bears at 'random' lanes.
+    waves: [
+      { // Wave 1 — 14W 8S
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 4,  lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 6,  lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 8,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 9,  lane: 'south',     type: 'stirge', count: 4 },
+          { t: 10, lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 12, lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 12, lane: 'southEast', type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 2 — 16W 10S 1B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 4,  lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 5,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 6,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 8,  lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 10, lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 10, lane: 'west',      type: 'stirge', count: 5 },
+          { t: 12, lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 14, lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 14, lane: 'south',     type: 'stirge', count: 5 },
+        ],
+      },
+      { // Wave 3 — 18W 12S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 4,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 4,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 6,  lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 8,  lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 9,  lane: 'southEast', type: 'stirge', count: 4 },
+          { t: 10, lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 12, lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 12, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 13, lane: 'west',      type: 'stirge', count: 4 },
+          { t: 14, lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 16, lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 16, lane: 'south',     type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 4 — 20W 14S 2B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,    lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 1.5,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 3,    lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 4.5,  lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 5,    lane: 'random',    type: 'bear',   count: 1 },
+          { t: 6,    lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 7.5,  lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 8,    lane: 'west',      type: 'stirge', count: 5 },
+          { t: 9,    lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 10.5, lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 11,   lane: 'random',    type: 'bear',   count: 1 },
+          { t: 12,   lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 13,   lane: 'south',     type: 'stirge', count: 5 },
+          { t: 13.5, lane: 'west',      type: 'wolf',   count: 2 },
+          { t: 16,   lane: 'southEast', type: 'stirge', count: 4 },
+        ],
+      },
+    ],
     stepBudget: 110,                      // TUNING — feature route 90% ≤ 121 (≤ 1.10 × budget)
   },
   // widows: geometry mirrored from wychwood (horizontally).
@@ -1918,15 +2140,77 @@ export const LEVELS = {
       vegetation: { base: '#6a5a2a', light: '#b08a3a' },
       mapTint: '#b08a4a',
     },
-    // TUNING — 56 wolves: two big surges (7 into each lane at about 15 and 40 s) with scattered
-    // single wolves between; Bears at 20 / 30 / 45 / 55 s.
-    wave: {
-      north: [{ time: 2, count: 1 }, { time: 8, count: 1 }, { time: 15, count: 7 }, { time: 20, count: 1, type: 'bear' }, { time: 26, count: 1 }, { time: 32, count: 1 }, { time: 40, count: 7 }, { time: 52, count: 1 }, { time: 16, count: 4, type: 'stirge' }],
-      east:  [{ time: 4, count: 1 }, { time: 10, count: 1 }, { time: 16, count: 7 }, { time: 24, count: 1 }, { time: 30, count: 1 }, { time: 30, count: 1, type: 'bear' }, { time: 41, count: 7 }, { time: 50, count: 1 }],
-      west:  [{ time: 6, count: 1 }, { time: 17, count: 7 }, { time: 22, count: 1 }, { time: 34, count: 1 }, { time: 42, count: 7 }, { time: 45, count: 1, type: 'bear' }, { time: 48, count: 1 }, { time: 55, count: 1, type: 'bear' }, { time: 41, count: 4, type: 'stirge' }],
-    },
-    bosses: [],
-    enemyCounts: { wolf: 56, bear: 4, stirge: 8 },
+    // TUNING (M2i §5–6) — 4 waves, each with a big surge mid-wave (all lanes, 1 s apart, Stirges
+    // with it) and single wolves before and after; Bears at 'random' lanes.
+    waves: [
+      { // Wave 1 — 16W 4S
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'north',  type: 'wolf',   count: 1 },
+          { t: 2,  lane: 'east',   type: 'wolf',   count: 1 },
+          { t: 4,  lane: 'west',   type: 'wolf',   count: 1 },
+          { t: 7,  lane: 'north',  type: 'wolf',   count: 4 },
+          { t: 8,  lane: 'east',   type: 'wolf',   count: 4 },
+          { t: 8,  lane: 'east',   type: 'stirge', count: 4 },
+          { t: 9,  lane: 'west',   type: 'wolf',   count: 4 },
+          { t: 13, lane: 'north',  type: 'wolf',   count: 1 },
+        ],
+      },
+      { // Wave 2 — 20W 6S 1B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'east',   type: 'wolf',   count: 1 },
+          { t: 2,  lane: 'west',   type: 'wolf',   count: 1 },
+          { t: 4,  lane: 'north',  type: 'wolf',   count: 1 },
+          { t: 5,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 8,  lane: 'north',  type: 'wolf',   count: 5 },
+          { t: 9,  lane: 'east',   type: 'wolf',   count: 5 },
+          { t: 9,  lane: 'north',  type: 'stirge', count: 3 },
+          { t: 10, lane: 'west',   type: 'wolf',   count: 5 },
+          { t: 10, lane: 'west',   type: 'stirge', count: 3 },
+          { t: 14, lane: 'east',   type: 'wolf',   count: 1 },
+          { t: 15, lane: 'west',   type: 'wolf',   count: 1 },
+        ],
+      },
+      { // Wave 3 — 24W 8S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'north',  type: 'wolf',   count: 1 },
+          { t: 2,  lane: 'east',   type: 'wolf',   count: 1 },
+          { t: 3,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 4,  lane: 'west',   type: 'wolf',   count: 1 },
+          { t: 9,  lane: 'north',  type: 'wolf',   count: 6 },
+          { t: 10, lane: 'east',   type: 'wolf',   count: 6 },
+          { t: 10, lane: 'east',   type: 'stirge', count: 4 },
+          { t: 11, lane: 'west',   type: 'wolf',   count: 6 },
+          { t: 11, lane: 'north',  type: 'stirge', count: 4 },
+          { t: 13, lane: 'random', type: 'bear',   count: 1 },
+          { t: 15, lane: 'north',  type: 'wolf',   count: 1 },
+          { t: 16, lane: 'east',   type: 'wolf',   count: 1 },
+          { t: 17, lane: 'west',   type: 'wolf',   count: 1 },
+        ],
+      },
+      { // Wave 4 — 28W 10S 2B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'west',   type: 'wolf',   count: 1 },
+          { t: 2,  lane: 'north',  type: 'wolf',   count: 1 },
+          { t: 4,  lane: 'east',   type: 'wolf',   count: 1 },
+          { t: 5,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 6,  lane: 'west',   type: 'wolf',   count: 1 },
+          { t: 10, lane: 'north',  type: 'wolf',   count: 7 },
+          { t: 10, lane: 'west',   type: 'stirge', count: 3 },
+          { t: 11, lane: 'east',   type: 'wolf',   count: 7 },
+          { t: 11, lane: 'north',  type: 'stirge', count: 4 },
+          { t: 12, lane: 'west',   type: 'wolf',   count: 7 },
+          { t: 12, lane: 'east',   type: 'stirge', count: 3 },
+          { t: 14, lane: 'random', type: 'bear',   count: 1 },
+          { t: 17, lane: 'north',  type: 'wolf',   count: 1 },
+          { t: 18, lane: 'east',   type: 'wolf',   count: 1 },
+          { t: 19, lane: 'west',   type: 'wolf',   count: 1 },
+        ],
+      },
+    ],
     stepBudget: 126,                      // TUNING — feature route 90% ≤ 138 (≤ 1.10 × budget)
   },
   // Rows 6–8 (M2f §4.6–4.11). Geometry mirrored from earlier levels for speed, as rows 4–5.
@@ -2020,14 +2304,83 @@ export const LEVELS = {
       moss: '#5a8a34',
       mapTint: '#7aa85a',
     },
-    // TUNING — 56 wolves, balanced like Tornville scaled up; Bears at 18 / 26 / 34 / 42 / 50 s.
-    wave: {
-      east:  [{ time: 0, count: 4 }, { time: 11, count: 4 }, { time: 18, count: 1, type: 'bear' }, { time: 22, count: 4 }, { time: 33, count: 4 }, { time: 42, count: 1, type: 'bear' }, { time: 44, count: 3 }, { time: 14, count: 3, type: 'stirge' }],
-      north: [{ time: 4, count: 4 }, { time: 15, count: 4 }, { time: 26, count: 4 }, { time: 26, count: 1, type: 'bear' }, { time: 37, count: 3 }, { time: 48, count: 4 }, { time: 50, count: 1, type: 'bear' }, { time: 44, count: 4, type: 'stirge' }],
-      west:  [{ time: 8, count: 3 }, { time: 19, count: 4 }, { time: 30, count: 4 }, { time: 34, count: 1, type: 'bear' }, { time: 41, count: 4 }, { time: 52, count: 3 }, { time: 28, count: 3, type: 'stirge' }],
-    },
-    bosses: [],
-    enemyCounts: { wolf: 56, bear: 5, stirge: 10 },
+    // TUNING (M2i §5–6) — 5 balanced waves: bursts of 2–3 on each lane in turn, Stirge flocks
+    // between them; Bears at 'random' lanes.
+    waves: [
+      { // Wave 1 — 12W 6S
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 6,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'north',  type: 'stirge', count: 3 },
+          { t: 9,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 10, lane: 'west',   type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 2 — 14W 8S 1B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 6,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'east',   type: 'stirge', count: 4 },
+          { t: 9,  lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 12, lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 12, lane: 'north',  type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 3 — 16W 8S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 6,  lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 8,  lane: 'west',   type: 'stirge', count: 4 },
+          { t: 9,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 11, lane: 'random', type: 'bear',   count: 1 },
+          { t: 12, lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 13, lane: 'east',   type: 'stirge', count: 4 },
+          { t: 14, lane: 'north',  type: 'wolf',   count: 2 },
+        ],
+      },
+      { // Wave 4 — 18W 10S 2B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 6,  lane: 'north',  type: 'stirge', count: 3 },
+          { t: 7,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 9,  lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 10, lane: 'east',   type: 'stirge', count: 4 },
+          { t: 12, lane: 'random', type: 'bear',   count: 1 },
+          { t: 12, lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 14, lane: 'west',   type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 5 — 20W 12S 3B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 4,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'west',   type: 'stirge', count: 4 },
+          { t: 7,  lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 8,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 9,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 10, lane: 'east',   type: 'stirge', count: 4 },
+          { t: 11, lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 13, lane: 'random', type: 'bear',   count: 1 },
+          { t: 14, lane: 'north',  type: 'wolf',   count: 2 },
+          { t: 15, lane: 'north',  type: 'stirge', count: 4 },
+        ],
+      },
+    ],
     stepBudget: 110,                      // TUNING — feature route 90% ≤ 121 (≤ 1.10 × budget)
   },
   // ashen: geometry mirrored from wychwood (both axes).
@@ -2126,14 +2479,83 @@ export const LEVELS = {
       ash: 'rgba(210, 205, 200, 0.5)',
       mapTint: '#7a6a66',
     },
-    // TUNING — 50 wolves, moderate; Bears at 25 / 35 / 45 / 55 s; the Ogre at 15 s on a random lane.
-    wave: {
-      south: [{ time: 0, count: 3 }, { time: 10, count: 3 }, { time: 20, count: 3 }, { time: 25, count: 1, type: 'bear' }, { time: 30, count: 4 }, { time: 42, count: 4 }, { time: 38, count: 4, type: 'stirge' }],
-      east:  [{ time: 3, count: 3 }, { time: 13, count: 3 }, { time: 23, count: 4 }, { time: 34, count: 3 }, { time: 35, count: 1, type: 'bear' }, { time: 46, count: 4 }, { time: 55, count: 1, type: 'bear' }, { time: 18, count: 4, type: 'stirge' }],
-      west:  [{ time: 6, count: 3 }, { time: 16, count: 3 }, { time: 27, count: 3 }, { time: 38, count: 4 }, { time: 45, count: 1, type: 'bear' }, { time: 50, count: 3 }],
-    },
-    bosses: [{ type: 'ogre', time: 15, lane: 'random' }], // TUNING
-    enemyCounts: { wolf: 50, bear: 4, ogre: 1, stirge: 8 },
+    // TUNING (M2i §5–6) — a Fell Wilds: 5 balanced waves; the Ogre opens wave 5 on a random lane.
+    // Bears at 'random' lanes.
+    waves: [
+      { // Wave 1 — 12W 6S
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'south',  type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 6,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'east',   type: 'stirge', count: 3 },
+          { t: 9,  lane: 'south',  type: 'wolf',   count: 3 },
+          { t: 10, lane: 'west',   type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 2 — 14W 8S 1B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 6,  lane: 'south',  type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'south',  type: 'stirge', count: 4 },
+          { t: 9,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 12, lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 12, lane: 'east',   type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 3 — 16W 10S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'south',  type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 6,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'west',   type: 'stirge', count: 3 },
+          { t: 9,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 10, lane: 'south',  type: 'stirge', count: 4 },
+          { t: 11, lane: 'random', type: 'bear',   count: 1 },
+          { t: 12, lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 14, lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 14, lane: 'east',   type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 4 — 18W 12S 2B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'south',  type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 6,  lane: 'east',   type: 'stirge', count: 4 },
+          { t: 7,  lane: 'south',  type: 'wolf',   count: 3 },
+          { t: 9,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 10, lane: 'west',   type: 'stirge', count: 4 },
+          { t: 12, lane: 'random', type: 'bear',   count: 1 },
+          { t: 12, lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 14, lane: 'south',  type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 5 — 16W 10S 2B 1O
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'random', type: 'ogre',   count: 1 },
+          { t: 3,  lane: 'south',  type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 8,  lane: 'south',  type: 'stirge', count: 3 },
+          { t: 9,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 10, lane: 'south',  type: 'wolf',   count: 3 },
+          { t: 12, lane: 'east',   type: 'stirge', count: 4 },
+          { t: 13, lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 14, lane: 'random', type: 'bear',   count: 1 },
+          { t: 15, lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 16, lane: 'west',   type: 'stirge', count: 3 },
+        ],
+      },
+    ],
     stepBudget: 115,                      // TUNING — feature route 90% ≤ 126 (≤ 1.10 × budget)
   },
   // bone: geometry mirrored from gallows (horizontally).
@@ -2224,15 +2646,87 @@ export const LEVELS = {
       vegetation: { base: '#5a5262', light: '#9a90a8' },
       mapTint: '#a8a0b8',
     },
-    // TUNING — 60 wolves: three surges (5 into each lane at about 10, 30 and 50 s) with single
-    // wolves between; Bears at 15 / 22 / 36 / 42 / 55 s.
-    wave: {
-      north:     [{ time: 3, count: 1 }, { time: 10, count: 5 }, { time: 15, count: 1, type: 'bear' }, { time: 18, count: 1 }, { time: 25, count: 1 }, { time: 30, count: 5 }, { time: 40, count: 1 }, { time: 50, count: 5 }, { time: 56, count: 1 }, { time: 11, count: 4, type: 'stirge' }],
-      east:      [{ time: 5, count: 1 }, { time: 11, count: 5 }, { time: 20, count: 1 }, { time: 22, count: 1, type: 'bear' }, { time: 31, count: 5 }, { time: 38, count: 1 }, { time: 42, count: 1, type: 'bear' }, { time: 44, count: 1 }, { time: 51, count: 5 }, { time: 57, count: 1 }, { time: 31, count: 4, type: 'stirge' }],
-      southWest: [{ time: 7, count: 1 }, { time: 12, count: 5 }, { time: 22, count: 1 }, { time: 32, count: 5 }, { time: 36, count: 1 }, { time: 36, count: 1, type: 'bear' }, { time: 46, count: 1 }, { time: 52, count: 5 }, { time: 55, count: 1, type: 'bear' }, { time: 58, count: 1 }, { time: 51, count: 4, type: 'stirge' }],
-    },
-    bosses: [],
-    enemyCounts: { wolf: 60, bear: 5, stirge: 12 },
+    // TUNING (M2i §5–6) — 5 waves, each with two surges (all lanes, 1 s apart, Stirges with them)
+    // about 10–12 s apart; Bears at 'random' lanes, between the surges.
+    waves: [
+      { // Wave 1 — 14W 8S
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'north',     type: 'wolf',   count: 2 },
+          { t: 1,  lane: 'east',      type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'north',     type: 'stirge', count: 4 },
+          { t: 8,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 9,  lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 10, lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 10, lane: 'east',      type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 2 — 18W 10S 1B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 1,  lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'southWest', type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'southWest', type: 'stirge', count: 5 },
+          { t: 5,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 10, lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 11, lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 12, lane: 'southWest', type: 'wolf',   count: 3 },
+          { t: 12, lane: 'north',     type: 'stirge', count: 5 },
+        ],
+      },
+      { // Wave 3 — 20W 12S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 1,  lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'southWest', type: 'wolf',   count: 4 },
+          { t: 2,  lane: 'east',      type: 'stirge', count: 4 },
+          { t: 6,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 11, lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 12, lane: 'east',      type: 'wolf',   count: 4 },
+          { t: 12, lane: 'southWest', type: 'stirge', count: 4 },
+          { t: 13, lane: 'southWest', type: 'wolf',   count: 3 },
+          { t: 13, lane: 'north',     type: 'stirge', count: 4 },
+          { t: 15, lane: 'random',    type: 'bear',   count: 1 },
+        ],
+      },
+      { // Wave 4 — 22W 14S 2B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'north',     type: 'wolf',   count: 4 },
+          { t: 1,  lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 1,  lane: 'north',     type: 'stirge', count: 5 },
+          { t: 2,  lane: 'southWest', type: 'wolf',   count: 4 },
+          { t: 3,  lane: 'southWest', type: 'stirge', count: 4 },
+          { t: 6,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 12, lane: 'north',     type: 'wolf',   count: 4 },
+          { t: 13, lane: 'east',      type: 'wolf',   count: 4 },
+          { t: 13, lane: 'east',      type: 'stirge', count: 5 },
+          { t: 14, lane: 'southWest', type: 'wolf',   count: 3 },
+          { t: 16, lane: 'random',    type: 'bear',   count: 1 },
+        ],
+      },
+      { // Wave 5 — 26W 16S 3B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'north',     type: 'wolf',   count: 4 },
+          { t: 1,  lane: 'east',      type: 'wolf',   count: 5 },
+          { t: 1,  lane: 'east',      type: 'stirge', count: 4 },
+          { t: 2,  lane: 'southWest', type: 'wolf',   count: 4 },
+          { t: 2,  lane: 'southWest', type: 'stirge', count: 4 },
+          { t: 4,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 8,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 12, lane: 'north',     type: 'wolf',   count: 5 },
+          { t: 13, lane: 'east',      type: 'wolf',   count: 4 },
+          { t: 13, lane: 'north',     type: 'stirge', count: 4 },
+          { t: 14, lane: 'southWest', type: 'wolf',   count: 4 },
+          { t: 14, lane: 'east',      type: 'stirge', count: 4 },
+          { t: 17, lane: 'random',    type: 'bear',   count: 1 },
+        ],
+      },
+    ],
     stepBudget: 117,                      // TUNING — feature route 90% ≤ 128 (≤ 1.10 × budget)
   },
   // weeping: geometry mirrored from tornville (vertically).
@@ -2326,15 +2820,85 @@ export const LEVELS = {
       glow: 'rgba(160, 200, 230, 0.35)',
       mapTint: '#6a8aa0',
     },
-    // TUNING — 54 wolves, moderate (3 every 9 s per lane, lanes 3 s apart); 7 Bears, every 7 s
-    // from 12 s (12 / 19 / 26 / 33 / 40 / 47 / 54 s).
-    wave: {
-      lowerLeft: [{ time: 0, count: 3 }, { time: 9, count: 3 }, { time: 12, count: 1, type: 'bear' }, { time: 18, count: 3 }, { time: 27, count: 3 }, { time: 33, count: 1, type: 'bear' }, { time: 36, count: 3 }, { time: 45, count: 3 }, { time: 54, count: 1, type: 'bear' }],
-      right:     [{ time: 3, count: 3 }, { time: 12, count: 3 }, { time: 19, count: 1, type: 'bear' }, { time: 21, count: 3 }, { time: 30, count: 3 }, { time: 39, count: 3 }, { time: 40, count: 1, type: 'bear' }, { time: 48, count: 3 }, { time: 16, count: 4, type: 'stirge' }],
-      topLeft:   [{ time: 6, count: 3 }, { time: 15, count: 3 }, { time: 24, count: 3 }, { time: 26, count: 1, type: 'bear' }, { time: 33, count: 3 }, { time: 42, count: 3 }, { time: 47, count: 1, type: 'bear' }, { time: 51, count: 3 }, { time: 38, count: 4, type: 'stirge' }],
-    },
-    bosses: [],
-    enemyCounts: { wolf: 54, bear: 7, stirge: 8 },
+    // TUNING (M2i §5–6) — 5 waves with the Bears spread evenly through each one (at 'random'
+    // lanes), wolves in bursts of 2–3 and Stirge flocks between them.
+    waves: [
+      { // Wave 1 — 10W 6S 2B
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'lowerLeft', type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 3,  lane: 'right',     type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'right',     type: 'stirge', count: 3 },
+          { t: 6,  lane: 'topLeft',   type: 'wolf',   count: 2 },
+          { t: 8,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 9,  lane: 'lowerLeft', type: 'wolf',   count: 2 },
+          { t: 10, lane: 'topLeft',   type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 2 — 12W 8S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'right',     type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 3,  lane: 'topLeft',   type: 'wolf',   count: 3 },
+          { t: 6,  lane: 'lowerLeft', type: 'wolf',   count: 3 },
+          { t: 6,  lane: 'lowerLeft', type: 'stirge', count: 4 },
+          { t: 9,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 10, lane: 'right',     type: 'wolf',   count: 3 },
+          { t: 11, lane: 'right',     type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 3 — 14W 8S 3B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'topLeft',   type: 'wolf',   count: 3 },
+          { t: 1,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 3,  lane: 'lowerLeft', type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'topLeft',   type: 'stirge', count: 4 },
+          { t: 6,  lane: 'right',     type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 9,  lane: 'topLeft',   type: 'wolf',   count: 3 },
+          { t: 11, lane: 'lowerLeft', type: 'stirge', count: 4 },
+          { t: 13, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 13, lane: 'lowerLeft', type: 'wolf',   count: 2 },
+        ],
+      },
+      { // Wave 4 — 14W 10S 3B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'lowerLeft', type: 'wolf',   count: 3 },
+          { t: 1,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 3,  lane: 'right',     type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'right',     type: 'stirge', count: 3 },
+          { t: 6,  lane: 'topLeft',   type: 'wolf',   count: 3 },
+          { t: 8,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 9,  lane: 'topLeft',   type: 'stirge', count: 4 },
+          { t: 10, lane: 'lowerLeft', type: 'wolf',   count: 3 },
+          { t: 13, lane: 'right',     type: 'wolf',   count: 2 },
+          { t: 14, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 14, lane: 'lowerLeft', type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 5 — 16W 12S 4B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'right',     type: 'wolf',   count: 3 },
+          { t: 1,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 3,  lane: 'topLeft',   type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'lowerLeft', type: 'stirge', count: 4 },
+          { t: 6,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 6,  lane: 'lowerLeft', type: 'wolf',   count: 3 },
+          { t: 9,  lane: 'right',     type: 'wolf',   count: 3 },
+          { t: 10, lane: 'right',     type: 'stirge', count: 4 },
+          { t: 11, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 12, lane: 'topLeft',   type: 'wolf',   count: 2 },
+          { t: 15, lane: 'lowerLeft', type: 'wolf',   count: 2 },
+          { t: 16, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 16, lane: 'topLeft',   type: 'stirge', count: 4 },
+        ],
+      },
+    ],
     stepBudget: 112,                      // TUNING — feature route 90% ≤ 123 (≤ 1.10 × budget)
   },
   // bells: geometry mirrored from barrow (both axes).
@@ -2417,8 +2981,6 @@ export const LEVELS = {
     decorDensity: 1,                      // TUNING
     // Signature: a cracked bronze bell half-buried near the Druid (base centre; size = half-width).
     landmarks: [{ kind: 'bell', x: 1150, y: 310, size: 60 }], // TUNING — the nearest clear spot to the Druid
-    // A deep bell toll (bellToll event) at each of these times, just before each surge (M2f §4.10).
-    tolls: [8.5, 22.5, 36.5, 50.5],       // TUNING — s
     palette: {                            // deep shadowed green, bronze accents
       floor: '#1c2e1e',
       floorAccent: { dark: 'rgba(6, 12, 6, 0.45)', light: 'rgba(160, 120, 60, 0.12)' },
@@ -2431,15 +2993,95 @@ export const LEVELS = {
       bronze: { base: '#8a6a34', light: '#c09a4a', dark: '#4a381a' },
       mapTint: '#a0844a',
     },
-    // TUNING — 64 wolves: every 14 s a toll and a big synchronised surge (5 into each lane at
-    // about 10, 24, 38 and 52 s); few wolves between. Bears at 18 / 30 / 44 / 56 s.
-    wave: {
-      east:  [{ time: 10, count: 5 }, { time: 17, count: 1 }, { time: 18, count: 1, type: 'bear' }, { time: 24, count: 5 }, { time: 38, count: 5 }, { time: 52, count: 5 }, { time: 10, count: 3, type: 'stirge' }, { time: 52, count: 4, type: 'stirge' }],
-      south: [{ time: 10, count: 5 }, { time: 24, count: 5 }, { time: 30, count: 1, type: 'bear' }, { time: 31, count: 1 }, { time: 38, count: 5 }, { time: 52, count: 5 }, { time: 24, count: 3, type: 'stirge' }],
-      west:  [{ time: 10, count: 5 }, { time: 24, count: 5 }, { time: 38, count: 5 }, { time: 44, count: 1, type: 'bear' }, { time: 45, count: 1 }, { time: 52, count: 5 }, { time: 56, count: 1, type: 'bear' }, { time: 58, count: 1 }, { time: 38, count: 4, type: 'stirge' }],
-    },
-    bosses: [],
-    enemyCounts: { wolf: 64, bear: 4, stirge: 14 },
+    // TUNING (M2i §5–6) — 5 waves. Each surge is a synchronised burst on all three lanes with
+    // Stirges, and a deep bell toll (bellToll event, M2f §4.10) rings 1.5 s before it: one surge in
+    // waves 1–2, two in waves 3–5. Bears at 'random' lanes, between the surges.
+    waves: [
+      { // Wave 1 — 18W 10S (one surge)
+        gapAfter: 5,
+        tolls: [0.5],
+        spawns: [
+          { t: 2,  lane: 'east',   type: 'wolf',   count: 5 },
+          { t: 2,  lane: 'south',  type: 'wolf',   count: 5 },
+          { t: 2,  lane: 'west',   type: 'wolf',   count: 5 },
+          { t: 2,  lane: 'south',  type: 'stirge', count: 5 },
+          { t: 3,  lane: 'west',   type: 'stirge', count: 5 },
+          { t: 10, lane: 'east',   type: 'wolf',   count: 1 },
+          { t: 11, lane: 'south',  type: 'wolf',   count: 1 },
+          { t: 12, lane: 'west',   type: 'wolf',   count: 1 },
+        ],
+      },
+      { // Wave 2 — 20W 12S 1B (one surge)
+        gapAfter: 6,
+        tolls: [4.5],
+        spawns: [
+          { t: 0,  lane: 'east',   type: 'wolf',   count: 1 },
+          { t: 2,  lane: 'west',   type: 'wolf',   count: 1 },
+          { t: 6,  lane: 'east',   type: 'wolf',   count: 5 },
+          { t: 6,  lane: 'south',  type: 'wolf',   count: 5 },
+          { t: 6,  lane: 'west',   type: 'wolf',   count: 5 },
+          { t: 6,  lane: 'east',   type: 'stirge', count: 4 },
+          { t: 6,  lane: 'west',   type: 'stirge', count: 4 },
+          { t: 7,  lane: 'south',  type: 'stirge', count: 4 },
+          { t: 10, lane: 'random', type: 'bear',   count: 1 },
+          { t: 13, lane: 'south',  type: 'wolf',   count: 2 },
+          { t: 14, lane: 'west',   type: 'wolf',   count: 1 },
+        ],
+      },
+      { // Wave 3 — 22W 14S 1B (two surges)
+        gapAfter: 6,
+        tolls: [0.5, 10.5],
+        spawns: [
+          { t: 2,  lane: 'east',   type: 'wolf',   count: 4 },
+          { t: 2,  lane: 'south',  type: 'wolf',   count: 4 },
+          { t: 2,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'east',   type: 'stirge', count: 4 },
+          { t: 3,  lane: 'south',  type: 'stirge', count: 3 },
+          { t: 6,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 12, lane: 'east',   type: 'wolf',   count: 4 },
+          { t: 12, lane: 'south',  type: 'wolf',   count: 3 },
+          { t: 12, lane: 'west',   type: 'wolf',   count: 4 },
+          { t: 12, lane: 'west',   type: 'stirge', count: 4 },
+          { t: 13, lane: 'east',   type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 4 — 24W 16S 2B (two surges)
+        gapAfter: 7,
+        tolls: [0.5, 12.5],
+        spawns: [
+          { t: 2,  lane: 'east',   type: 'wolf',   count: 4 },
+          { t: 2,  lane: 'south',  type: 'wolf',   count: 4 },
+          { t: 2,  lane: 'west',   type: 'wolf',   count: 4 },
+          { t: 2,  lane: 'south',  type: 'stirge', count: 4 },
+          { t: 3,  lane: 'west',   type: 'stirge', count: 4 },
+          { t: 7,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 14, lane: 'east',   type: 'wolf',   count: 4 },
+          { t: 14, lane: 'south',  type: 'wolf',   count: 4 },
+          { t: 14, lane: 'west',   type: 'wolf',   count: 4 },
+          { t: 14, lane: 'east',   type: 'stirge', count: 4 },
+          { t: 15, lane: 'south',  type: 'stirge', count: 4 },
+          { t: 17, lane: 'random', type: 'bear',   count: 1 },
+        ],
+      },
+      { // Wave 5 — 28W 20S 2B (two surges)
+        gapAfter: 7,
+        tolls: [0.5, 14.5],
+        spawns: [
+          { t: 2,  lane: 'east',   type: 'wolf',   count: 5 },
+          { t: 2,  lane: 'south',  type: 'wolf',   count: 5 },
+          { t: 2,  lane: 'west',   type: 'wolf',   count: 4 },
+          { t: 2,  lane: 'east',   type: 'stirge', count: 5 },
+          { t: 3,  lane: 'west',   type: 'stirge', count: 5 },
+          { t: 8,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 16, lane: 'east',   type: 'wolf',   count: 4 },
+          { t: 16, lane: 'south',  type: 'wolf',   count: 5 },
+          { t: 16, lane: 'west',   type: 'wolf',   count: 5 },
+          { t: 16, lane: 'south',  type: 'stirge', count: 5 },
+          { t: 17, lane: 'east',   type: 'stirge', count: 5 },
+          { t: 19, lane: 'random', type: 'bear',   count: 1 },
+        ],
+      },
+    ],
     stepBudget: 113,                      // TUNING — feature route 90% ≤ 124 (≤ 1.10 × budget)
   },
   // heartwood: geometry mirrored from blackthorn (vertically).
@@ -2537,15 +3179,109 @@ export const LEVELS = {
       laneGlow: '160, 40, 90',
       mapTint: '#8a3a5a',
     },
-    // TUNING — 60 wolves building steadily to a final heavy push at 50–60 s; Bears at 20 / 28 / 36 /
-    // 44 / 50 / 56 s; two Ogres, at 15 s (south-west lane) and 40 s (east lane).
-    wave: {
-      southWest: [{ time: 0, count: 2 }, { time: 9, count: 2 }, { time: 18, count: 3 }, { time: 20, count: 1, type: 'bear' }, { time: 27, count: 3 }, { time: 36, count: 3 }, { time: 44, count: 1, type: 'bear' }, { time: 45, count: 3 }, { time: 52, count: 4 }, { time: 25, count: 4, type: 'stirge' }],
-      north:     [{ time: 3, count: 2 }, { time: 12, count: 2 }, { time: 21, count: 3 }, { time: 28, count: 1, type: 'bear' }, { time: 30, count: 3 }, { time: 39, count: 3 }, { time: 48, count: 3 }, { time: 50, count: 1, type: 'bear' }, { time: 55, count: 4 }, { time: 42, count: 4, type: 'stirge' }],
-      east:      [{ time: 6, count: 2 }, { time: 15, count: 2 }, { time: 24, count: 3 }, { time: 33, count: 3 }, { time: 36, count: 1, type: 'bear' }, { time: 42, count: 3 }, { time: 50, count: 3 }, { time: 56, count: 1, type: 'bear' }, { time: 57, count: 4 }, { time: 54, count: 4, type: 'stirge' }],
-    },
-    bosses: [{ type: 'ogre', time: 15, lane: 'southWest' }, { type: 'ogre', time: 40, lane: 'east' }], // TUNING
-    enemyCounts: { wolf: 60, bear: 6, ogre: 2, stirge: 12 },
+    // TUNING (M2i §5–6) — the Boss: 6 waves, each building from small bursts to larger ones at
+    // its end. The Ogres open waves 3 (south-west lane) and 6 (east lane); Bears at 'random' lanes.
+    waves: [
+      { // Wave 1 — 14W 8S
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'north',     type: 'wolf',   count: 2 },
+          { t: 4,  lane: 'east',      type: 'wolf',   count: 2 },
+          { t: 6,  lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 7,  lane: 'north',     type: 'stirge', count: 4 },
+          { t: 8,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 10, lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 11, lane: 'southWest', type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 2 — 16W 10S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'north',     type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'east',      type: 'wolf',   count: 2 },
+          { t: 4,  lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 5,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 7,  lane: 'east',      type: 'stirge', count: 5 },
+          { t: 8,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 10, lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 11, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 12, lane: 'southWest', type: 'wolf',   count: 4 },
+          { t: 13, lane: 'north',     type: 'stirge', count: 5 },
+        ],
+      },
+      { // Wave 3 — 18W 12S 2B 1O
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'southWest', type: 'ogre',   count: 1 },
+          { t: 3,  lane: 'east',      type: 'wolf',   count: 2 },
+          { t: 5,  lane: 'north',     type: 'wolf',   count: 2 },
+          { t: 7,  lane: 'southWest', type: 'wolf',   count: 3 },
+          { t: 8,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 9,  lane: 'north',     type: 'stirge', count: 4 },
+          { t: 10, lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 12, lane: 'north',     type: 'wolf',   count: 4 },
+          { t: 13, lane: 'east',      type: 'stirge', count: 4 },
+          { t: 14, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 15, lane: 'southWest', type: 'wolf',   count: 4 },
+          { t: 16, lane: 'southWest', type: 'stirge', count: 4 },
+        ],
+      },
+      { // Wave 4 — 18W 14S 2B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'north',     type: 'wolf',   count: 2 },
+          { t: 4,  lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 6,  lane: 'southWest', type: 'stirge', count: 4 },
+          { t: 8,  lane: 'southWest', type: 'wolf',   count: 3 },
+          { t: 10, lane: 'north',     type: 'wolf',   count: 4 },
+          { t: 11, lane: 'east',      type: 'stirge', count: 5 },
+          { t: 12, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 13, lane: 'east',      type: 'wolf',   count: 4 },
+          { t: 15, lane: 'north',     type: 'stirge', count: 5 },
+        ],
+      },
+      { // Wave 5 — 20W 16S 3B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'north',     type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 4,  lane: 'southWest', type: 'wolf',   count: 3 },
+          { t: 6,  lane: 'north',     type: 'stirge', count: 5 },
+          { t: 8,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 9,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 10, lane: 'east',      type: 'wolf',   count: 4 },
+          { t: 11, lane: 'southWest', type: 'stirge', count: 5 },
+          { t: 13, lane: 'southWest', type: 'wolf',   count: 5 },
+          { t: 15, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 16, lane: 'east',      type: 'stirge', count: 3 },
+          { t: 17, lane: 'north',     type: 'stirge', count: 3 },
+        ],
+      },
+      { // Wave 6 — 22W 18S 3B 1O
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'east',      type: 'ogre',   count: 1 },
+          { t: 3,  lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 5,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 6,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 7,  lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 8,  lane: 'southWest', type: 'stirge', count: 5 },
+          { t: 10, lane: 'southWest', type: 'wolf',   count: 4 },
+          { t: 11, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 12, lane: 'north',     type: 'wolf',   count: 4 },
+          { t: 13, lane: 'east',      type: 'stirge', count: 5 },
+          { t: 14, lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 16, lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 16, lane: 'north',     type: 'stirge', count: 4 },
+          { t: 17, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 18, lane: 'southWest', type: 'stirge', count: 4 },
+        ],
+      },
+    ],
     stepBudget: 111,                      // TUNING — feature route 90% ≤ 122 (≤ 1.10 × budget)
   },
 };

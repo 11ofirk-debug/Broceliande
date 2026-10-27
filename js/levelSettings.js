@@ -18,25 +18,8 @@ export function stuckTime(level) {
 }
 
 // M2i §2: the level's waves, each { gapAfter, spawns: [{ t, lane, type, count }], tolls? }.
-// TEMPORARY (until rows 4–8 are migrated, M2i I2): a level still written with the old single
-// schedule (wave / bosses / tolls) runs it as one wave; its Bears' lanes are 'random' (spread
-// as before) when RANDOMISE_BEAR_LANES.
-const legacyWaves = new WeakMap();
 export function levelWaves(level) {
-  if (level.waves) return level.waves;
-  if (!legacyWaves.has(level)) {
-    const spawns = [];
-    for (const [laneId, bursts] of Object.entries(level.wave ?? {})) {
-      for (const b of bursts) {
-        const type = b.type ?? 'wolf';
-        spawns.push({ t: b.time, lane: type === 'bear' && C.RANDOMISE_BEAR_LANES ? 'random' : laneId, type, count: b.count });
-      }
-    }
-    for (const boss of level.bosses ?? []) spawns.push({ t: boss.time, lane: boss.lane, type: boss.type, count: 1 });
-    spawns.sort((a, b) => a.t - b.t);
-    legacyWaves.set(level, [{ gapAfter: 0, spawns, tolls: level.tolls ?? [] }]);
-  }
-  return legacyWaves.get(level);
+  return level.waves;
 }
 
 // Per-type enemy totals { type: n } of one wave, or of all the level's waves.
