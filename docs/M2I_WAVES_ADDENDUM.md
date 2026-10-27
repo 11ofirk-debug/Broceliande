@@ -66,7 +66,8 @@ COUNTDOWN (before wave 1) → WAVE → GAP → WAVE → GAP → … → WAVE (la
 - **COUNTDOWN:** when Combat begins, a `FIRST_WAVE_DELAY` (3 s) countdown with the wave 1 preview.
 - **WAVE:** spawns run on the wave's own clock. The wave is **cleared** when all its spawns have happened and no enemies are alive.
 - **GAP:** starts the moment a wave is cleared, lasts `gapAfter` seconds, then the next wave begins. In the gap, everything else continues as normal: summons keep their timers, Squirrels collect drops, Bough Double jobs progress, and the player can summon and upgrade.
-- **Victory:** clearing the last wave enters `ENDING` → Victory, as before.
+- **Gap timer (later change):** a wave's gap starts as soon as **either** the wave is cleared **or** `WAVE_GAP_AFTER_LAST_SPAWN` (10 s, TUNING) has passed since the wave's last enemy spawned, whichever comes first. When the timer starts it, enemies from that wave may still be alive: they keep fighting normally and the next wave spawns alongside them. The preview and Call next wave appear when the gap starts either way. The HUD's `Enemies left` counts every enemy alive (from any wave) plus this wave's enemies not yet spawned.
+- **Victory:** clearing the last wave enters `ENDING` → Victory, as before. The last wave has no gap and no timer: Victory needs every enemy from every wave dead.
 - **Defeat** can happen at any time, as before.
 
 ### 3.2 Call next wave

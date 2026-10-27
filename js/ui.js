@@ -72,9 +72,10 @@ function enemyDebugLines(game) {
 function waveDebugLines(game) {
   const w = game.wave;
   if (!w) return [`Wave:     — (${waveCount(game)} waves, from Combat)`];
-  const timer = w.state === WaveState.WAVE ? `wave time ${game.waveTime.toFixed(1)} s` : `next in ${w.remaining.toFixed(1)} s`;
+  const timer = w.state === WaveState.WAVE ? `wave time ${game.waveTime.toFixed(1)} s, last spawn at ${w.lastSpawnAt.toFixed(1)}` : `next in ${w.remaining.toFixed(1)} s`;
+  const reason = w.state === WaveState.GAP ? `  gap: ${w.gapReason}` : '';
   return [
-    `Wave:     ${w.index + 1} / ${waveCount(game)}  ${w.state}  ${timer}  (cleared ${w.cleared})`,
+    `Wave:     ${w.index + 1} / ${waveCount(game)}  ${w.state}${reason}  ${timer}  (done ${w.cleared})`,
     `          spawned ${w.spawned}  alive ${game.enemies.length}  left ${waveEnemiesLeft(game)}`,
   ];
 }
@@ -567,8 +568,11 @@ function updateHud(el, game) {
   } else {
     setText(el.timer, formatTime(game.combatTime));
   }
-  // M2i §4.1: this wave's enemies left, alive or still to spawn (none shown between waves).
-  setText(el.wolves, isCombat && game.wave?.state === WaveState.WAVE ? `Enemies left: ${waveEnemiesLeft(game)}` : '');
+  // M2i §4.1: every enemy alive (from any wave) plus this wave's still to spawn; between waves only
+  // while some are still alive (a gap started by WAVE_GAP_AFTER_LAST_SPAWN).
+  const left = game.wave ? waveEnemiesLeft(game) : 0;
+  const showLeft = isCombat && game.wave && (game.wave.state === WaveState.WAVE || left > 0);
+  setText(el.wolves, showLeft ? `Enemies left: ${left}` : '');
   el.startCombat.hidden = !isPrep;
   const muted = isMuted();
   if (el.mute.classList.contains('muted') !== muted) {

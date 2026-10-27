@@ -74,7 +74,7 @@ function trySpawn(game, lane, type, first = true) {
   game.enemies.push(createEnemy(game.nextEntityId++, type, lane, offset, game.rng, game.stats['enemy.hpMult']));
   game.enemyCounts[type].spawned++;
   game.enemyCounts[type].alive++;
-  if (game.wave) game.wave.spawned++; // this wave's figures (M2i §7)
+  if (game.wave) { game.wave.spawned++; game.wave.lastSpawnAt = game.waveTime; } // this wave's figures (M2i §7); its gap timer
   // A mini-boss arrives (M2c §2.6): banner, its lane's entrance pulses red, roar (audio).
   if (t.boss) {
     game.bossAnnouncement = { text: `An ${t.name} approaches!`, age: 0 };

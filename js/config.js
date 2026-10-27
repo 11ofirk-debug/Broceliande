@@ -328,6 +328,7 @@ export const DECOR = {
 // ---------------------------------------------------------------------------
 export const BURST_STAGGER = 0.6;        // TUNING — s between enemies in one burst
 export const FIRST_WAVE_DELAY = 3;      // TUNING — s of countdown before wave 1 (M2i §3.1)
+export const WAVE_GAP_AFTER_LAST_SPAWN = 10; // TUNING — s after a wave's last spawn when its gap starts even with enemies alive (not after the last wave)
 export const WAVE_ICON_SIZE = 30;       // px, enemy images in the wave preview (M2i §4.2)
 
 // ---------------------------------------------------------------------------

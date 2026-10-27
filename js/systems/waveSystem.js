@@ -2,7 +2,9 @@
 // game.wave: { state: WaveState, index, remaining, cleared, spawned }
 //   index:     the current wave (WAVE) or the next one (COUNTDOWN / GAP), 0-based
 //   remaining: s left of the countdown or gap
-//   cleared:   waves cleared so far
+//   cleared:   waves done so far (their gap started, or the last one won)
+//   gapReason: what started the current gap, 'cleared' or 'timer' (debug panel)
+//   lastSpawnAt: wave time of the current wave's latest spawn
 //   spawned:   enemies spawned in the current wave (debug panel)
 // game.waveTime counts from the start of the current wave and keeps running through its gap,
 // so debug-queued enemies spawn in gaps too. Spawning, tolls and wave clears all read it.
@@ -19,7 +21,7 @@ export function waveCount(game) {
 
 // Combat begins: the countdown to wave 1, with its preview.
 export function startWaves(game) {
-  game.wave = { state: WaveState.COUNTDOWN, index: 0, remaining: C.FIRST_WAVE_DELAY, cleared: 0, spawned: 0 };
+  game.wave = { state: WaveState.COUNTDOWN, index: 0, remaining: C.FIRST_WAVE_DELAY, cleared: 0, spawned: 0, gapReason: null, lastSpawnAt: 0 };
   game.waveTime = 0;
   game.spawnQueues = game.lanes.map((lane) => ({ lane, spawns: [] })); // debug spawns before wave 1
   game.tolls = [];
@@ -34,16 +36,23 @@ export function updateWaveClock(game, dt) {
   if (w.remaining <= 0) beginWave(game);
 }
 
-// Each Combat step, last: a wave is cleared once all its spawns have happened and no enemies are
-// alive. Clearing the last wave wins the battle (the caller enters ENDING).
-// Returns true when the battle is won.
+// Each Combat step, last: once all the wave's spawns have happened, its gap starts when either
+//   'cleared': no enemies are alive (from any wave), or
+//   'timer':   WAVE_GAP_AFTER_LAST_SPAWN s have passed since its last spawn; enemies still alive
+//              keep fighting and the next wave spawns alongside them.
+// The last wave has no gap: the battle is won only once every enemy is dead (the caller enters
+// ENDING). Returns true when the battle is won.
 export function checkWaveCleared(game) {
   const w = game.wave;
   if (w.state !== WaveState.WAVE) return false;
-  if (game.enemies.length > 0 || game.spawnQueues.some((q) => q.spawns.length > 0)) return false;
-  w.cleared++;
-  events.emit('waveCleared', { index: w.index });
-  if (w.index + 1 >= waveCount(game)) return true;
+  if (game.spawnQueues.some((q) => q.spawns.length > 0)) return false;
+  const cleared = game.enemies.length === 0;
+  const last = w.index + 1 >= waveCount(game);
+  if (!cleared && (last || game.waveTime - w.lastSpawnAt < C.WAVE_GAP_AFTER_LAST_SPAWN)) return false;
+  w.cleared++; // waves done (Victory overlay)
+  w.gapReason = cleared ? 'cleared' : 'timer';
+  if (cleared) events.emit('waveCleared', { index: w.index });
+  if (last) return true;
   w.state = WaveState.GAP;
   w.remaining = levelWaves(game.scene.level)[w.index].gapAfter;
   w.index++;
@@ -65,7 +74,7 @@ export function skipWave(game) {
   for (const enemy of [...game.enemies]) killEnemy(game, enemy);
 }
 
-// This wave's enemies still to deal with: alive plus not yet spawned (HUD, M2i §4.1).
+// Enemies still to deal with: every one alive (from any wave) plus this wave's not yet spawned (HUD).
 export function waveEnemiesLeft(game) {
   return game.enemies.length + game.spawnQueues.reduce((a, q) => a + q.spawns.length, 0);
 }
@@ -84,5 +93,7 @@ function beginWave(game) {
   w.state = WaveState.WAVE;
   w.remaining = 0;
   w.spawned = 0;
+  w.lastSpawnAt = 0;
+  w.gapReason = null;
   events.emit('waveStarts', { index: w.index });
 }
