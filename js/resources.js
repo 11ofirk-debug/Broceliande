@@ -1,21 +1,17 @@
 // Resource helpers (spec §8.1, M1i §1). An amount/cost is { pits, reeds, feathers, boughs };
 // a missing key counts as 0. RESOURCE_KEYS is the display order everywhere (HUD, tooltips, cost rows).
 
-export const RESOURCE_KEYS = ['pits', 'reeds', 'feathers', 'boughs'];
+import * as C from './config.js';
 
-const NAMES = {
-  pits: ['Pit', 'Pits'],
-  reeds: ['Reed', 'Reeds'],
-  feathers: ['Feather', 'Feathers'],
-  boughs: ['Bough', 'Boughs'], // Mossy Bough (M1i §1.1)
-};
+// From data/resources.csv (its `order` column).
+export const RESOURCE_KEYS = C.RESOURCE_ORDER;
 
 export function emptyResources() {
   return Object.fromEntries(RESOURCE_KEYS.map((k) => [k, 0]));
 }
 
 export function resourceName(key, n) {
-  return NAMES[key][n === 1 ? 0 : 1];
+  return n === 1 ? C.RESOURCES[key].singular : C.RESOURCES[key].plural;
 }
 
 export function canAfford(resources, cost) {

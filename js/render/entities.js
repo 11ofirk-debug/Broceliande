@@ -669,7 +669,7 @@ export function drawBear(ctx, bear, hit, lunging) {
 }
 
 // The Stirge (M2h §5): a small bat-like flyer with leathery wings flapping fast, a long thin
-// proboscis and red eyes, drawn STIRGE_FLY_HEIGHT above its ground point, where a small soft
+// proboscis and red eyes, drawn its flyHeight above its ground point, where a small soft
 // shadow shows its place on the lane. Hovers with a slight bob. hit / lunging as for the others.
 export function drawStirge(ctx, s, hit, lunging, anim) {
   const r = s.radius;
@@ -677,7 +677,7 @@ export function drawStirge(ctx, s, hit, lunging, anim) {
   const bob = Math.sin(anim * 9 + s.id) * 1.5;
   const flap = Math.sin(anim * 38 + s.id * 1.7); // fast wingbeat
   ctx.save();
-  ctx.translate(s.x, s.y - C.STIRGE_FLY_HEIGHT + bob);
+  ctx.translate(s.x, s.y - C.ENEMY_TYPES[s.type].flyHeight + bob);
   ctx.scale(s.facing * (r / 12), r / 12);
   if (lunging) ctx.translate(3, 2);
   const body = hit === 'strike' ? COLORS.strikeFlash : hit ? STIRGE.hit : STIRGE.body;
@@ -933,7 +933,7 @@ export function drawFeature(ctx, feature, hovered) {
 // blue, and slightly longer arms with a bigger cup.
 export function drawTurret(ctx, turret, upgrading) {
   const { x, y } = slotBase(turret);
-  const top = y - C.TURRET_MUZZLE_HEIGHT;
+  const top = y - C.TURRET_TYPES[turret.type ?? 'sprinkler'].muzzleHeight;
   const band = turret.level >= 3 ? COLORS.level3Band : COLORS.upgradeBand;
   const armLength = turret.level >= 3 ? 29 : 27;
   const cupRadius = turret.level >= 3 ? 7 : 6.5;

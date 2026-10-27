@@ -1,0 +1,5 @@
+id,name,plural,hp,speed,radius,collisionRadius,damage,attackInterval,windup,meleeSlots,flying,flyHeight,hitHeight,burstStagger,dropSpacing,keepSide,sideWander,boss,stepSoundInterval
+wolf,Wolf,Wolves,17,82,16,,2,1.4,,1,,,10,,,,,,
+bear,Bear,Bears,90,48,26,,8,2,,2,,,20,,,,,,
+ogre,Ogre,Ogres,450,30,52,30,25,3.5,0.8,3,,,46,,24,TRUE,4,TRUE,0.8
+stirge,Stirge,Stirges,6,144,12,,0.5,0.6,,0,TRUE,18,24,0.3,,,,,

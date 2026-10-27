@@ -119,6 +119,19 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js"></script>
+  <!-- M2j §4: shown while the data tabs load, and the data problems (errors stop the game from
+       starting; warnings can be dismissed). Outside the stage, so they read at any window size. -->
+  <div id="loading-screen">Loading…</div>
+  <div id="data-errors" class="data-problems" hidden>
+    <div class="data-problems-title">The game data has errors. Fix them in the sheet (or data/*.csv) and reload.</div>
+    <ul></ul>
+  </div>
+  <div id="data-warnings" class="data-problems" hidden>
+    <div class="data-problems-title">Data warnings (the game runs anyway)</div>
+    <ul></ul>
+    <button type="button">Dismiss</button>
+  </div>
+
+  <script type="module" src="js/boot.js"></script>
 </body>
 </html>

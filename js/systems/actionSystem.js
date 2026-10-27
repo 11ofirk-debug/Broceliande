@@ -128,10 +128,10 @@ function completeTravel(game, marker, turretType) {
 // cap. The Bough Double is `targeted`: instead of being placed anywhere, it is pointed at a
 // turret slot and does a job there (doubleSystem.js); its cost is the Bough, and the job's.
 export const SUMMONS = {
-  vulture: { kind: 'vulture', name: 'Vulture', plural: 'Vultures', cost: C.VULTURE_COST, max: C.MAX_VULTURES, active: (g) => g.vultures, create: createVulture },
-  squirrel: { kind: 'squirrel', name: 'Squirrel', plural: 'Squirrels', cost: C.SQUIRREL_COST, max: C.MAX_SQUIRRELS, active: (g) => g.squirrels, create: createSquirrel },
+  vulture: { kind: 'vulture', name: C.SUMMON_TYPES.vulture.name, plural: C.SUMMON_TYPES.vulture.plural, cost: C.VULTURE_COST, max: C.MAX_VULTURES, active: (g) => g.vultures, create: createVulture },
+  squirrel: { kind: 'squirrel', name: C.SUMMON_TYPES.squirrel.name, plural: C.SUMMON_TYPES.squirrel.plural, cost: C.SQUIRREL_COST, max: C.MAX_SQUIRRELS, active: (g) => g.squirrels, create: createSquirrel },
   // The Bough Double's cap is the effective double.max (M2e), checked in doubleSystem.js.
-  double: { kind: 'double', name: 'Bough Double', plural: 'Bough Doubles', cost: C.BOUGH_DOUBLE_COST, active: (g) => g.doubles, targeted: true },
+  double: { kind: 'double', name: C.SUMMON_TYPES.double.name, plural: C.SUMMON_TYPES.double.plural, cost: C.BOUGH_DOUBLE_COST, active: (g) => g.doubles, targeted: true },
 };
 
 // A summon's cap: its config max, or for the Bough Double the effective double.max (M2e).

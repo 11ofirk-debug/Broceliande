@@ -99,7 +99,7 @@ export function updateProjectiles(game, dt) {
   const remaining = [];
   for (const p of game.projectiles) {
     const pellet = p.kind === 'pellet';
-    const step = (pellet ? turretType(p.source).pelletSpeed : C.PROJECTILE_SPEED) * dt;
+    const step = turretType(p.source).projectileSpeed * dt; // pebble or pellet speed, per turret type
     const target = game.enemies.find((e) => e.id === p.targetId);
     if (target) {
       // Remember where the target was: a pellet bursts there if it dies in flight (M1f §6.4).

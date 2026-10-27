@@ -27,23 +27,10 @@ const BASES = {
 
 export const STAT_KEYS = Object.keys(BASES);
 
-// Short labels for the debug panel (and later the stats strip).
-export const STAT_LABELS = {
-  'vulture.duration': 'Vulture duration (s)',
-  'vulture.damage': 'Vulture damage',
-  'squirrel.duration': 'Squirrel duration (s)',
-  'squirrel.speed': 'Squirrel speed (px/s)',
-  'squirrel.pickupRange': 'Squirrel pickup range (px)',
-  'double.boughRefundChance': 'Bough refund chance',
-  'double.max': 'Bough Doubles at a time',
-  'druid.maxHp': 'Max HP',
-  'druid.regenAmount': 'Regen (HP per interval)',
-  'work.speed': 'Build speed',
-  'search.mainBonus': 'Search bonus',
-  'steps.budget': 'Steps',
-  'steps.length': 'Step length (px)',
-  'enemy.hpMult': 'Enemy HP ×',
-};
+// A stat's short label (debug panel, and later the stats strip), from data/stats.csv.
+export function statLabel(stat) {
+  return C.STATS[stat] ?? stat;
+}
 
 export function baseStats(level) {
   return Object.fromEntries(STAT_KEYS.map((k) => [k, BASES[k](level)]));

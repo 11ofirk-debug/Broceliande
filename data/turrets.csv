@@ -1,0 +1,7 @@
+turret,name,level,attack,damage,fireInterval,range,cost_pits,cost_reeds,cost_feathers,cost_boughs,time,projectileSpeed,muzzleHeight,cloudRadius,cloudDuration,cloudTick,cloudTickDamage
+sprinkler,Pebble Sprinkler,1,projectile,3,0.75,220,2,1,0,,2.3,600,40,,,,
+sprinkler,Pebble Sprinkler,2,projectile,5,0.6,264,2,0,1,,2.5,600,40,,,,
+sprinkler,Pebble Sprinkler,3,projectile,7,0.5,297,6,0,2,,4,600,40,,,,
+toader,Poison Toader,1,cloud,3,3.5,260,0,2,0,,2.5,450,20,70,4.2,0.8,1
+toader,Poison Toader,2,cloud,4,3,285,3,1,0,,3,450,20,80,5,0.65,1
+toader,Poison Toader,3,cloud,5,2.6,310,5,1,1,,4,450,20,90,5.6,0.5,1

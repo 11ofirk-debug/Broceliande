@@ -48,4 +48,4 @@ Then open http://localhost:8000 in Chrome.
 | `G` | Grant +10 of each resource |
 | `X` | Toggle enemy drop chances between ×1 and ×`DEBUG_DROP_MULT` (×10) — see `docs/M1D_DROPS_SQUIRREL_ADDENDUM.md` |
 
-All tuning values and coordinates live in `js/config.js`.
+Balancing data (stats, costs, levels, waves, candidates, palettes, sounds…) lives in `data/*.csv`, one file per tab of the Google Sheet, loaded at start-up; data problems show in the page. Code-side settings (lane geometry, decoration, UI and drawing sizes, debug) live in `js/config.js`. See `docs/M2J_DATA_SHEET_ADDENDUM.md`.

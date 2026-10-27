@@ -1,0 +1,18 @@
+id,name,description,row,nodeType,enemyHpMult,corridorWidth,stepBudget,stuckTime,mix_tree,mix_reedPatch,mix_shrub,mix_ruins,mix_pond
+tornville,Tornville Haunt,The old haunt at the forest's edge.,1,wilds,,,102,,3,1,1,2,2
+gallows,Gallows Copse,A restless swarm.,2,wilds,,,102,,3,1,1,2,2
+blackthorn,Blackthorn Hollow,Thick thorns hide heavy beasts.,2,wilds,,,102,,3,1,1,2,2
+drowned,The Drowned Hamlet,Half-sunk cottages and narrow causeways.,3,wilds,,90,110,,1,2,1,1,4
+wychwood,Wychwood Circle,The old stones hum. The packs come in great surges.,3,wilds,,130,126,,2,1,3,2,1
+barrow,Forgotten Barrow,Something stirs beneath the mound.,3,fell,,,106,,2,1,1,4,1
+charcoal,Charcoal Burner's Camp,Smoke hangs low over the old kilns.,4,wilds,1.1,,114,,1,1,1,4,2
+stags,Stag's Crossing,Where the old ford cuts through the forest.,4,wilds,1.1,130,127,,2,2,1,1,3
+briar,Briar Chapel,Thorns have swallowed the old chapel.,5,wilds,1.2,95,117,1.8,2,1,3,2,1
+causeway,Sunken Causeway,An old road drowned in black water.,5,wilds,1.2,90,110,2.5,1,2,1,1,4
+widows,Widow's Orchard,"Gnarled fruit trees, and something hungry beneath them.",5,wilds,1.2,115,126,,4,1,1,2,1
+mossbound,Mossbound Cairn,Moss-covered stones mark an ancient grave.,6,wilds,1.3,,110,,3,1,2,2,1
+ashen,The Ashen Glade,Nothing grows here since the fire.,6,fell,1.3,115,115,,2,1,1,3,2
+bone,Bone Orchard,"Pale branches, and paler things among the roots.",7,wilds,1.4,120,117,,2,1,2,3,1
+weeping,The Weeping Stones,"The standing stones are always wet, though it never rains.",7,wilds,1.4,115,112,,2,1,1,3,2
+bells,Hollow of Bells,"Somewhere below, a bell tolls. The packs answer.",7,wilds,1.4,125,113,,2,1,3,2,1
+heartwood,The Heartwood,"The heart of Broceliande, and the rot at its centre.",8,boss,1.5,120,111,,2,1,2,2,2

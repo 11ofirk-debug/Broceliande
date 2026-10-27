@@ -1,0 +1,13 @@
+id,slot,name,description,effect1_stat,effect1_op,effect1_value,effect2_stat,effect2_op,effect2_value,iconColor,iconAccent,iconMark
+hawkfeatherCrown,crown,Hawkfeather Crown,Vultures stay 4 s longer.,vulture.duration,add,4,,,,#c9a25a,#f4ecd8,feather
+talonCrown,crown,Talon Crown,Vultures deal 3 more damage.,vulture.damage,add,3,,,,#8e3b2c,#efe0c4,talon
+nutwoodGrip,grip,Nutwood Grip,Squirrels stay 6 s longer.,squirrel.duration,add,6,,,,#7a4e2a,#e3b46a,nut
+quickpawGrip,grip,Quickpaw Grip,Squirrels run 40% faster and grab drops from 10 px further.,squirrel.speed,mult,1.4,squirrel.pickupRange,add,10,#b5652e,#f6d9a8,paw
+mossheartFerrule,ferrule,Mossheart Ferrule,35% chance a Bough Double gives its Bough back when its job starts.,double.boughRefundChance,add,0.35,,,,#4f7a3a,#b8e08a,moss
+twinrootFerrule,ferrule,Twin-root Ferrule,One more Bough Double can work at a time.,double.max,add,1,,,,#6b4a2e,#d8b88a,roots
+oakheartAmulet,necklace,Oakheart Amulet,+20 max HP.,druid.maxHp,add,20,,,,#8a5a2b,#7fc46a,acorn
+sapPendant,necklace,Sap Pendant,Regain 1 HP every 4 s in Combat.,druid.regenAmount,add,1,,,,#c98a1e,#ffd36a,drop
+wrightsBelt,belt,Wright's Belt,Building and upgrading 25% faster.,work.speed,mult,1.25,,,,#5a4632,#c0c4c8,hammer
+foragersBelt,belt,Forager's Belt,Every search yields 1 more of the spot's main resource.,search.mainBonus,add,1,,,,#6e7a3a,#e8d27a,pouch
+fernstepBoots,shoes,Fernstep Boots,+15 steps.,steps.budget,add,15,,,,#3f6a3a,#9fdc7a,fern
+haresShoes,shoes,Hare's Shoes,Travel costs 15% fewer steps.,steps.length,mult,1.15,,,,#a08a6e,#f2ece0,ears

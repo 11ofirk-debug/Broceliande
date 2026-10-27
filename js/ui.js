@@ -24,10 +24,10 @@ import { isStepMode, stepCost, canVisit, anyVisitable, routePreview, calibration
 import { enemyTotals, waveCounts } from './game.js';
 import { isMuted, soundStats, audioStatus } from './audio.js';
 import { isRunComplete, mapNode, nodeRadius } from './run.js';
-import { resolveStats, changedStats, STAT_LABELS } from './stats.js';
+import { resolveStats, changedStats, statLabel } from './stats.js';
 import { drawSlotIcon } from './render/items.js';
 
-const RESOURCE_LABELS = { pits: 'Peach Pits', reeds: 'Reeds', feathers: 'Feathers', boughs: 'Mossy Boughs' };
+const RESOURCE_LABELS = Object.fromEntries(Object.entries(C.RESOURCES).map(([k, r]) => [k, r.name])); // full names (data/resources.csv)
 // "Pits 3  Reeds 0  Feathers 2  Boughs 1": every resource, in display order (debug panel).
 const resourceLine = (o) => RESOURCE_KEYS.map((k) => `${resourceName(k, 2)} ${o[k] ?? 0}`).join('  ');
 const POPUP_GAP = 16; // px between a world object and its tooltip/menu
@@ -1011,7 +1011,7 @@ function equipmentLines(game) {
   const r = game.run;
   const stats = game.state === GameState.MAP ? resolveStats(r.equipped, game.scene.level) : game.stats;
   const equipped = Object.entries(r.equipped).filter(([, id]) => id).map(([slot, id]) => `${slot} ${id}`);
-  const changed = changedStats(stats, game.scene.level).map((c) => `${STAT_LABELS[c.stat]} ${fmt(c.base)} → ${fmt(c.value)}`);
+  const changed = changedStats(stats, game.scene.level).map((c) => `${statLabel(c.stat)} ${fmt(c.base)} → ${fmt(c.value)}`);
   return [
     `Items:  ${r.items.join(', ') || '—'}   (I on the map adds one)`,
     `Equipped: ${equipped.join(', ') || '—'}`,

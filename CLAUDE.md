@@ -4,14 +4,15 @@ Browser prototype of a survival tower-defence roguelite. Current goal: **Milesto
 
 ## Source of truth
 - The full specification is `docs/M1_SPEC.md`. Read the sections relevant to the current task before writing code.
-- The addenda in `docs/` extend and override it. Read them in order: M1, then M1B–M1J, then M2A. A later document overrides an earlier one where they differ.
+- The addenda in `docs/` extend and override it. Read them in order: M1, then M1B–M1J, then M2A–M2J. A later document overrides an earlier one where they differ.
 - If the spec and a prompt conflict, ask before proceeding.
 - If the spec is silent and no reasonable judgement call is possible, ask rather than guess. If you do make a judgement call, mention it in your summary.
 
 ## Hard rules
 - HTML, CSS and vanilla JavaScript ES modules only. No frameworks, libraries, bundlers or build step.
 - No external assets. All visuals are drawn programmatically.
-- **Every gameplay number and scene coordinate lives in `js/config.js`.** Never hard-code tuning values in systems. Label starting guesses with a `// TUNING` comment.
+- **Balancing data lives in `data/*.csv`** (one file per tab of the designer's Google Sheet, where it is edited; see `docs/M2J_DATA_SHEET_ADDENDUM.md`). The game loads it at start-up (`js/boot.js`, `js/data/`), and `js/config.js` fills its data values from it in `applyData()`. A value lives in exactly one place: never copy a CSV value into code.
+- **`js/config.js` holds only code-side settings**: stage and loop, UI and drawing sizes, visual-only timings, lane geometry, Druid positions, zones and decoration (`LEVEL_GEOMETRY`), debug settings. Never hard-code tuning values in systems; label starting guesses with `// TUNING` (in config.js) or in the CSV `notes` column.
 - Keep simulation, rendering and UI separate: config → simulation → rendering → UI.
 - Simulation uses a fixed timestep and simulation time only (never wall-clock).
 - All randomness goes through the seeded RNG in `js/rng.js`.

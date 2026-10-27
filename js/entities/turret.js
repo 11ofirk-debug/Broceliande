@@ -48,7 +48,7 @@ export function nextLevelStats(turret) {
 }
 
 export function levelRange(type, level) {
-  return C.TURRET_TYPES[type].range * levelStats(type, level).rangeMult;
+  return levelStats(type, level).range;
 }
 
 export function turretRange(turret) {
