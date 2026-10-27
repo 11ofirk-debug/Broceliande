@@ -907,3 +907,48 @@ html, body {
 .menu-option.flash {
   background: rgba(224, 85, 58, 0.35);
 }
+
+/* ---------- Wave preview (M2i §4.2) ---------- */
+/* One row in the HUD strip's centre, in place of the wave label and clock. */
+#wave-preview {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 22px;
+  white-space: nowrap;
+}
+#wave-preview-title {
+  font-weight: bold;
+  letter-spacing: 0.04em;
+}
+#wave-preview-entries {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.wave-entry {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  border-radius: 6px;
+}
+.wave-entry.boss {
+  outline: 2px solid #c8402a;
+  color: #ffd0c0;
+}
+#btn-next-wave {
+  font-size: 16px;
+  padding: 3px 14px;
+  background: #3e5a2c;
+  color: #f1e8cc;
+  border: 1px solid #7a9a5a;
+  border-radius: 6px;
+}
+#btn-next-wave:hover {
+  background: #4e6e38;
+}
+#btn-next-wave .key-hint {
+  opacity: 0.7;
+}

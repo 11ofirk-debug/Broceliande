@@ -102,6 +102,8 @@ function subscribe() {
   events.on('runComplete', (e) => play('runComplete', e));
   events.on('magicFound', (e) => play('magicFound', e));
   events.on('bellToll', (e) => play('bellToll', e));
+  events.on('waveStarts', (e) => play('waveStarts', e));   // M2i §4.3
+  events.on('waveCleared', (e) => play('waveCleared', e));
   events.on('summonDenied', (e) => play('summonDenied', e));
   events.on('doubleAppears', (e) => play('doubleAppears', e));
   events.on('doubleCraftHit', (e) => play('doubleCraftHit', e));
@@ -383,6 +385,21 @@ const RECIPES = {
     });
     noise(t, out, { filter: 'highpass', freq: 6000 * p, dur: 0.9, attack: 0.05, gain: 0.25 });
     return 0.95;
+  },
+
+  // A wave starts (M2i §4.3): a low drum hit under a short, rough horn call.
+  waveStarts(t, out, p) {
+    tone(t, out, { freq: 70 * p, to: 42 * p, dur: 0.35, gain: 1 });
+    noise(t, out, { filter: 'lowpass', freq: 300 * p, dur: 0.12, gain: 0.5 });
+    tone(t, out, { type: 'sawtooth', freq: 147 * p, to: 165 * p, dur: 0.55, gain: 0.22, attack: 0.08, delay: 0.05 });
+    return tone(t, out, { type: 'triangle', freq: 294 * p, to: 330 * p, dur: 0.55, gain: 0.25, attack: 0.08, delay: 0.05 });
+  },
+
+  // A wave cleared: a soft rising chime.
+  waveCleared(t, out, p) {
+    bell(t, out, 660 * p, 0, 0.5, 0.35);
+    bell(t, out, 880 * p, 0.12, 0.5, 0.35);
+    return bell(t, out, 1100 * p, 0.24, 0.7, 0.35);
   },
 
   // Stirges (M2h §5). A flock arriving: a short, thin buzzing whirr (a fast-trembling high buzz).

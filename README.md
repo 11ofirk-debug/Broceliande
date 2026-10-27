@@ -20,6 +20,7 @@ Then open http://localhost:8000 in Chrome.
 | `Q` | Summon a Vulture (Combat only) — straight into placement; again to cancel |
 | `W` | Summon a Squirrel (Combat only) |
 | `E` | Summon a Bough Double (Combat only) — straight into targeting |
+| `Space` | Call next wave (during the countdown or a gap between waves) |
 | `V` | Mute / unmute sound |
 | `Esc` / right-click | Close menu, otherwise cancel the current action or placement |
 
@@ -31,6 +32,7 @@ Then open http://localhost:8000 in Chrome.
 | `P` | Pause / resume simulation |
 | `1` / `2` / `4` | Simulation speed ×1 / ×2 / ×4 |
 | `N` | Skip to next phase (Prep → Combat) |
+| `Shift+N` | Kill all current enemies and skip the rest of this wave's spawns (straight to the gap) |
 | `R` | Restart this encounter (same node, layout and starting resources) |
 | `Shift+R` | Start a new run (back to the map) |
 | `Shift+W` | Win the battle now (Combat only) |

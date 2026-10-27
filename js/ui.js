@@ -3,11 +3,12 @@
 // state live in `view` (UI state, not simulation).
 
 import * as C from './config.js';
-import { GameState, ActionState } from './states.js';
+import { GameState, ActionState, WaveState } from './states.js';
 import { laneStats, expectedResources, candidateProblems } from './scene.js';
 import { routeBand, generateLayout } from './layout.js';
 import { zoneIds, zoneQuota, zoneCandidates, quotaTotals } from './zones.js';
-import { corridorWidth, featureMix, stuckTime } from './levelSettings.js';
+import { corridorWidth, featureMix, stuckTime, levelWaves, waveTotals, levelTotals } from './levelSettings.js';
+import { waveCount, waveEnemiesLeft } from './systems/waveSystem.js';
 import { createRng } from './rng.js';
 import { RESOURCE_ICON_SVG } from './icons.js';
 import { costRowsElement, costRowsKey } from './costRows.js';
@@ -65,6 +66,17 @@ function enemyDebugLines(game) {
     const name = C.ENEMY_TYPES[type].plural;
     return `${`${name}:`.padEnd(9)} spawned ${c.spawned}/${waveCounts(game)[type] ?? 0}  alive ${c.alive}  killed ${c.killed}`;
   });
+}
+
+// Waves (M2i §7): the wave and its sub-state, this wave's spawned / alive / left, and the countdown.
+function waveDebugLines(game) {
+  const w = game.wave;
+  if (!w) return [`Wave:     — (${waveCount(game)} waves, from Combat)`];
+  const timer = w.state === WaveState.WAVE ? `wave time ${game.waveTime.toFixed(1)} s` : `next in ${w.remaining.toFixed(1)} s`;
+  return [
+    `Wave:     ${w.index + 1} / ${waveCount(game)}  ${w.state}  ${timer}  (cleared ${w.cleared})`,
+    `          spawned ${w.spawned}  alive ${game.enemies.length}  left ${waveEnemiesLeft(game)}`,
+  ];
 }
 
 // Mini-bosses (M2c §4): spawned / alive / killed over every boss type, then each living one's
@@ -221,7 +233,7 @@ function placeBeside(popup, x, y, halfWidth) {
   popup.style.top = `${top}px`;
 }
 
-// callbacks: { onStartCombat(), onEndButton(), onMenuAction(), onToggleMute() }
+// callbacks: { onStartCombat(), onEndButton(), onMenuAction(), onToggleMute(), onCallNextWave() }
 export function createUI(callbacks) {
   // Static layout lines of each level's scene, built once per level.
   const layoutLinesByLevel = {};
@@ -275,6 +287,10 @@ export function createUI(callbacks) {
     endFound: document.getElementById('end-found'),
     endFoundLine: document.getElementById('end-found-line'),
     debugPanel: document.getElementById('debug-panel'),
+    wavePreview: document.getElementById('wave-preview'),
+    wavePreviewTitle: document.getElementById('wave-preview-title'),
+    wavePreviewEntries: document.getElementById('wave-preview-entries'),
+    nextWave: document.getElementById('btn-next-wave'),
   };
 
   el.hud.style.height = `${C.HUD_STRIP_HEIGHT}px`;
@@ -285,7 +301,14 @@ export function createUI(callbacks) {
     icon.style.height = `${C.RESOURCE_ICON_SIZE}px`;
   }
   el.stepsBar.style.setProperty('--blink-period', `${1 / C.STEP_BAR_BLINK_HZ}s`);
-  el.startCombat.addEventListener('click', () => callbacks.onStartCombat());
+  el.startCombat.addEventListener('click', () => {
+    callbacks.onStartCombat();
+    el.startCombat.blur(); // so Space (Call next wave) doesn't press it again
+  });
+  el.nextWave.addEventListener('click', () => {
+    callbacks.onCallNextWave();
+    el.nextWave.blur();
+  });
   el.restart.addEventListener('click', () => callbacks.onEndButton());
   el.mute.addEventListener('click', () => {
     callbacks.onToggleMute();
@@ -329,6 +352,7 @@ export function createUI(callbacks) {
     updateEndOverlay(el, game);
     updateLevelName(el, game);
     updateBoss(el, game);
+    updateWavePreview(el, game);
     updateFoundItem(el, game);
     updateDebugPanel(el, game, clock, view, layoutLinesFor(game.scene), game.scene);
   }
@@ -395,6 +419,70 @@ function livingBoss(game) {
 
 // Mini-boss HP bar while one is alive (from its spawn, not its first damage), and the arrival
 // banner fading out over its last third (M2c §2.6–2.7).
+// Wave preview (M2i §4.2): during the countdown and gaps, the next wave's number, countdown and
+// enemies (icons with counts, an Ogre outlined in red), with Call next wave.
+const PREVIEW_ORDER = ['wolf', 'stirge', 'bear', 'ogre'];
+
+function wavePreviewEntries(wave) {
+  const totals = waveTotals(wave);
+  const types = [...PREVIEW_ORDER, ...Object.keys(totals).filter((t) => !PREVIEW_ORDER.includes(t))];
+  const row = document.createDocumentFragment();
+  for (const type of types.filter((t) => totals[t])) {
+    const t = C.ENEMY_TYPES[type];
+    const entry = document.createElement('span');
+    entry.className = t.boss ? 'wave-entry boss' : 'wave-entry';
+    entry.append(portraitCanvas(type, C.WAVE_ICON_SIZE), t.boss ? `${t.name} ×${totals[type]}` : `×${totals[type]}`);
+    row.append(entry);
+  }
+  return row;
+}
+
+function updateWavePreview(el, game) {
+  const w = game.wave;
+  const shown = game.state === GameState.COMBAT && w && w.state !== WaveState.WAVE;
+  el.wavePreview.hidden = !shown;
+  el.phase.hidden = shown; // the preview takes the wave label's and the clock's place in the strip
+  if (shown) el.timer.hidden = true;
+  if (!shown) return;
+  setText(el.wavePreviewTitle, `Wave ${w.index + 1} of ${waveCount(game)} — in ${Math.max(1, Math.ceil(w.remaining))}`);
+  const key = `${game.levelId}:${w.index}`;
+  if (el.wavePreviewEntries.dataset.key !== key) {
+    el.wavePreviewEntries.dataset.key = key;
+    el.wavePreviewEntries.replaceChildren(wavePreviewEntries(levelWaves(game.scene.level)[w.index]));
+  }
+}
+
+// Start-up check (M2i §4.2): the preview must not cover any candidate location, in any level. It is
+// measured with the level's largest wave (most icons).
+export function checkWavePreview(scenes) {
+  const panel = document.getElementById('wave-preview');
+  const entries = document.getElementById('wave-preview-entries');
+  const wasHidden = panel.hidden;
+  panel.hidden = false;
+  document.getElementById('wave-preview-title').textContent = 'Wave 3 of 5 — in 6';
+  const footprint = C.LOCATION_RADIUS; // visible footprint only, as for the boss bar
+  for (const scene of scenes) {
+    const waves = levelWaves(scene.level);
+    const widest = waves.reduce((a, w) => (Object.keys(waveTotals(w)).length > Object.keys(waveTotals(a)).length ? w : a), waves[0]);
+    entries.replaceChildren(wavePreviewEntries(widest));
+    // Stage coordinates (the panel sits in the HUD strip, inside the scaled stage).
+    const stage = document.getElementById('stage').getBoundingClientRect();
+    const s = stage.width / C.STAGE_WIDTH;
+    const b = panel.getBoundingClientRect();
+    const r = { left: (b.left - stage.left) / s, top: (b.top - stage.top) / s, right: (b.right - stage.left) / s, bottom: (b.bottom - stage.top) / s };
+    for (const c of scene.candidates) {
+      const nx = Math.max(r.left, Math.min(c.x, r.right));
+      const ny = Math.max(r.top, Math.min(c.y, r.bottom));
+      if (Math.hypot(c.x - nx, c.y - ny) < footprint) {
+        console.warn(`${scene.levelId}: candidate ${c.index} at (${c.x}, ${c.y}) is under the wave preview`);
+      }
+    }
+  }
+  entries.replaceChildren();
+  delete entries.dataset.key;
+  panel.hidden = wasHidden;
+}
+
 function updateBoss(el, game) {
   const inBattle = game.state === GameState.COMBAT || game.state === GameState.ENDING;
   const boss = inBattle ? livingBoss(game) : null;
@@ -469,16 +557,18 @@ function updateHud(el, game) {
   // ENDING (M1e §1) still reads as Combat in the HUD, frozen, until the result overlay appears.
   const isCombat = game.state === GameState.COMBAT || game.state === GameState.ENDING;
 
-  setText(el.phase, game.state === GameState.ENDING ? GameState.COMBAT : game.state);
+  // M2i §4.1: in Combat, the wave (the current one, or the next during the countdown and gaps).
+  setText(el.phase, isCombat && game.wave
+    ? `WAVE ${Math.min(game.wave.index + 1, waveCount(game))} / ${waveCount(game)}`
+    : game.state);
   if (isPrep) {
     // Countdown shows 00:25 at the start and 00:00 only at the moment Combat begins.
     setText(el.timer, formatTime(Math.ceil(game.prepRemaining)));
   } else {
     setText(el.timer, formatTime(game.combatTime));
   }
-  // M1e §3.6: all enemy types combined.
-  const totals = enemyTotals(game);
-  setText(el.wolves, isCombat ? `Enemies: ${totals.remaining} / ${totals.total}` : '');
+  // M2i §4.1: this wave's enemies left, alive or still to spawn (none shown between waves).
+  setText(el.wolves, isCombat && game.wave?.state === WaveState.WAVE ? `Enemies left: ${waveEnemiesLeft(game)}` : '');
   el.startCombat.hidden = !isPrep;
   const muted = isMuted();
   if (el.mute.classList.contains('muted') !== muted) {
@@ -597,13 +687,15 @@ function mapTooltip(nodeId) {
   const node = mapNode(nodeId);
   const level = C.LEVELS[node.levelId];
   const anchor = { x: node.pos.x, y: node.pos.y, halfWidth: nodeRadius(node) * C.MAP_HOVER_SCALE };
-  const counts = (types) => types.map(([type, n]) => `${C.ENEMY_TYPES[type].plural} ${n}`).join(' · ');
-  const entries = Object.entries(level.enemyCounts).filter(([, n]) => n > 0);
+  // M2i §4.3: "3 waves · Wolves 42 · Stirges 4 · Bears 3" (types in display order, from the waves).
+  const waves = `${levelWaves(level).length} waves`;
+  const counts = (types) => [waves, ...types.map(([type, n]) => `${C.ENEMY_TYPES[type].plural} ${n}`)].join(' · ');
+  const totals = levelTotals(level);
+  const entries = PREVIEW_ORDER.filter((type) => totals[type] > 0).map((type) => [type, totals[type]]);
   if (node.type === 'wilds') return { title: `${node.name} — ${level.description}`, lines: [['', counts(entries)]], anchor };
   // Fell Wilds: "Mini-boss: Ogre"; the Boss node (M2f §2): "Bosses: Ogre ×2" (counted from its level).
-  const tally = {};
-  for (const b of level.bosses ?? []) tally[C.ENEMY_TYPES[b.type].name] = (tally[C.ENEMY_TYPES[b.type].name] ?? 0) + 1;
-  const bosses = Object.entries(tally).map(([name, n]) => (n > 1 ? `${name} ×${n}` : name)).join(', ');
+  const bosses = entries.filter(([type]) => C.ENEMY_TYPES[type].boss)
+    .map(([type, n]) => (n > 1 ? `${C.ENEMY_TYPES[type].name} ×${n}` : C.ENEMY_TYPES[type].name)).join(', ');
   return {
     title: `${node.name} — ${C.NODE_TYPES[node.type].label}`,
     lines: [
@@ -877,8 +969,10 @@ function updateEndOverlay(el, game) {
   setText(el.endTitle, game.state);
   el.endOverlay.dataset.result = game.state;
   const totals = enemyTotals(game);
-  setText(el.endStats, `Combat time ${formatTime(game.combatTime)}  ·  Enemies killed ${totals.killed} / ${totals.total}`);
   const won = game.state === GameState.VICTORY;
+  // M2i §4.3: the waves cleared (Victory) or the wave the Druid fell in (Defeat).
+  const waves = won ? `Waves cleared: ${game.wave?.cleared ?? 0} / ${waveCount(game)}` : `Fell during wave ${(game.wave?.index ?? 0) + 1} of ${waveCount(game)}`;
+  setText(el.endStats, `${waves}  ·  Combat time ${formatTime(game.combatTime)}  ·  Enemies killed ${totals.killed} / ${totals.total}`);
   const goesOn = won && !isRunComplete(game.run);
   // M2d §2.3: what the field sweep gathered, on Victory only and only if anything.
   const gathered = won ? game.sweep?.gathered : null;
@@ -974,6 +1068,7 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
     druidMeleeLine(game),
     ...enemyDebugLines(game),
     ...bossDebugLines(game),
+    ...waveDebugLines(game),
     `Resources: ${resourceLine(game.resources)}`,
     `Turrets: ${game.turrets.length}  Pebbles in flight: ${game.projectiles.length}  Vultures: ${game.vultures.length}/${C.MAX_VULTURES}  Squirrels: ${game.squirrels.length}/${C.MAX_SQUIRRELS}${C.SQUIRREL_BLOCKS_WOLVES ? ' (block wolves)' : ''}`,
     ...dropDebugLines(game),

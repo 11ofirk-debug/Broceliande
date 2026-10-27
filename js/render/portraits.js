@@ -4,11 +4,14 @@
 // copy of that bitmap.
 
 import * as C from '../config.js';
-import { drawVulture, drawSquirrel, drawTurretSlot, drawTurret, drawToader, drawDruid, DRUID_REST_POSE } from './entities.js';
+import { drawVulture, drawSquirrel, drawTurretSlot, drawTurret, drawToader, drawDruid, DRUID_REST_POSE, drawWolf, drawBear, drawOgre, drawStirge } from './entities.js';
 
 const SCRATCH = 240;   // px, scratch canvas the entity is first drawn on
 const RESOLUTION = 2;  // bitmap pixels per CSS pixel, so portraits stay sharp when the stage scales
 const PAD = 1;         // px of margin inside the portrait
+
+// A resting enemy for its portrait (wave preview, M2i §4.2): just what the draw functions read.
+const restingEnemy = (type, x, y) => ({ x, y, type, radius: C.ENEMY_TYPES[type].radius, facing: 1, id: 0, stride: 0, attack: null, lastBlowTime: -Infinity, windupElapsed: 0 });
 
 // How each portrait is drawn: an entity's own draw function, in a neutral resting pose.
 const PORTRAIT_DRAW = {
@@ -17,6 +20,11 @@ const PORTRAIT_DRAW = {
   // Bough Double (M1i §2.7): the Druid's drawing, monochrome brown and translucent.
   double: (ctx, x, y) => drawDruid(ctx, x, y, false, 0, DRUID_REST_POSE, { tint: C.DOUBLE_TINT, alpha: C.DOUBLE_ALPHA }),
   // Turrets on their slot pad, level 1 (M1f §5.2 build menu).
+  // Enemies (M2i §4.2), with their battlefield draw functions.
+  wolf: (ctx, x, y) => drawWolf(ctx, restingEnemy('wolf', x, y), false, false, 0),
+  bear: (ctx, x, y) => drawBear(ctx, restingEnemy('bear', x, y), false, false, 0),
+  ogre: (ctx, x, y) => drawOgre(ctx, restingEnemy('ogre', x, y), false, false, 0),
+  stirge: (ctx, x, y) => drawStirge(ctx, restingEnemy('stirge', x, y), false, false, 0),
   sprinkler: (ctx, x, y) => {
     drawTurretSlot(ctx, { x, y }, false, false);
     drawTurret(ctx, { x, y, level: 1, angle: -0.5 }, false);
@@ -57,16 +65,17 @@ function renderBitmap(kind) {
   return bitmap;
 }
 
-// A new MENU_PORTRAIT_SIZE <canvas> showing the entity, copied from the cached rendering.
-export function portraitCanvas(kind) {
+// A new <canvas> of size px (MENU_PORTRAIT_SIZE by default) showing the entity, copied from the
+// cached rendering.
+export function portraitCanvas(kind, size = C.MENU_PORTRAIT_SIZE) {
   if (!cache.has(kind)) cache.set(kind, renderBitmap(kind));
   const bitmap = cache.get(kind);
   const canvas = document.createElement('canvas');
   canvas.width = bitmap.width;
   canvas.height = bitmap.height;
   canvas.className = 'menu-portrait';
-  canvas.style.width = `${C.MENU_PORTRAIT_SIZE}px`;
-  canvas.style.height = `${C.MENU_PORTRAIT_SIZE}px`;
+  canvas.style.width = `${size}px`;
+  canvas.style.height = `${size}px`;
   canvas.getContext('2d').drawImage(bitmap, 0, 0);
   return canvas;
 }

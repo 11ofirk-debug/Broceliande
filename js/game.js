@@ -2,11 +2,12 @@
 
 import * as C from './config.js';
 import { createRng, makeRandomSeed } from './rng.js';
-import { buildSpawnQueues, updateSpawning, queueDebugEnemy } from './systems/spawnSystem.js';
+import { buildWavePlans, updateSpawning, queueDebugEnemy } from './systems/spawnSystem.js';
+import { startWaves, updateWaveClock, checkWaveCleared } from './systems/waveSystem.js';
 import { updateEnemyMovement } from './systems/movementSystem.js';
 import { updateMelee, updateWindupAttacks, killEnemy, updateTurrets, updateProjectiles } from './systems/combatSystem.js';
 import { fitsCorridor } from './entities/enemy.js';
-import { corridorWidth } from './levelSettings.js';
+import { corridorWidth, levelTotals } from './levelSettings.js';
 import { createIdleAction, updateAction, enforceActionAllowed } from './systems/actionSystem.js';
 import { createFeatures } from './entities/searchableFeature.js';
 import { generateLayout } from './layout.js';
@@ -114,7 +115,10 @@ export function createGame(levelId) {
     nextEntityId: 1,
     enemies: [],       // all living enemies, every type (M1e §3.4)
     meleeSlots: createMeleeSlots(scene.level.druidPos),
-    spawnQueues: [],
+    spawnQueues: [],   // the current wave's spawns per lane (M2i §2)
+    wavePlans: [],     // every wave's spawns per lane, lanes resolved at encounter start
+    wave: null,        // M2i §3: wave sub-state in Combat (see waveSystem.js); null before Combat
+    waveTime: 0,       // s since the current wave began
     enemyCounts: emptyEnemyCounts(), // per type: { spawned, alive, killed }
   };
 }
@@ -193,8 +197,11 @@ export function startEncounter(game, { newSeed = false, levelId = null, resource
   game.nextEntityId = 1;
   game.enemies = [];
   game.meleeSlots = createMeleeSlots(level.druidPos);
-  game.spawnQueues = buildSpawnQueues(level, game.lanes, game.rng);
-  game.tolls = [...(level.tolls ?? [])].sort((a, b) => a - b); // M2f §4.10: bell tolls still to ring (s)
+  game.wavePlans = buildWavePlans(level, game.lanes, game.rng);
+  game.spawnQueues = [];
+  game.wave = null;
+  game.waveTime = 0;
+  game.tolls = []; // M2f §4.10: this wave's bell tolls still to ring (s, wave time)
   game.enemyCounts = emptyEnemyCounts();
   setState(game, GameState.PREP);
 }
@@ -210,6 +217,7 @@ export function startCombat(game) {
   game.druidStrike = null;
   game.druidWasBusy = false;
   setState(game, GameState.COMBAT);
+  startWaves(game); // M2i §3: the countdown to wave 1
   enforceActionAllowed(game); // a search, build or travel in progress is cancelled (§9.3)
 }
 
@@ -300,7 +308,7 @@ export function winNow(game) {
 function checkEndConditions(game) {
   if (game.druidHp <= 0) {
     beginEnding(game, GameState.DEFEAT);
-  } else if (allEnemiesDefeated(game)) {
+  } else if (checkWaveCleared(game)) { // M2i §3.1: the last wave cleared
     beginEnding(game, GameState.VICTORY);
   }
 }
@@ -319,7 +327,7 @@ function hideItem(game) {
 // Bell tolls (M2f §4.10): at each of the level's toll times in Combat, a bellToll event (heard as a
 // deep bell just before a surge). No gameplay effect.
 function updateTolls(game) {
-  while (game.tolls.length && game.tolls[0] <= game.combatTime) {
+  while (game.tolls.length && game.tolls[0] <= game.waveTime) {
     game.tolls.shift();
     events.emit('bellToll', {});
   }
@@ -336,9 +344,9 @@ function updateDruidRegen(game, dt) {
   game.druidHp = Math.min(game.stats['druid.maxHp'], game.druidHp + amount);
 }
 
-// Expected number of each enemy type in the level's wave (M1e §3.6, M2a §5.2).
+// Expected number of each enemy type over all the level's waves (M2i §2).
 export function waveCounts(game) {
-  return game.scene.level.enemyCounts;
+  return levelTotals(game.scene.level);
 }
 
 // M1i §4: Boughs gained (searches and debug G) and spent (net of refunds); Double jobs done.
@@ -348,13 +356,6 @@ function emptyDoubleStats() {
 
 function emptyEnemyCounts() {
   return Object.fromEntries(Object.keys(C.ENEMY_TYPES).map((type) => [type, { spawned: 0, alive: 0, killed: 0 }]));
-}
-
-// Victory (M1e §3.6): every enemy of every type has spawned and died.
-function allEnemiesDefeated(game) {
-  return Object.entries(waveCounts(game)).every(([type, n]) => game.enemyCounts[type].spawned >= n)
-    && game.spawnQueues.every((q) => q.spawns.length === 0) // includes debug-queued Bears
-    && game.enemies.length === 0;
 }
 
 // Combined counts for the HUD and end screen: { total, killed, remaining }.
@@ -426,6 +427,7 @@ export function updateGame(game, dt) {
       break;
     case GameState.COMBAT:
       game.combatTime += dt;
+      updateWaveClock(game, dt);    // M2i §3: countdown, gap, the wave's own clock
       updateSpawning(game);
       updateTolls(game);             // M2f §4.10: a bell toll just before each surge (sound only)
       updateBlocking(game, dt);      // wolves held by landed Vultures (and, if enabled, waiting Squirrels) stop and bite them

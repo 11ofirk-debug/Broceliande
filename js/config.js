@@ -327,7 +327,9 @@ export const DECOR = {
 // 17.8 Wave
 // ---------------------------------------------------------------------------
 export const BURST_STAGGER = 0.6;        // TUNING — s between enemies in one burst
-export const RANDOMISE_BEAR_LANES = true; // M1e §3.6: shuffle the Bears across lanes each run (one per lane); false = lanes as in the level's wave
+export const RANDOMISE_BEAR_LANES = true; // M1e §3.6: old schedules (rows 4–8 until M2i I2): spread their Bears across lanes at random
+export const FIRST_WAVE_DELAY = 3;      // TUNING — s of countdown before wave 1 (M2i §3.1)
+export const WAVE_ICON_SIZE = 30;       // px, enemy images in the wave preview (M2i §4.2)
 
 // ---------------------------------------------------------------------------
 // M1d addendum — drops and Squirrel (docs/M1D_DROPS_SQUIRREL_ADDENDUM.md). Drop tables are
@@ -414,6 +416,8 @@ export const SOUNDS = {
   stirgeDies:    { volume: 0.4,  pitch: 1, minGap: 0.08, maxVoices: 3, enabled: true }, // TUNING — short high squeak
   summonDenied:  { volume: 0.35, pitch: 1, minGap: 0.15, maxVoices: 1, enabled: true }, // TUNING — soft low blip when a summon shortcut can't be used
   bellToll:      { volume: 0.8,  pitch: 1, minGap: 2,    maxVoices: 1, enabled: true }, // TUNING — deep bell before each Hollow of Bells surge (M2f §4.10)
+  waveStarts:    { volume: 0.7,  pitch: 1, minGap: 0.5,  maxVoices: 1, enabled: true }, // TUNING — short horn over a low drum hit (M2i §4.3)
+  waveCleared:   { volume: 0.5,  pitch: 1, minGap: 0.5,  maxVoices: 1, enabled: true }, // TUNING — soft rising chime
   // The Ogre (M2c §2.9)
   ogreSpawns:    { volume: 0.9,  pitch: 1, minGap: 1,    maxVoices: 1, enabled: true }, // TUNING — deep, long roar
   ogreStep:      { volume: 0.3,  pitch: 1, minGap: 0.3,  maxVoices: 2, enabled: true }, // TUNING — very low thud, quiet
@@ -485,13 +489,16 @@ export const STRIKE_KNOCKBACK_TIME = 0.15; // s for that visual knock-back to se
 //   stoneRing, landmarks    cell); water or mist patches; standing stones round the Druid; fixed
 //                           landmarks such as the burial mound
 //   palette                 scene colours only (M2a §5.5); entities, UI and HUD keep theirs
-//   wave, enemyCounts       TUNING — bursts per lane id; time = seconds since Combat began; type:
-//                           an ENEMY_TYPES key, default 'wolf'. enemyCounts: the expected totals
-//                           per type (bosses included), validated at start-up against the bursts.
-//                           Stirge flocks (M2h §4.1, TUNING): 3–5 each, from row 3, timed to the
-//                           level's pacing (with the surges, or in a lane's quiet spell); their
-//                           lanes are as written (only Bears' are shuffled).
-//   bosses                  mini-bosses (M2c §3): { type, time, lane: a lane id or 'random' (seeded) }
+//   waves                   TUNING (M2i §2) — the battle as a list of waves, each
+//                           { gapAfter, spawns: [{ t, lane, type, count }], tolls? } with a one-line
+//                           summary comment. t: s from the start of that wave; lane: a lane id or
+//                           'random' (seeded, spread over the lanes per type, M2a §5.4); count > 1
+//                           spawns with the type's stagger. gapAfter: s of gap once the wave is
+//                           cleared (ignored on the last). tolls: optional bell tolls (s, wave time).
+//   wave, enemyCounts,      OLD schedule, rows 4–8 only until M2i I2 migrates them (run as one wave,
+//   bosses, tolls           levelSettings.js levelWaves): bursts per lane id; time = s since the
+//                           wave began; Bears' lanes are spread at random; bosses
+//                           { type, time, lane: a lane id or 'random' }; tolls: bell toll times.
 //   stepBudget              TUNING — steps available in step-mode Prep
 //   enemyHpMult             optional (M2f §3.1): every enemy's HP × this in the level; default 1
 //   stuckTime               optional (M2f §4): the level's STUCK_TIME (unstick rule); default STUCK_TIME
@@ -602,14 +609,43 @@ export const LEVELS = {
       vegetation: { base: '#2c5a2a', light: '#3f7334' },
       mapTint: null,
     },
-    // Bears are single-unit bursts at 22 / 32 / 42 s (M1e §3.6).
-    wave: {
-      upperLeft:  [{ time: 0, count: 3 }, { time: 12, count: 2 }, { time: 22, count: 1, type: 'bear' }, { time: 24, count: 3 }, { time: 40, count: 4 }],
-      right:      [{ time: 5, count: 2 }, { time: 16, count: 3 }, { time: 30, count: 3 }, { time: 32, count: 1, type: 'bear' }, { time: 48, count: 4 }],
-      bottomLeft: [{ time: 9, count: 3 }, { time: 20, count: 2 }, { time: 35, count: 3 }, { time: 42, count: 1, type: 'bear' }, { time: 52, count: 3 }],
-    },
-    bosses: [],                           // M2c §3: none yet
-    enemyCounts: { wolf: 35, bear: 3 },
+    // TUNING (M2i §5–6) — 3 waves, even small bursts across the lanes; Bears at 'random' lanes.
+    waves: [
+      { // Wave 1 — 10W
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'upperLeft',  type: 'wolf', count: 3 },
+          { t: 4,  lane: 'right',      type: 'wolf', count: 3 },
+          { t: 8,  lane: 'bottomLeft', type: 'wolf', count: 2 },
+          { t: 11, lane: 'upperLeft',  type: 'wolf', count: 2 },
+        ],
+      },
+      { // Wave 2 — 14W 1B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'right',      type: 'wolf', count: 3 },
+          { t: 3,  lane: 'bottomLeft', type: 'wolf', count: 3 },
+          { t: 6,  lane: 'upperLeft',  type: 'wolf', count: 2 },
+          { t: 8,  lane: 'random',     type: 'bear', count: 1 },
+          { t: 10, lane: 'right',      type: 'wolf', count: 3 },
+          { t: 14, lane: 'bottomLeft', type: 'wolf', count: 3 },
+        ],
+      },
+      { // Wave 3 — 18W 4S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'upperLeft',  type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'right',      type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'random',     type: 'bear',   count: 1 },
+          { t: 6,  lane: 'bottomLeft', type: 'wolf',   count: 3 },
+          { t: 9,  lane: 'upperLeft',  type: 'wolf',   count: 3 },
+          { t: 10, lane: 'right',      type: 'stirge', count: 4 },
+          { t: 12, lane: 'right',      type: 'wolf',   count: 3 },
+          { t: 14, lane: 'random',     type: 'bear',   count: 1 },
+          { t: 16, lane: 'bottomLeft', type: 'wolf',   count: 3 },
+        ],
+      },
+    ],
     stepBudget: 102,                      // TUNING (~2,250 px)
   },
   // Option A: swarm (M2a §5.2). Lanes enter from the top, the left and the bottom-right; the
@@ -708,15 +744,49 @@ export const LEVELS = {
       vegetation: { base: '#3d5348', light: '#566d60' },
       mapTint: '#8aa69a',
     },
-    // TUNING — 44 wolves in 14 bursts (Tornville: 35 in 12), slightly larger and closer
-    // together, the last at 55 s; Bears at 22 / 32 / 42 s.
-    wave: {
-      north:     [{ time: 0, count: 3 }, { time: 9, count: 3 }, { time: 18, count: 4 }, { time: 22, count: 1, type: 'bear' }, { time: 29, count: 3 }, { time: 41, count: 3 }],
-      west:      [{ time: 3, count: 3 }, { time: 12, count: 3 }, { time: 22, count: 3 }, { time: 32, count: 1, type: 'bear' }, { time: 34, count: 4 }, { time: 48, count: 3 }],
-      southEast: [{ time: 6, count: 3 }, { time: 16, count: 3 }, { time: 38, count: 3 }, { time: 42, count: 1, type: 'bear' }, { time: 55, count: 3 }],
-    },
-    bosses: [],                           // M2c §3: none yet
-    enemyCounts: { wolf: 44, bear: 3 },
+    // TUNING (M2i §5–6) — 3 waves, frequent bursts close together; Bears at 'random' lanes.
+    waves: [
+      { // Wave 1 — 14W 4S
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'west',      type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'southEast', type: 'wolf',   count: 2 },
+          { t: 6,  lane: 'north',     type: 'stirge', count: 4 },
+          { t: 7,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 10, lane: 'west',      type: 'wolf',   count: 3 },
+        ],
+      },
+      { // Wave 2 — 18W 6S 1B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'southEast', type: 'wolf',   count: 3 },
+          { t: 2,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'west',      type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'southEast', type: 'stirge', count: 3 },
+          { t: 6,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 7,  lane: 'southEast', type: 'wolf',   count: 3 },
+          { t: 9,  lane: 'north',     type: 'wolf',   count: 3 },
+          { t: 12, lane: 'west',      type: 'stirge', count: 3 },
+          { t: 12, lane: 'west',      type: 'wolf',   count: 3 },
+        ],
+      },
+      { // Wave 3 — 22W 8S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'west',      type: 'wolf',   count: 4 },
+          { t: 2,  lane: 'southEast', type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'north',     type: 'wolf',   count: 4 },
+          { t: 5,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 6,  lane: 'north',     type: 'stirge', count: 4 },
+          { t: 7,  lane: 'west',      type: 'wolf',   count: 3 },
+          { t: 9,  lane: 'southEast', type: 'wolf',   count: 4 },
+          { t: 12, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 12, lane: 'southEast', type: 'stirge', count: 4 },
+          { t: 13, lane: 'north',     type: 'wolf',   count: 4 },
+        ],
+      },
+    ],
     stepBudget: 102,                      // TUNING — Tornville's; calibrate from the reported route cost
   },
   // Option B: brutes (M2a §5.2). Lanes enter from the top-left, the bottom and the right; the
@@ -817,15 +887,48 @@ export const LEVELS = {
       vegetation: { base: '#3f2836', light: '#7a4a62' },
       mapTint: '#6e4c66',
     },
-    // TUNING — 36 wolves, pacing like Tornville; Bears at 18 / 26 / 34 / 42 / 50 s (spread
-    // across lanes at random each run, M2a §5.4).
-    wave: {
-      northWest: [{ time: 0, count: 3 }, { time: 12, count: 3 }, { time: 18, count: 1, type: 'bear' }, { time: 24, count: 3 }, { time: 40, count: 4 }, { time: 42, count: 1, type: 'bear' }],
-      south:     [{ time: 5, count: 3 }, { time: 16, count: 3 }, { time: 26, count: 1, type: 'bear' }, { time: 30, count: 3 }, { time: 48, count: 3 }, { time: 50, count: 1, type: 'bear' }],
-      east:      [{ time: 9, count: 3 }, { time: 20, count: 2 }, { time: 34, count: 1, type: 'bear' }, { time: 35, count: 3 }, { time: 52, count: 3 }],
-    },
-    bosses: [],                           // M2c §3: none yet
-    enemyCounts: { wolf: 36, bear: 5 },
+    // TUNING (M2i §5–6) — 3 waves; Bears lead each wave and the wolves follow behind them, so the
+    // Bears have fixed lanes here (a different lead lane each wave).
+    waves: [
+      { // Wave 1 — 10W 1B
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'south',     type: 'bear', count: 1 },
+          { t: 2,  lane: 'south',     type: 'wolf', count: 3 },
+          { t: 5,  lane: 'northWest', type: 'wolf', count: 3 },
+          { t: 8,  lane: 'east',      type: 'wolf', count: 2 },
+          { t: 11, lane: 'south',     type: 'wolf', count: 2 },
+        ],
+      },
+      { // Wave 2 — 12W 4S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'northWest', type: 'bear',   count: 1 },
+          { t: 1,  lane: 'east',      type: 'bear',   count: 1 },
+          { t: 3,  lane: 'northWest', type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 9,  lane: 'south',     type: 'stirge', count: 4 },
+          { t: 10, lane: 'northWest', type: 'wolf',   count: 2 },
+          { t: 12, lane: 'east',      type: 'wolf',   count: 2 },
+        ],
+      },
+      { // Wave 3 — 14W 6S 3B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'northWest', type: 'bear',   count: 1 },
+          { t: 1,  lane: 'south',     type: 'bear',   count: 1 },
+          { t: 2,  lane: 'east',      type: 'bear',   count: 1 },
+          { t: 3,  lane: 'northWest', type: 'wolf',   count: 3 },
+          { t: 4,  lane: 'south',     type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'east',      type: 'wolf',   count: 3 },
+          { t: 9,  lane: 'east',      type: 'stirge', count: 3 },
+          { t: 11, lane: 'northWest', type: 'wolf',   count: 2 },
+          { t: 12, lane: 'northWest', type: 'stirge', count: 3 },
+          { t: 14, lane: 'south',     type: 'wolf',   count: 3 },
+        ],
+      },
+    ],
     stepBudget: 102,                      // TUNING — Tornville's; calibrate from the reported route cost
   },
   // Level 3 (M2b §3.2): narrow causeways between flooded ground. Lanes enter from the right, the
@@ -937,15 +1040,60 @@ export const LEVELS = {
       roof: { dark: '#3a2c22', light: '#5e4a36' },
       mapTint: '#7f97a8',
     },
-    // TUNING — 46 wolves in a steady stream of 2–3 wolf bursts, each lane every 9 s, the lanes
-    // 3 s apart (a burst somewhere every 3 s), the last at 55 s; Bears at 16 / 28 / 40 / 52 s.
-    wave: {
-      east:      [{ time: 0, count: 3 }, { time: 9, count: 2 }, { time: 18, count: 3 }, { time: 27, count: 2 }, { time: 28, count: 1, type: 'bear' }, { time: 36, count: 3 }, { time: 45, count: 3 }, { time: 20, count: 3, type: 'stirge' }],
-      south:     [{ time: 3, count: 2 }, { time: 12, count: 3 }, { time: 16, count: 1, type: 'bear' }, { time: 21, count: 2 }, { time: 30, count: 3 }, { time: 39, count: 2 }, { time: 48, count: 3 }, { time: 52, count: 1, type: 'bear' }],
-      southWest: [{ time: 6, count: 3 }, { time: 15, count: 2 }, { time: 24, count: 3 }, { time: 33, count: 2 }, { time: 40, count: 1, type: 'bear' }, { time: 42, count: 3 }, { time: 55, count: 2 }, { time: 44, count: 3, type: 'stirge' }],
-    },
-    bosses: [],                           // M2c §3: none yet
-    enemyCounts: { wolf: 46, bear: 4, stirge: 6 },
+    // TUNING (M2i §5–6) — 3 waves, each a steady stream of 2-wolf bursts, a lane every 2 s in turn;
+    // Bears at 'random' lanes.
+    waves: [
+      { // Wave 1 — 14W 4S
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'east',      type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 4,  lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 6,  lane: 'east',      type: 'wolf',   count: 2 },
+          { t: 7,  lane: 'south',     type: 'stirge', count: 4 },
+          { t: 8,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 10, lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 12, lane: 'east',      type: 'wolf',   count: 2 },
+        ],
+      },
+      { // Wave 2 — 16W 6S 1B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 4,  lane: 'east',      type: 'wolf',   count: 2 },
+          { t: 6,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 7,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 8,  lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 9,  lane: 'east',      type: 'stirge', count: 3 },
+          { t: 10, lane: 'east',      type: 'wolf',   count: 2 },
+          { t: 12, lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 14, lane: 'southWest', type: 'stirge', count: 3 },
+          { t: 14, lane: 'southWest', type: 'wolf',   count: 2 },
+        ],
+      },
+      { // Wave 3 — 20W 10S 3B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 2,  lane: 'east',      type: 'wolf',   count: 2 },
+          { t: 3,  lane: 'random',    type: 'bear',   count: 1 },
+          { t: 4,  lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 6,  lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 7,  lane: 'south',     type: 'stirge', count: 3 },
+          { t: 8,  lane: 'east',      type: 'wolf',   count: 2 },
+          { t: 10, lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 10, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 12, lane: 'southWest', type: 'wolf',   count: 2 },
+          { t: 12, lane: 'east',      type: 'stirge', count: 4 },
+          { t: 14, lane: 'east',      type: 'wolf',   count: 2 },
+          { t: 16, lane: 'south',     type: 'wolf',   count: 2 },
+          { t: 17, lane: 'random',    type: 'bear',   count: 1 },
+          { t: 17, lane: 'southWest', type: 'stirge', count: 3 },
+          { t: 18, lane: 'southWest', type: 'wolf',   count: 2 },
+        ],
+      },
+    ],
     stepBudget: 110,                      // TUNING — feature route median 114, 90% ≤ 119 (≤ 1.10 × budget)
   },
   // Level 3 (M2b §3.3): huge wolf surges down wide corridors. Lanes enter from the top, the left
@@ -1055,15 +1203,55 @@ export const LEVELS = {
       mushroom: { cap: '#b48ce0', stem: '#d8d0c0' },
       mapTint: '#7a6aa8',
     },
-    // TUNING — 54 wolves: three surges (5, 5, 6 wolves into each lane, the lanes 1 s apart) at
-    // about 8, 28 and 48 s, with single wolves between; Bears at 20 / 38 / 56 s.
-    wave: {
-      north: [{ time: 8, count: 5 }, { time: 22, count: 1 }, { time: 28, count: 5 }, { time: 38, count: 1, type: 'bear' }, { time: 40, count: 1 }, { time: 48, count: 6 }, { time: 28, count: 4, type: 'stirge' }],
-      west:  [{ time: 9, count: 5 }, { time: 17, count: 1 }, { time: 20, count: 1, type: 'bear' }, { time: 29, count: 5 }, { time: 42, count: 1 }, { time: 49, count: 6 }],
-      east:  [{ time: 10, count: 5 }, { time: 19, count: 1 }, { time: 30, count: 5 }, { time: 37, count: 1 }, { time: 50, count: 6 }, { time: 56, count: 1, type: 'bear' }, { time: 50, count: 4, type: 'stirge' }],
-    },
-    bosses: [],                           // M2c §3: none yet
-    enemyCounts: { wolf: 54, bear: 3, stirge: 8 },
+    // TUNING (M2i §5–6) — 3 waves, each one big surge on all lanes (1 s apart) with Stirges in it,
+    // a few single wolves around it; Bears at 'random' lanes.
+    waves: [
+      { // Wave 1 — 16W 6S
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'north',  type: 'wolf',   count: 1 },
+          { t: 3,  lane: 'west',   type: 'wolf',   count: 1 },
+          { t: 7,  lane: 'north',  type: 'wolf',   count: 4 },
+          { t: 8,  lane: 'west',   type: 'wolf',   count: 4 },
+          { t: 9,  lane: 'east',   type: 'wolf',   count: 4 },
+          { t: 9,  lane: 'north',  type: 'stirge', count: 3 },
+          { t: 10, lane: 'east',   type: 'stirge', count: 3 },
+          { t: 12, lane: 'east',   type: 'wolf',   count: 2 },
+        ],
+      },
+      { // Wave 2 — 20W 8S 1B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'east',   type: 'wolf',   count: 1 },
+          { t: 3,  lane: 'north',  type: 'wolf',   count: 1 },
+          { t: 5,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 9,  lane: 'north',  type: 'wolf',   count: 5 },
+          { t: 10, lane: 'west',   type: 'wolf',   count: 5 },
+          { t: 10, lane: 'west',   type: 'stirge', count: 4 },
+          { t: 11, lane: 'east',   type: 'wolf',   count: 5 },
+          { t: 11, lane: 'north',  type: 'stirge', count: 4 },
+          { t: 15, lane: 'west',   type: 'wolf',   count: 3 },
+        ],
+      },
+      { // Wave 3 — 26W 12S 2B
+        gapAfter: 7,
+        spawns: [
+          { t: 0,  lane: 'west',   type: 'wolf',   count: 1 },
+          { t: 2,  lane: 'east',   type: 'wolf',   count: 1 },
+          { t: 4,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 7,  lane: 'north',  type: 'wolf',   count: 1 },
+          { t: 12, lane: 'north',  type: 'wolf',   count: 6 },
+          { t: 12, lane: 'north',  type: 'stirge', count: 4 },
+          { t: 13, lane: 'west',   type: 'wolf',   count: 6 },
+          { t: 13, lane: 'west',   type: 'stirge', count: 4 },
+          { t: 14, lane: 'east',   type: 'wolf',   count: 6 },
+          { t: 14, lane: 'east',   type: 'stirge', count: 4 },
+          { t: 16, lane: 'random', type: 'bear',   count: 1 },
+          { t: 18, lane: 'north',  type: 'wolf',   count: 2 },
+          { t: 19, lane: 'east',   type: 'wolf',   count: 3 },
+        ],
+      },
+    ],
     stepBudget: 126,                      // TUNING — feature route median 134, 90% ≤ 138 (≤ 1.10 × budget)
   },
   // Level 3 (M2b §3.4), a Fell Wilds since M2c §1.4: its Ogre is the main threat. Lanes enter from the left, the top and the top of the
@@ -1172,16 +1360,50 @@ export const LEVELS = {
       mist: 'rgba(235, 235, 225, 0.22)',
       mapTint: '#c2a865',
     },
-    // TUNING — a Fell Wilds (M2c §1.4): the Ogre is the main threat. 44 wolves, pacing like
-    // Tornville but larger; Bears at 15 / 30 / 45 s (spread across the lanes at random each run,
-    // M2a §5.4); the Ogre at 20 s on a random lane, arriving near the end.
-    wave: {
-      west:  [{ time: 0, count: 3 }, { time: 11, count: 3 }, { time: 15, count: 1, type: 'bear' }, { time: 22, count: 3 }, { time: 34, count: 3 }, { time: 47, count: 3 }],
-      north: [{ time: 4, count: 3 }, { time: 15, count: 3 }, { time: 27, count: 3 }, { time: 30, count: 1, type: 'bear' }, { time: 40, count: 3 }, { time: 52, count: 3 }],
-      east:  [{ time: 8, count: 3 }, { time: 19, count: 3 }, { time: 30, count: 3 }, { time: 43, count: 3 }, { time: 45, count: 1, type: 'bear' }, { time: 56, count: 2 }],
-    },
-    bosses: [{ type: 'ogre', time: 20, lane: 'random' }], // TUNING
-    enemyCounts: { wolf: 44, bear: 3, ogre: 1 },
+    // TUNING (M2i §5–6) — a Fell Wilds (M2c §1.4): 3 balanced waves; the Ogre opens wave 3 on a
+    // random lane. Bears at 'random' lanes.
+    waves: [
+      { // Wave 1 — 12W 4S 1B
+        gapAfter: 5,
+        spawns: [
+          { t: 0,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 6,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 7,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 8,  lane: 'north',  type: 'stirge', count: 4 },
+          { t: 10, lane: 'west',   type: 'wolf',   count: 3 },
+        ],
+      },
+      { // Wave 2 — 16W 6S 2B
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 3,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 5,  lane: 'random', type: 'bear',   count: 1 },
+          { t: 6,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 8,  lane: 'east',   type: 'stirge', count: 3 },
+          { t: 10, lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 12, lane: 'random', type: 'bear',   count: 1 },
+          { t: 13, lane: 'east',   type: 'wolf',   count: 2 },
+          { t: 14, lane: 'west',   type: 'stirge', count: 3 },
+          { t: 16, lane: 'west',   type: 'wolf',   count: 2 },
+        ],
+      },
+      { // Wave 3 — 14W 6S 1B 1O
+        gapAfter: 6,
+        spawns: [
+          { t: 0,  lane: 'random', type: 'ogre',   count: 1 },
+          { t: 4,  lane: 'west',   type: 'wolf',   count: 3 },
+          { t: 6,  lane: 'north',  type: 'wolf',   count: 3 },
+          { t: 8,  lane: 'east',   type: 'wolf',   count: 3 },
+          { t: 10, lane: 'north',  type: 'stirge', count: 3 },
+          { t: 11, lane: 'random', type: 'bear',   count: 1 },
+          { t: 12, lane: 'west',   type: 'wolf',   count: 2 },
+          { t: 14, lane: 'east',   type: 'stirge', count: 3 },
+          { t: 15, lane: 'north',  type: 'wolf',   count: 3 },
+        ],
+      },
+    ],
     stepBudget: 106,                      // TUNING — feature route median 112, 90% ≤ 116 (≤ 1.10 × budget)
   },
   // Rows 4–5 (M2f §4.1–4.5). Geometry (lanes, Druid, sectors, candidates) mirrored from earlier

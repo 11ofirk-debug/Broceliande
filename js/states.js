@@ -36,3 +36,11 @@ export const ACTION_ALLOWED_IN = Object.freeze({
   [ActionState.TRAVELLING]: [GameState.PREP],
   [ActionState.SUMMON_PLACEMENT]: [GameState.COMBAT],
 });
+
+// Wave sub-state within COMBAT (M2i §3.1): COUNTDOWN before wave 1, then WAVE and GAP in turn.
+// Clearing the last wave ends Combat (ENDING → Victory).
+export const WaveState = Object.freeze({
+  COUNTDOWN: 'COUNTDOWN',
+  WAVE: 'WAVE',
+  GAP: 'GAP',
+});

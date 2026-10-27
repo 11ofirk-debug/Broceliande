@@ -4,8 +4,9 @@ import * as C from './config.js';
 import { GameState, createGame, startEncounter, startCombat, beginEnding, updateGame, validateConfig, killAllEnemies, spawnDebugBear, spawnDebugOgre, spawnDebugStirges, grantResources, togglePrepMode, newRun, restartEncounter, continueRun, winNow } from './game.js';
 import { createInput } from './input.js';
 import { createRenderer } from './renderer.js';
-import { createUI, checkLevelNameLabel, checkBossBar } from './ui.js';
-import { LEVEL_IDS, sceneFor, validateLevels } from './scene.js';
+import { createUI, checkLevelNameLabel, checkBossBar, checkWavePreview } from './ui.js';
+import { callNextWave, skipWave } from './systems/waveSystem.js';
+import { LEVEL_IDS, sceneFor, validateLevels, logWaveTotals } from './scene.js';
 import { createInteraction, isInteractive } from './interaction.js';
 import { pick } from './picking.js';
 import { ActionState } from './states.js';
@@ -50,6 +51,7 @@ validateItems();  // ITEMS slots, stats and ops (M2e §2)
 const game = createGame(mapNode(C.MAP_START_NODE).levelId);
 const clock = { speed: 1, paused: false };            // acts on simulation time only
 // UI-only state: never read by the simulation.
+let wavesLogged = C.DEBUG_START_ENABLED; // per-wave totals logged (M2i §2)
 const view = { debug: C.DEBUG_START_ENABLED, revealItem: false, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null, menuHoverType: null, mapHover: null }; // menuHoverType: build-menu card under the pointer (range preview); mapHover: available map node under the pointer
 const interaction = createInteraction(game, view);
 
@@ -100,9 +102,12 @@ const ui = createUI({
   onEndButton: endButton,
   onMenuAction: (option) => interaction.onMenuAction(option),
   onToggleMute: toggleMute,
+  onCallNextWave: () => callNextWave(game), // M2i §3.2
 });
 checkLevelNameLabel(LEVEL_IDS.map(sceneFor)); // M2a §6: the label must not cover a candidate in any level
 checkBossBar(LEVEL_IDS.map(sceneFor));        // M2c §2.7: nor may the boss HP bar
+checkWavePreview(LEVEL_IDS.map(sceneFor));    // M2i §4.2: nor the wave preview
+if (view.debug) logWaveTotals();              // M2i §2: per-wave totals, to compare with the comments
 // Equipment panel on the map (M2e §4): equipping is free and only possible there, between battles.
 const equipPanel = createEquipmentPanel({
   onEquip: (itemId) => equipItem(game.run, itemId),
@@ -121,12 +126,19 @@ const input = createInput(stage, canvas, () => scale, {
   },
   onKeyDown(key, e) {
     switch (key) {
-      case 'd': view.debug = !view.debug; break;
+      case 'd':
+        view.debug = !view.debug;
+        if (view.debug && !wavesLogged) { logWaveTotals(); wavesLogged = true; } // M2i §2: once
+        break;
+      case ' ': callNextWave(game); e.preventDefault(); break; // M2i §3.2: Call next wave (countdown / gap only)
       case 'p': clock.paused = !clock.paused; break;
       case '1': case '2': case '4':
         if (C.SIM_SPEEDS.includes(Number(key))) clock.speed = Number(key);
         break;
-      case 'n': if (game.state === GameState.PREP) startCombat(game); break;
+      case 'n': // N: start Combat from Prep; Shift+N (M2i §7): kill all and skip the rest of this wave
+        if (e.shiftKey) skipWave(game);
+        else if (game.state === GameState.PREP) startCombat(game);
+        break;
       case 'r': if (e.shiftKey) startNewRun(); else if (game.state !== GameState.MAP) { restartEncounter(game); afterRestart(); } break; // M2a §8: R this encounter again, Shift+R a new run
       case 'w': // Shift+W (debug): win the battle now (Combat only); W alone is the Squirrel shortcut
         if (e.shiftKey) winNow(game); else summonShortcut(key);

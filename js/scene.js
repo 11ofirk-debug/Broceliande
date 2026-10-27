@@ -8,7 +8,7 @@ import { createLanePath } from './lanePath.js';
 import { createRng } from './rng.js';
 import { emptyResources } from './resources.js';
 import { zoneIds, geometricZone, zoneQuota, zoneCandidates, quotaTotals } from './zones.js';
-import { corridorWidth, featureMix } from './levelSettings.js';
+import { corridorWidth, featureMix, levelWaves, waveTotals } from './levelSettings.js';
 import { fitsCorridor } from './entities/enemy.js';
 
 export const LEVEL_IDS = Object.keys(C.LEVELS);
@@ -113,41 +113,41 @@ function validateZones(scene) {
   }
 }
 
-// Wave totals (§14, M1e §3.6): per enemy type, the bursts must add up to the level's enemyCounts.
-function validateWave(scene) {
+// Waves (M2i §2, after §14): every wave has spawns; every spawn a known lane id (or 'random'), a
+// known enemy type, a count ≥ 1 and t ≥ 0; an Ogre needs corridors wide enough for it (M2c §2.4).
+function validateWaves(scene) {
   const { level, levelId } = scene;
-  const totals = Object.fromEntries(Object.keys(C.ENEMY_TYPES).map((type) => [type, 0]));
-  for (const lane of level.lanes) {
-    const bursts = level.wave[lane.id];
-    if (!bursts) {
-      console.error(`${levelId}: wave has no bursts for lane "${lane.id}"`);
-      continue;
+  const waves = levelWaves(level);
+  if (waves.length === 0) console.error(`${levelId}: has no waves`);
+  waves.forEach((wave, i) => {
+    const where = `${levelId} wave ${i + 1}`;
+    if (!wave.spawns?.length) console.error(`${where}: has no spawns`);
+    if (i < waves.length - 1 && !(wave.gapAfter >= 0)) console.error(`${where}: gapAfter should be a number of seconds`);
+    for (const s of wave.spawns ?? []) {
+      const t = C.ENEMY_TYPES[s.type];
+      if (!t) console.error(`${where}: spawn has unknown type "${s.type}"`);
+      if (s.lane !== 'random' && !level.lanes.some((l) => l.id === s.lane)) {
+        console.error(`${where}: spawn has unknown lane "${s.lane}" (a lane id or 'random')`);
+      }
+      if (!(s.count >= 1) || !(s.t >= 0)) console.error(`${where}: spawn needs count ≥ 1 and t ≥ 0`);
+      if (t && !fitsCorridor(s.type, corridorWidth(level))) {
+        console.error(`${levelId}: corridors are ${corridorWidth(level)} px, too narrow for its ${t.name} (needs ${2 * t.radius + 2})`);
+      }
     }
-    for (const burst of bursts) {
-      const type = burst.type ?? 'wolf';
-      if (!(type in totals)) console.error(`${levelId}: wave burst on lane "${lane.id}" has unknown type "${type}"`);
-      else totals[type] += burst.count;
-    }
-  }
-  // Mini-bosses (M2c §3) count in the totals; each needs a known type and lane, and an Ogre
-  // corridors wide enough for it (§2.4).
-  for (const boss of level.bosses ?? []) {
-    if (!(boss.type in totals)) {
-      console.error(`${levelId}: boss has unknown type "${boss.type}"`);
-      continue;
-    }
-    totals[boss.type]++;
-    if (boss.lane !== 'random' && !level.lanes.some((l) => l.id === boss.lane)) {
-      console.error(`${levelId}: boss ${boss.type} has unknown lane "${boss.lane}" (a lane id or 'random')`);
-    }
-    if (!fitsCorridor(boss.type, corridorWidth(level))) {
-      console.error(`${levelId}: corridors are ${corridorWidth(level)} px, too narrow for its ${C.ENEMY_TYPES[boss.type].name} (needs ${2 * C.ENEMY_TYPES[boss.type].radius + 2})`);
-    }
-  }
-  for (const [type, n] of Object.entries(totals)) {
-    if ((level.enemyCounts[type] ?? 0) !== n) {
-      console.error(`${levelId}: wave and bosses have ${n} ${C.ENEMY_TYPES[type].plural}, expected ${level.enemyCounts[type] ?? 0} (enemyCounts)`);
-    }
+  });
+}
+
+// Per-wave totals, e.g. "Tornville Haunt W2: 14W 1B", to compare with each wave's comment by eye
+// (M2i §2). Logged once, the first time the debug view is on.
+const TOTAL_LETTERS = [['wolf', 'W'], ['stirge', 'S'], ['bear', 'B'], ['ogre', 'O']];
+export function logWaveTotals() {
+  for (const id of LEVEL_IDS) {
+    const level = C.LEVELS[id];
+    levelWaves(level).forEach((wave, i) => {
+      const totals = waveTotals(wave);
+      const text = TOTAL_LETTERS.filter(([type]) => totals[type]).map(([type, letter]) => `${totals[type]}${letter}`).join(' ');
+      console.info(`${level.name} W${i + 1}: ${text}`);
+    });
   }
 }
 
@@ -155,7 +155,7 @@ function validateWave(scene) {
 export function validateLevel(scene) {
   const { levelId, level } = scene;
   validateZones(scene);
-  validateWave(scene);
+  validateWaves(scene);
   for (const { index, problem } of candidateProblems(scene)) {
     const c = scene.candidates[index];
     console.warn(`${levelId}: candidate ${index} at (${c.x}, ${c.y}): ${problem}`);
