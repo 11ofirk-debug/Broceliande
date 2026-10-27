@@ -67,6 +67,9 @@ export const BEAR_DROPS = [               // TUNING
   { resource: 'reeds',    chance: 0.20, min: 1, max: 1 },
   { resource: 'boughs',    chance: 0.25, min: 1, max: 1 },
 ];
+export const STIRGE_DROPS = [             // M2h §2.1 — Feathers only
+  { resource: 'feathers', chance: 0.10, min: 1, max: 1 },
+];
 export const OGRE_DROPS = [               // M2c §2.3 — the first enemy to always drop Boughs
   { resource: 'pits',     chance: 1.0, min: 3, max: 5 },
   { resource: 'feathers', chance: 1.0, min: 2, max: 3 },
@@ -123,7 +126,32 @@ export const ENEMY_TYPES = {
     boss: true,
     stepSoundInterval: 0.8, // s between ogreStep thuds while walking (M2c §2.9)
   },
+  // Flying enemy (M2h §2–3): flies over the ground enemies, never uses melee slots, hovers over
+  // the Druid to bite. All TUNING.
+  stirge: {
+    name: 'Stirge', plural: 'Stirges',
+    hp: 6,               // TUNING — STIRGE_HP: 2 base pebbles, 2 Vulture pecks
+    speed: 144,          // TUNING — STIRGE_SPEED, px/s: 2× wolf
+    radius: 12,          // TUNING — STIRGE_RADIUS: visual and collision
+    damage: 0.5,         // TUNING — STIRGE_DAMAGE (HP is fractional, M2h §2)
+    attackInterval: 0.6, // TUNING — STIRGE_ATTACK_INTERVAL, s
+    meleeSlotsUsed: 0,   // hovers on STIRGE_DRUID_RING instead
+    hitHeight: 24,       // pebbles strike its body, STIRGE_FLY_HEIGHT above its ground point
+    drops: STIRGE_DROPS,
+    flying: true,
+    burstStagger: 0.3,   // TUNING — STIRGE_FLOCK_STAGGER, s between the Stirges of one flock
+  },
 };
+
+// Flying enemies (M2h §3, the Stirge).
+export const STIRGE_FLY_HEIGHT = 18;       // TUNING — px it is drawn above its ground point (with a shadow there)
+export const STIRGE_DRUID_RING = 40;       // TUNING — px, ring over the Druid it hovers on to bite (no melee slots)
+export const STIRGE_WANDER_SPEED = 34;     // TUNING — px/s lateral flutter (a wolf's wander is ENEMY_WANDER_SPEED)
+export const STIRGE_WANDER_INTERVAL = [0.3, 0.9]; // TUNING — s between new flutter targets
+export const STIRGE_SEPARATION = 16;       // TUNING — px Stirges ease apart below (they may overlap a little)
+export const STIRGE_SEPARATION_SPEED = 40; // TUNING — px/s of that easing
+export const DEBUG_STIRGE_FLOCK = 4; // debug key S: Stirges per flock (M2h §6)
+export const CLOUDS_HIT_FLYERS = false;    // true: Toaders target flyers and their clouds damage them
 
 // Mini-boss feedback (M2c §2.5–2.7). Visual only.
 export const SCREEN_SHAKE_ENABLED = true; // false: no screen shake
@@ -381,6 +409,9 @@ export const SOUNDS = {
   mapNodeChosen: { volume: 0.6,  pitch: 1, minGap: 0.2,  maxVoices: 1, enabled: true }, // TUNING — warm drum hit + rising tone
   runComplete:   { volume: 0.6,  pitch: 1, minGap: 1,    maxVoices: 1, enabled: true }, // TUNING — short triumphant phrase
   magicFound:    { volume: 0.6,  pitch: 1, minGap: 0.5,  maxVoices: 1, enabled: true }, // TUNING — bright shimmer on finding a hidden item (M2e §3.2)
+  stirgeFlockSpawns: { volume: 0.45, pitch: 1, minGap: 0.4, maxVoices: 2, enabled: true }, // TUNING — thin buzzing whirr, once per flock (M2h §5)
+  stirgeBite:    { volume: 0.25, pitch: 1, minGap: 0.15, maxVoices: 2, enabled: true }, // TUNING — tiny wet tsk, low and rate-limited
+  stirgeDies:    { volume: 0.4,  pitch: 1, minGap: 0.08, maxVoices: 3, enabled: true }, // TUNING — short high squeak
   summonDenied:  { volume: 0.35, pitch: 1, minGap: 0.15, maxVoices: 1, enabled: true }, // TUNING — soft low blip when a summon shortcut can't be used
   bellToll:      { volume: 0.8,  pitch: 1, minGap: 2,    maxVoices: 1, enabled: true }, // TUNING — deep bell before each Hollow of Bells surge (M2f §4.10)
   // The Ogre (M2c §2.9)

@@ -395,6 +395,13 @@ export function spawnDebugOgre(game) {
   return true;
 }
 
+// Debug key S (M2h §6): spawn a flock of Stirges at the start of a random lane. Combat only.
+export function spawnDebugStirges(game) {
+  if (game.state !== GameState.COMBAT) return false;
+  queueDebugEnemy(game, 'stirge', C.DEBUG_STIRGE_FLOCK);
+  return true;
+}
+
 // Debug key G: +DEBUG_GRANT_AMOUNT of each resource.
 export function grantResources(game) {
   const n = C.DEBUG_GRANT_AMOUNT;

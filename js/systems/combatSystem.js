@@ -82,6 +82,7 @@ function selectCloudTarget(game, turret) {
   for (const enemy of game.enemies) {
     const dist = Math.hypot(enemy.x - turret.x, enemy.y - turret.y);
     if (dist > range) continue;
+    if (enemy.flying && !C.CLOUDS_HIT_FLYERS) continue; // M2h §3.4: Toaders don't target flyers
     const key = [isInsideCloud(game, enemy) ? 1 : 0, remainingDistance(enemy), dist];
     if (!best || key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] < bestKey[1] || (key[1] === bestKey[1] && key[2] < bestKey[2])))) {
       best = enemy;

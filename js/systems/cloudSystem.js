@@ -6,6 +6,7 @@
 // A cloud copies the stats of the level its pellet was fired at (M1h §2.3), so upgrading the
 // Toader changes only the clouds created after it.
 
+import * as C from '../config.js';
 import { cloudStats } from '../entities/turret.js';
 import { damageEnemy } from './combatSystem.js';
 import { events } from '../events.js';
@@ -18,7 +19,9 @@ export function createCloud(game, x, y, source, level) {
   events.emit('cloudBurst', { x, y });
 }
 
+// Flyers (M2h §3.4) are above the clouds unless CLOUDS_HIT_FLYERS.
 function overlaps(cloud, enemy) {
+  if (enemy.flying && !C.CLOUDS_HIT_FLYERS) return false;
   return Math.hypot(enemy.x - cloud.x, enemy.y - cloud.y) <= cloud.spec.radius + enemy.radius;
 }
 

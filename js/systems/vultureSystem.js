@@ -79,12 +79,13 @@ export function updateVultures(game, dt) {
 export function updateBlocking(game, dt) {
   const blockers = [
     ...game.vultures.filter((v) => v.state === VultureState.LANDED).map((unit) => ({ unit, radius: C.VULTURE_BLOCK_RADIUS })),
-    ...blockingSquirrels(game).map((unit) => ({ unit, radius: C.SQUIRREL_BLOCK_RADIUS })),
+    ...blockingSquirrels(game).map((unit) => ({ unit, radius: C.SQUIRREL_BLOCK_RADIUS, squirrel: true })),
   ];
   for (const enemy of game.enemies) {
     let blocker = null;
     let bestDist = Infinity;
-    for (const { unit, radius } of blockers) {
+    for (const { unit, radius, squirrel } of blockers) {
+      if (squirrel && enemy.flying) continue; // M2h §3.2: Squirrels never block flyers
       const d = Math.hypot(unit.x - enemy.x, unit.y - enemy.y);
       if (d <= radius && d < bestDist) {
         bestDist = d;

@@ -5,7 +5,7 @@ import { GameState, ActionState } from './states.js';
 import { drawDebugOverlay } from './debug/debugOverlay.js';
 import { drawFloor, drawCorridors, drawFlats, drawDecor, drawStream, drawAshFlecks, drawLaneGlow } from './render/environment.js';
 import {
-  drawTurretSlot, drawDruid, drawFeature, drawWolf, drawBear, drawOgre, drawEnemyHpBar, drawDruidHpBar, drawDustRing, drawLanePulse,
+  drawTurretSlot, drawDruid, drawFeature, drawWolf, drawBear, drawOgre, drawStirge, drawEnemyHpBar, drawDruidHpBar, drawDustRing, drawLanePulse,
   drawTurret, drawToader, toaderMouthOpen, drawPellet, drawCloud, drawRange, drawProgressBar, drawFloatingText, drawPebble,
   drawVulture, drawVultureStatus, drawVultureGhost, featureBase, slotBase, drawDrop,
   drawSquirrel, drawSquirrelStatus, drawSquirrelGhost, drawSwipe, drawSpark, drawNextRange, DRUID_REST_POSE,
@@ -23,7 +23,7 @@ import { drawSlotFloater } from './render/items.js';
 
 const HIT_FLASH_TIME = 0.15; // s of hit flash on the Druid (bite) or an enemy (pebble); visual only
 // Draw function per enemy type (M1e §3.4): ENEMY_TYPES holds the data, this holds the look.
-const ENEMY_DRAW = { wolf: drawWolf, bear: drawBear, ogre: drawOgre };
+const ENEMY_DRAW = { wolf: drawWolf, bear: drawBear, ogre: drawOgre, stirge: drawStirge };
 const PROGRESS_GAP = 12;     // px between the top of a location's footprint and its progress bar
 
 const COLORS = {
@@ -106,7 +106,7 @@ export function createRenderer(canvas) {
       ...game.turrets.map((t) => ({ y: slotBase(t).y, draw: () => drawTurretOfType(ctx, t, isBeingUpgraded(game, t.slotIndex), anim) })),
       ...doubleDrawables(ctx, game, anim),
       { y: druidPos.y + C.DRUID_RADIUS * 0.6, draw: () => drawDruid(ctx, druidPos.x, druidPos.y, hurt, defeatProgress(game), druidPose(game)) },
-      ...game.enemies.map((e) => ({
+      ...game.enemies.filter((e) => !e.flying).map((e) => ({ // flyers: drawn after, above them
         y: e.y + e.radius * 0.5,
         draw: () => ENEMY_DRAW[e.type](ctx, knockedBack(e, anim), strikeFlash(e, anim) ? 'strike' : recent(e.lastHitTime), recent(e.lastBiteTime), anim),
       })),
@@ -120,6 +120,10 @@ export function createRenderer(canvas) {
       })),
     ].sort((a, b) => a.y - b.y);
     for (const d of drawables) d.draw();
+    // Flyers (M2h §5): above every ground enemy (not y-sorted with them), below projectiles and UI.
+    for (const e of game.enemies) {
+      if (e.flying) ENEMY_DRAW[e.type](ctx, knockedBack(e, anim), strikeFlash(e, anim) ? 'strike' : recent(e.lastHitTime), recent(e.lastBiteTime), anim);
+    }
     drawAshFlecks(ctx, scene, performance.now() / 1000); // M2f §4.7: ambient, over the ground and entities
     for (const p of game.projectiles) (p.kind === 'pellet' ? drawPellet : drawPebble)(ctx, p);
     for (const s of game.swipes) drawSwipe(ctx, s, s.age / C.DRUID_SWIPE_TIME);

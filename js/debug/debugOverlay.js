@@ -381,6 +381,25 @@ function drawEnemies(ctx, game) {
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = ENEMY_COLOR;
     }
+    // M2h §6: a flyer's ground point (a cross) and its shadow, and a line to the Vulture holding it.
+    if (w.flying) {
+      ctx.beginPath();
+      ctx.moveTo(w.x - 4, w.y - 4); ctx.lineTo(w.x + 4, w.y + 4);
+      ctx.moveTo(w.x + 4, w.y - 4); ctx.lineTo(w.x - 4, w.y + 4);
+      ctx.stroke();
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.ellipse(w.x, w.y, w.radius, w.radius * 0.4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const holder = w.blockedBy !== null && game.vultures.find((v) => v.id === w.blockedBy);
+      if (holder) {
+        ctx.beginPath();
+        ctx.moveTo(w.x, w.y);
+        ctx.lineTo(holder.x, holder.y);
+        ctx.stroke();
+      }
+    }
     const tag = w.type === 'wolf' ? '' : `${C.ENEMY_TYPES[w.type].name} `;
     const slots = w.slots.length ? ` s${w.slots.join('+')}` : '';
     label(ctx, `${tag}#${w.id} ${w.blockedBy !== null ? 'blocked' : STATE_TAGS[w.state]}${slots}`, w.x - 14, w.y + w.radius + 14);

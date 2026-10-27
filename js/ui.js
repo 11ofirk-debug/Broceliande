@@ -494,7 +494,8 @@ function updateHud(el, game) {
   const hpWidth = `${hpFrac * 100}%`;
   if (el.hpFill.style.width !== hpWidth) el.hpFill.style.width = hpWidth;
   el.hpFill.dataset.level = hpFrac > 0.5 ? 'high' : hpFrac > 0.25 ? 'mid' : 'low';
-  setText(el.hpText, `${game.druidHp} / ${maxHp}`);
+  // HP may be fractional (Stirge bites, M2h §2): the text rounds up (79.5 shows 80), the bar is exact.
+  setText(el.hpText, `${Math.ceil(game.druidHp)} / ${maxHp}`);
 
   for (const [k, node] of Object.entries(el.res)) {
     setText(node, String(game.resources[k]));
@@ -927,7 +928,7 @@ function runLines(game) {
   return [
     `Run seed: ${r.seed}  (Shift+R new run)`,
     `Node:   ${r.currentNodeId ?? '—'}   completed: ${r.completedNodeIds.join(', ') || '—'}${isRunComplete(r) ? '   RUN COMPLETE' : ''}`,
-    `Carried: ${resourceLine(r.inventory)}   Druid HP ${r.druidHp}${C.CARRY_DRUID_HP ? ' (carried)' : ' (not carried)'}`,
+    `Carried: ${resourceLine(r.inventory)}   Druid HP ${r.druidHp.toFixed(1)}${C.CARRY_DRUID_HP ? ' (carried)' : ' (not carried)'}`,
     ...equipmentLines(game),
     // M2d §4: items the field sweep gathered on the last Victory.
     `Last sweep: ${game.lastSweep ? `${game.lastSweep.items} items  ${resourceLine(game.lastSweep.gathered)}` : 'none yet'}`,
@@ -969,7 +970,7 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
     `Speed:  ${speed}`,
     `FPS:    ${Math.round(view.fps)}`,
     '',
-    `Druid HP: ${game.druidHp} / ${game.stats['druid.maxHp']}`,
+    `Druid HP: ${game.druidHp.toFixed(1)} / ${game.stats['druid.maxHp']}`,
     druidMeleeLine(game),
     ...enemyDebugLines(game),
     ...bossDebugLines(game),

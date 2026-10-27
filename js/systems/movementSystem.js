@@ -28,6 +28,10 @@ export function updateEnemyMovement(game, dt) {
   for (const enemy of order) {
     if (enemy.blockedBy !== null) continue; // held up by a landed Vulture (§15.4)
     if (enemy.attack === AttackState.WINDUP) continue; // finishes its swing where it stands (M2c §2.5)
+    if (enemy.flying) {
+      moveFlyer(game, enemy, dt); // M2h §3: its own rules, over the ground enemies
+      continue;
+    }
     const before = { x: enemy.x, y: enemy.y };
     switch (enemy.state) {
       case EnemyState.WALKING: walk(game, enemy, dt); break;
@@ -37,6 +41,73 @@ export function updateEnemyMovement(game, dt) {
       default: break;
     }
     footsteps(enemy, before, dt);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Flying enemies (M2h §3.1, §3.3). They follow their lane (s + lateral offset) like the others,
+// with a quicker flutter, but never collide with ground enemies (so no queues and no unstick
+// rule); flyers only ease apart from each other a little. At the lane end each picks a random
+// point on STIRGE_DRUID_RING over the Druid, flies straight to it and hovers there biting, with
+// no melee slots, so any number can attack at once.
+// ---------------------------------------------------------------------------
+function moveFlyer(game, enemy, dt) {
+  if (enemy.state === EnemyState.WALKING) flyAlongLane(game, enemy, dt);
+  else if (enemy.state === EnemyState.APPROACHING) flyToStand(game, enemy, dt);
+  // BITING: hovers in place; the combat system handles its bites.
+}
+
+function flyAlongLane(game, enemy, dt) {
+  const lane = enemy.lane;
+  const max = maxOffset(enemy.type, lane);
+  enemy.wanderTimer -= dt;
+  if (enemy.wanderTimer <= 0) {
+    enemy.wanderTarget = game.rng.range(-max, max);
+    enemy.wanderTimer = game.rng.range(C.STIRGE_WANDER_INTERVAL[0], C.STIRGE_WANDER_INTERVAL[1]);
+  }
+  let offset = enemy.offset + clamp(enemy.wanderTarget - enemy.offset, -C.STIRGE_WANDER_SPEED * dt, C.STIRGE_WANDER_SPEED * dt);
+  // Light separation from other flyers on the same lane: ease apart sideways, never blocked.
+  for (const other of game.enemies) {
+    if (other === enemy || !other.flying || other.lane !== lane || other.state !== EnemyState.WALKING) continue;
+    if (Math.hypot(other.x - enemy.x, other.y - enemy.y) >= C.STIRGE_SEPARATION) continue;
+    const away = Math.sign(offset - other.offset) || (enemy.id % 2 ? 1 : -1);
+    offset += away * C.STIRGE_SEPARATION_SPEED * dt;
+  }
+  offset = clamp(offset, -max, max);
+  const exitS = lane.path.length - C.ENEMY_SLOT_CLAIM_DISTANCE;
+  const s = Math.min(enemy.s + enemyType(enemy).speed * dt, exitS);
+  const p = laneWorldPos(lane, s, offset);
+  if (Math.abs(p.x - enemy.x) > 0.01) enemy.facing = Math.sign(p.x - enemy.x);
+  enemy.stride += Math.hypot(p.x - enemy.x, p.y - enemy.y);
+  enemy.s = s;
+  enemy.offset = offset;
+  enemy.x = p.x;
+  enemy.y = p.y;
+  if (s >= exitS) {
+    const d = game.scene.level.druidPos;
+    const angle = game.rng.range(0, Math.PI * 2);
+    enemy.stand = { x: d.x + Math.cos(angle) * C.STIRGE_DRUID_RING, y: d.y + Math.sin(angle) * C.STIRGE_DRUID_RING, angle };
+    enemy.state = EnemyState.APPROACHING;
+  }
+}
+
+function flyToStand(game, enemy, dt) {
+  const dx = enemy.stand.x - enemy.x;
+  const dy = enemy.stand.y - enemy.y;
+  const dist = Math.hypot(dx, dy);
+  const step = Math.min(enemyType(enemy).speed * dt, dist);
+  if (dist > 0) {
+    if (Math.abs(dx) > 0.01) enemy.facing = Math.sign(dx);
+    enemy.x += (dx / dist) * step;
+    enemy.y += (dy / dist) * step;
+    enemy.stride += step;
+  }
+  if (dist - step < 0.5) {
+    enemy.state = EnemyState.BITING;
+    enemy.biteTimer = 0;
+    enemy.bitingSince = game.combatTime; // the Druid's strike counts it as an attacker (M1e §2.3)
+    const d = game.scene.level.druidPos;
+    enemy.facing = d.x >= enemy.x ? 1 : -1;
   }
 }
 

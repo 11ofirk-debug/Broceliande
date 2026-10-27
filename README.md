@@ -40,6 +40,7 @@ Then open http://localhost:8000 in Chrome.
 | `K` | Kill all living enemies (extra, not in the spec; handy for checking Victory) |
 | `B` | Spawn a Bear at the start of a random lane (Combat only) — see `docs/M1E_ADDENDUM.md` |
 | `O` | Spawn an Ogre at the start of a random lane (Combat only; not in levels with narrow corridors) |
+| `S` | Spawn a flock of 4 Stirges at the start of a random lane (Combat only) |
 | `I` | On the map: add a random unowned item. In battle: show the hidden item's spot (debug overlay) |
 | `[` / `]` | Previous / next level |
 | `G` | Grant +10 of each resource |

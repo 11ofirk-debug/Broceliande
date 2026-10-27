@@ -598,7 +598,7 @@ export function drawDruidHpBar(ctx, x, y, hp, maxHp = C.DRUID_HP) {
 
 // Enemy HP bars (§13, M1e §3.4): hidden until first damage; sized to the sprite.
 // lift: bar height above the collision centre, × radius; width in px.
-const HP_BAR = { wolf: { lift: 2.9, width: 30 }, bear: { lift: 1.75, width: 48 }, ogre: { lift: 2.15, width: 90 } };
+const HP_BAR = { wolf: { lift: 2.9, width: 30 }, bear: { lift: 1.75, width: 48 }, ogre: { lift: 2.15, width: 90 }, stirge: { lift: 3.1, width: 22 } }; // stirge: above its flying body
 
 // Mini-bosses (M2c §2.7) keep theirs visible all the time.
 export function drawEnemyHpBar(ctx, enemy) {
@@ -667,6 +667,66 @@ export function drawBear(ctx, bear, hit, lunging) {
   ctx.fill();
   ctx.restore();
 }
+
+// The Stirge (M2h §5): a small bat-like flyer with leathery wings flapping fast, a long thin
+// proboscis and red eyes, drawn STIRGE_FLY_HEIGHT above its ground point, where a small soft
+// shadow shows its place on the lane. Hovers with a slight bob. hit / lunging as for the others.
+export function drawStirge(ctx, s, hit, lunging, anim) {
+  const r = s.radius;
+  drawShadow(ctx, s.x, s.y, r * 0.8, r * 0.28);
+  const bob = Math.sin(anim * 9 + s.id) * 1.5;
+  const flap = Math.sin(anim * 38 + s.id * 1.7); // fast wingbeat
+  ctx.save();
+  ctx.translate(s.x, s.y - C.STIRGE_FLY_HEIGHT + bob);
+  ctx.scale(s.facing * (r / 12), r / 12);
+  if (lunging) ctx.translate(3, 2);
+  const body = hit === 'strike' ? COLORS.strikeFlash : hit ? STIRGE.hit : STIRGE.body;
+  // Wings: two leathery fans hinged at the shoulders, swinging up and down.
+  ctx.fillStyle = STIRGE.wing;
+  for (const side of [-1, 1]) {
+    const tip = -10 * flap * side;
+    ctx.beginPath();
+    ctx.moveTo(-1, -2);
+    ctx.lineTo(-15, -6 + tip - 6 * side);
+    ctx.lineTo(-10, 1 + tip * 0.4);
+    ctx.lineTo(-5, 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Body and head.
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 8, 5.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(7, -2, 4.2, 0, Math.PI * 2);
+  ctx.fill();
+  // Long thin proboscis.
+  ctx.strokeStyle = STIRGE.proboscis;
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(10.5, -1);
+  ctx.lineTo(19, 2.5);
+  ctx.stroke();
+  // Red eye, like the other enemies.
+  ctx.fillStyle = COLORS.wolfEyeGlow;
+  ctx.beginPath();
+  ctx.arc(8.5, -3.5, 2.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = COLORS.wolfEye;
+  ctx.beginPath();
+  ctx.arc(8.5, -3.5, 1.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+const STIRGE = {
+  body: '#4a2e38',
+  hit: '#b8a0aa',
+  wing: 'rgba(58, 34, 44, 0.9)',
+  proboscis: '#c8a090',
+};
 
 // Club angles (rad; 0 = straight ahead, positive = downward) for the Ogre's poses (M2c §2.8).
 const OGRE_CLUB_WALK = 0.95;   // carried low in front

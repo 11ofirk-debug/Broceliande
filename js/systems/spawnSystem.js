@@ -46,7 +46,10 @@ export function buildSpawnQueues(level, lanes, rng) {
   return lanes.map((lane) => {
     const spawns = [];
     for (const burst of bursts.filter((b) => b.lane === lane.id)) {
-      for (let k = 0; k < burst.count; k++) spawns.push({ time: burst.time + k * C.BURST_STAGGER, type: burst.type });
+      // Each type may space its burst its own way (Stirge flocks, M2h §4); the first of a burst is marked
+      // so a flock's sound plays once.
+      const stagger = C.ENEMY_TYPES[burst.type].burstStagger ?? C.BURST_STAGGER;
+      for (let k = 0; k < burst.count; k++) spawns.push({ time: burst.time + k * stagger, type: burst.type, first: k === 0 });
     }
     spawns.sort((a, b) => a.time - b.time);
     return { lane, spawns };
@@ -56,20 +59,21 @@ export function buildSpawnQueues(level, lanes, rng) {
 export function updateSpawning(game) {
   for (const queue of game.spawnQueues) {
     while (queue.spawns.length > 0 && queue.spawns[0].time <= game.combatTime) {
-      if (!trySpawn(game, queue.lane, queue.spawns[0].type)) break; // blocked: retry next step
+      if (!trySpawn(game, queue.lane, queue.spawns[0].type, queue.spawns[0].first)) break; // blocked: retry next step
       queue.spawns.shift();
     }
   }
 }
 
-function trySpawn(game, lane, type) {
+function trySpawn(game, lane, type, first = true) {
   const t = C.ENEMY_TYPES[type];
   // A keepSide enemy (the Ogre, M2d §3.3) picks a side with the seeded RNG and enters near it.
   const offset = t.keepSide
     ? (game.rng.next() < 0.5 ? -1 : 1) * Math.max(0, maxOffset(type, lane) - C.SIDE_KEEP_MARGIN)
     : game.rng.range(-maxOffset(type, lane), maxOffset(type, lane));
   const pos = laneWorldPos(lane, 0, offset);
-  if (findBlocker(game.enemies, null, pos.x, pos.y, collisionRadiusOf(type))) return false;
+  // Flyers (M2h §3.1) enter over anything on the ground.
+  if (!t.flying && findBlocker(game.enemies, null, pos.x, pos.y, collisionRadiusOf(type))) return false;
   game.enemies.push(createEnemy(game.nextEntityId++, type, lane, offset, game.rng, game.stats['enemy.hpMult']));
   game.enemyCounts[type].spawned++;
   game.enemyCounts[type].alive++;
@@ -78,14 +82,17 @@ function trySpawn(game, lane, type) {
     game.bossAnnouncement = { text: `An ${t.name} approaches!`, age: 0 };
     game.lanePulses.push({ laneId: lane.id, age: 0 });
   }
-  events.emit('enemySpawned', { type, lane: lane.id });
+  events.emit('enemySpawned', { type, lane: lane.id, first }); // first: of its burst (one flock sound)
   return true;
 }
 
-// Debug keys B (M1e §6) and O (M2c §4): queue one enemy of the type at the start of a random
-// lane, now. It spawns as soon as the entry point is clear. Uses the seeded RNG.
-export function queueDebugEnemy(game, type) {
+// Debug keys B (M1e §6), O (M2c §4) and S (M2h §6): queue `count` enemies of the type at the
+// start of a random lane, from now, spaced by its burst stagger. They spawn as soon as the entry
+// point is clear. Uses the seeded RNG.
+export function queueDebugEnemy(game, type, count = 1) {
   const queue = game.spawnQueues[game.rng.int(0, game.spawnQueues.length - 1)];
-  queue.spawns.unshift({ time: game.combatTime, type });
+  const stagger = C.ENEMY_TYPES[type].burstStagger ?? C.BURST_STAGGER;
+  for (let k = 0; k < count; k++) queue.spawns.push({ time: game.combatTime + k * stagger, type, first: k === 0 });
+  queue.spawns.sort((a, b) => a.time - b.time); // stable: wave spawns already due keep their order
   return queue.lane;
 }

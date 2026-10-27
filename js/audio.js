@@ -75,10 +75,10 @@ export function toggleMute() {
 // Events → sounds
 // ---------------------------------------------------------------------------
 const TURRET_FIRE_SOUND = { sprinkler: 'sprinklerFire', toader: 'toaderFire' };
-const ENEMY_ATTACK_SOUND = { wolf: 'wolfBite', bear: 'bearAttack', ogre: 'ogreBlow' };
-const ENEMY_DEATH_SOUND = { wolf: 'wolfDie', bear: 'bearDie', ogre: 'ogreDies' };
+const ENEMY_ATTACK_SOUND = { wolf: 'wolfBite', bear: 'bearAttack', ogre: 'ogreBlow', stirge: 'stirgeBite' };
+const ENEMY_DEATH_SOUND = { wolf: 'wolfDie', bear: 'bearDie', ogre: 'ogreDies', stirge: 'stirgeDies' };
 // M2c §2.9: a mini-boss's arrival, footsteps and wind-up (none for wolves and Bears).
-const ENEMY_SPAWN_SOUND = { ogre: 'ogreSpawns' };
+const ENEMY_SPAWN_SOUND = { ogre: 'ogreSpawns', stirge: 'stirgeFlockSpawns' }; // M2h: once per flock (its first Stirge)
 const ENEMY_STEP_SOUND = { ogre: 'ogreStep' };
 const ENEMY_WINDUP_SOUND = { ogre: 'ogreWindup' };
 
@@ -91,7 +91,7 @@ function subscribe() {
   events.on('vulturePecked', (e) => play('vulturePeck', e));
   events.on('squirrelStrikes', (e) => play('squirrelScratch', e));
   events.on('enemyDied', (e) => play(ENEMY_DEATH_SOUND[e.type], e));
-  events.on('enemySpawned', (e) => play(ENEMY_SPAWN_SOUND[e.type], e));
+  events.on('enemySpawned', (e) => { if (e.first !== false) play(ENEMY_SPAWN_SOUND[e.type], e); });
   events.on('enemyStep', (e) => play(ENEMY_STEP_SOUND[e.type], e));
   events.on('enemyWindup', (e) => play(ENEMY_WINDUP_SOUND[e.type], e));
   events.on('resourcesGained', (e) => play('resourceChime', e));
@@ -383,6 +383,48 @@ const RECIPES = {
     });
     noise(t, out, { filter: 'highpass', freq: 6000 * p, dur: 0.9, attack: 0.05, gain: 0.25 });
     return 0.95;
+  },
+
+  // Stirges (M2h §5). A flock arriving: a short, thin buzzing whirr (a fast-trembling high buzz).
+  stirgeFlockSpawns(t, out, p) {
+    const dur = 0.5;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(420 * p, t);
+    osc.frequency.linearRampToValueAtTime(520 * p, t + dur);
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 1400 * p;
+    band.Q.value = 2.5;
+    const trem = ctx.createGain();
+    trem.gain.value = 0.5;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 55;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.5;
+    lfo.connect(depth);
+    depth.connect(trem.gain);
+    const env = envelope(t, 0.06, dur, 0.9);
+    osc.connect(band);
+    band.connect(trem);
+    trem.connect(env);
+    env.connect(out);
+    osc.start(t);
+    lfo.start(t);
+    osc.stop(t + dur + 0.02);
+    lfo.stop(t + dur + 0.02);
+    return dur;
+  },
+
+  // A bite: a tiny wet "tsk".
+  stirgeBite(t, out, p) {
+    noise(t, out, { filter: 'highpass', freq: 3500 * p, q: 1, dur: 0.025, gain: 0.7 });
+    return tone(t, out, { freq: 900 * p, to: 500 * p, dur: 0.03, gain: 0.25, attack: 0.002 });
+  },
+
+  // Death: a short high squeak.
+  stirgeDies(t, out, p) {
+    return tone(t, out, { type: 'triangle', freq: 2200 * p, to: 1300 * p, dur: 0.12, gain: 0.7, attack: 0.004 });
   },
 
   // Summon shortcut denied: a soft, short two-note low blip, falling.

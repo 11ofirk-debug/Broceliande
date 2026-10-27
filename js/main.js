@@ -1,7 +1,7 @@
 // Bootstrap, stage scaling and the fixed-timestep loop (spec §3.4, §3.5).
 
 import * as C from './config.js';
-import { GameState, createGame, startEncounter, startCombat, beginEnding, updateGame, validateConfig, killAllEnemies, spawnDebugBear, spawnDebugOgre, grantResources, togglePrepMode, newRun, restartEncounter, continueRun, winNow } from './game.js';
+import { GameState, createGame, startEncounter, startCombat, beginEnding, updateGame, validateConfig, killAllEnemies, spawnDebugBear, spawnDebugOgre, spawnDebugStirges, grantResources, togglePrepMode, newRun, restartEncounter, continueRun, winNow } from './game.js';
 import { createInput } from './input.js';
 import { createRenderer } from './renderer.js';
 import { createUI, checkLevelNameLabel, checkBossBar } from './ui.js';
@@ -141,6 +141,7 @@ const input = createInput(stage, canvas, () => scale, {
       case 'k': killAllEnemies(game); break; // extra debug key (not in §18.1): kill all living enemies
       case 'b': spawnDebugBear(game); break;  // M1e §6: spawn a Bear at the start of a random lane (Combat only)
       case 'o': spawnDebugOgre(game); break;  // M2c §4: spawn an Ogre likewise (an error if the corridors are too narrow)
+      case 's': spawnDebugStirges(game); break; // M2h §6: spawn a flock of Stirges at the start of a random lane (Combat only)
       case '[': switchLevel(-1); break;                 // M2a §8: previous / next level in LEVELS,
       case ']': switchLevel(1); break;                  //   starting its Prep with the current resources
       case 'g': grantResources(game); break;

@@ -61,6 +61,7 @@ export function createEnemy(id, type, lane, offset, rng, hpMult = 1) {
     type,
     radius: t.radius,      // drawn size: drawing, HP bar, hover, Druid melee positioning
     collisionRadius: collisionRadiusOf(type), // collisions with other enemies, corridor clamping (M2d §3.2)
+    flying: !!t.flying,    // M2h §3: flies over the ground enemies (no collision with them, no melee slots)
     lane,
     state: EnemyState.WALKING,
     s: 0,                  // distance along the lane
