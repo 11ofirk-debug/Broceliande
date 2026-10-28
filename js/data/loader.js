@@ -108,7 +108,8 @@ export function readTab(tab, text, problems) {
 }
 
 // Fetches and reads every tab. urlFor(tab) gives each tab's URL. Returns { tables, problems }.
-export async function loadTables(urlFor) {
+// urlFor(tab) gives each tab's address; failHint is added to a tab's "could not load" error.
+export async function loadTables(urlFor, failHint = '') {
   const problems = { errors: [], warnings: [] };
   const tables = {};
   await Promise.all(Object.keys(TABS).map(async (tab) => {
@@ -117,8 +118,10 @@ export async function loadTables(urlFor) {
       const res = await fetch(urlFor(tab), { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       text = await res.text();
+      // An unpublished Google Sheet answers with a sign-in page rather than an HTTP error.
+      if (text.trimStart().startsWith('<')) throw new Error('got a web page, not CSV');
     } catch (err) {
-      problems.errors.push({ tab, row: '', column: '', message: `could not load ${urlFor(tab)} (${err.message})` });
+      problems.errors.push({ tab, row: '', column: '', message: `could not load ${urlFor(tab)} (${err.message})${failHint}` });
       tables[tab] = [];
       return;
     }

@@ -49,3 +49,6 @@ Then open http://localhost:8000 in Chrome.
 | `X` | Toggle enemy drop chances between ×1 and ×`DEBUG_DROP_MULT` (×10) — see `docs/M1D_DROPS_SQUIRREL_ADDENDUM.md` |
 
 Balancing data (stats, costs, levels, waves, candidates, palettes, sounds…) lives in `data/*.csv`, one file per tab of the Google Sheet, loaded at start-up; data problems show in the page. Code-side settings (lane geometry, decoration, UI and drawing sizes, debug) live in `js/config.js`. See `docs/M2J_DATA_SHEET_ADDENDUM.md`.
+
+- **Live data:** open `http://localhost:8000/?live` to load every tab straight from the published Google Sheet (`data/sheet_sources.json`); a LIVE DATA badge shows. Google can take a few minutes to refresh after an edit.
+- **Pull the sheet into `data/`:** double-click `tools/pull_sheet.bat` (or run `python tools/pull_sheet.py`), then commit the CSVs. If any tab fails, nothing is written.

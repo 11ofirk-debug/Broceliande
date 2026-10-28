@@ -980,6 +980,22 @@ html, body {
 .data-problems-title {
   font: bold 17px Georgia, 'Times New Roman', serif;
 }
+/* M2j §4.3: the data comes straight from the published Google Sheet (?live). */
+#live-badge {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  z-index: 30;
+  padding: 3px 8px;
+  background: #c8402a;
+  color: #fff;
+  font: bold 12px/1.2 sans-serif;
+  letter-spacing: 1px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+#live-badge[hidden] { display: none; }
+
 #data-errors {
   inset: 40px;
   padding: 20px 28px;

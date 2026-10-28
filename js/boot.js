@@ -40,7 +40,34 @@ function captureConsole(problems) {
   return () => Object.assign(console, original);
 }
 
-const { tables, problems } = await loadTables((tab) => `data/${tab}.csv`);
+// Live mode (§4.3): with ?live in the URL, every tab comes straight from the published Google
+// Sheet named in data/sheet_sources.json, and a LIVE DATA badge shows. Otherwise from data/*.csv.
+const LIVE_URL = 'https://docs.google.com/spreadsheets/d/e/{id}/pub?gid={gid}&single=true&output=csv';
+const LIVE_HINT = ' — check that the Google Sheet is published (File › Share › Publish to web) and that the tab\'s gid in data/sheet_sources.json is right';
+const live = new URLSearchParams(location.search).has('live');
+
+async function liveSources() {
+  const res = await fetch('data/sheet_sources.json', { cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function load() {
+  if (!live) return loadTables((tab) => `data/${tab}.csv`);
+  document.getElementById('live-badge').hidden = false;
+  let sources;
+  try {
+    sources = await liveSources();
+  } catch (err) {
+    return { tables: {}, problems: { errors: [{ tab: 'sheet_sources.json', message: `could not read data/sheet_sources.json (${err.message})` }], warnings: [] } };
+  }
+  const urlFor = (tab) => sources.tabs?.[tab] === undefined
+    ? `(no gid for "${tab}" in data/sheet_sources.json)`
+    : LIVE_URL.replace('{id}', sources.publishedId).replace('{gid}', sources.tabs[tab]);
+  return loadTables(urlFor, LIVE_HINT);
+}
+
+const { tables, problems } = await load();
 if (problems.errors.length === 0) validateTables(tables, problems);
 if (problems.errors.length === 0) {
   try {
