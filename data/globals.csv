@@ -1,6 +1,6 @@
 key,value,notes
 # Timing,,
-PREP_DURATION,28,s  (build and upgrade times: TURRET_TYPES levels)
+PREP_DURATION,28,s (build and upgrade times: TURRET_TYPES levels)
 END_DELAY,1.5,s of ENDING between the last kill / Druid death and the result overlay (M1e §1)
 # Step-mode Prep,,
 STEP_PX,25,TUNING — px of straight-line travel per step
