@@ -16,6 +16,8 @@ import { emptyResources, add, RESOURCE_KEYS } from './resources.js';
 import { updateEffects, addResourceFloaters } from './effects.js';
 import { updateVultures, updateBlocking, expireVultures } from './systems/vultureSystem.js';
 import { updateSquirrels, updateSquirrelStrikes, expireSquirrels } from './systems/squirrelSystem.js';
+import { updateWisps } from './systems/wispSystem.js';
+import { updateStatuses } from './systems/statusSystem.js';
 import { isStepMode } from './systems/stepSystem.js';
 import { GameState, PrepMode, ActionState } from './states.js';
 import { sceneFor } from './scene.js';
@@ -99,6 +101,8 @@ export function createGame(levelId) {
     damageStats: {},   // damage dealt this encounter by source, e.g. "sprinkler:impact", "toader:cloud" (M1f §7)
     vultures: [],
     squirrels: [],                // Squirrel summons (M1d §2)
+    wisps: [],                    // Slow Wisps in flight (M2k §3)
+    wispBursts: [],               // their bursts fading out { x, y, age, seed } (visual only)
     doubles: [],                  // Bough Doubles at work (M1i §2), each with its job
     doubleFades: [],              // Doubles fading out after a job { x, y, facing, age } (visual only)
     chips: [],                    // wood chips from crafting swings { x, y, vx, vy, age } (visual only)
@@ -179,6 +183,8 @@ export function startEncounter(game, { newSeed = false, levelId = null, resource
   game.damageStats = {};
   game.vultures = [];
   game.squirrels = [];
+  game.wisps = [];
+  game.wispBursts = [];
   game.doubles = [];
   game.doubleFades = [];
   game.chips = [];
@@ -439,6 +445,8 @@ export function updateGame(game, dt) {
       updateVultures(game, dt);
       updateDrops(game, dt);         // drop pop flight (M1g §1); before Squirrels so a just-landed item can be claimed
       updateSquirrels(game, dt);
+      updateWisps(game, dt);         // M2k §3.3: Slow Wisps fly and burst
+      updateStatuses(game);          // M2k §3.4: timed statuses (slowed) run out
       updateDoubles(game, dt);       // Bough Double jobs (M1i §2)
       updateMelee(game, dt);
       updateWindupAttacks(game, dt); // the Ogre's wind-up and blow (M2c §2.5), on the Druid or a blocker

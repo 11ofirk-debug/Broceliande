@@ -20,6 +20,7 @@ Then open http://localhost:8000 in Chrome.
 | `Q` | Summon a Vulture (Combat only) — straight into placement; again to cancel |
 | `W` | Summon a Squirrel (Combat only) |
 | `E` | Summon a Bough Double (Combat only) — straight into targeting |
+| `R` | Summon a Slow Wisp (Combat only) — straight into placement (shows the burst radius); again to cancel |
 | `Space` | Call next wave (during the countdown or a gap between waves) |
 | `1` / `2` / `4` | Game speed ×1 / ×2 / ×4 (Combat only; also the HUD buttons, remembered between battles) |
 | `V` | Mute / unmute sound |
@@ -33,8 +34,7 @@ Then open http://localhost:8000 in Chrome.
 | `P` | Pause / resume simulation |
 | `N` | Skip to next phase (Prep → Combat) |
 | `Shift+N` | Kill all current enemies and skip the rest of this wave's spawns (straight to the gap) |
-| `R` | Restart this encounter (same node, layout and starting resources) |
-| `Shift+R` | Start a new run (back to the map) |
+| `Shift+R` | Restart this encounter (same node, layout and starting resources) |
 | `Shift+W` | Win the battle now (Combat only) |
 | `L` | Restart with a new seed and layout, even if `DEBUG_SEED` is set — see `docs/M1C_LAYOUT_ADDENDUM.md` |
 | `M` | Toggle Prep mode (steps / timed) and restart — see `docs/M1B_STEPS_ADDENDUM.md` |

@@ -28,6 +28,17 @@ export function enemyType(enemy) {
   return C.ENEMY_TYPES[enemy.type];
 }
 
+// Movement speed multiplier from its statuses (M2k §3.4): slowed moves at its mult (movement only;
+// attack timing is unchanged).
+export function moveMult(enemy) {
+  return enemy.statuses.slowed?.mult ?? 1;
+}
+
+// Its current movement speed, px/s: the type's speed times its statuses' multiplier.
+export function enemySpeed(enemy) {
+  return enemyType(enemy).speed * moveMult(enemy);
+}
+
 // Largest |offset| that keeps the enemy's collision circle inside its lane's corridor (the level's
 // width, M2b §2; collision radius, M2d §3.2 — the Ogre's drawn body may overhang a little).
 // Never below 0: an enemy wider than its corridor walks the centreline (M2c §2.4).
@@ -101,6 +112,7 @@ export function createEnemy(id, type, lane, offset, rng, hpMult = 1) {
     passOverlapped: false, // whether they have overlapped yet
     advancing: false,      // moved forward along its lane this step
     blockerId: null,       // id of the enemy that held up its full step this step
+    statuses: {},          // timed statuses (M2k §3.4): slowed: { until, mult } (combat time)
   };
 }
 

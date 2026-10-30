@@ -36,6 +36,8 @@ export function updateEffects(game, dt) {
   game.floatingTexts = game.floatingTexts.filter((t) => t.age < C.FLOATING_TEXT_TIME);
   for (const s of game.swipes) s.age += dt;
   game.swipes = game.swipes.filter((s) => s.age < C.DRUID_SWIPE_TIME);
+  for (const b of game.wispBursts) b.age += dt; // Slow Wisp bursts (M2k §3.5)
+  game.wispBursts = game.wispBursts.filter((b) => b.age < C.WISP_BURST_TIME);
   for (const s of game.sparks) s.age += dt;
   game.sparks = game.sparks.filter((s) => s.age < C.STRIKE_SPARK_TIME);
   // Bough Double effects (M1i §2.7): wood chips and Doubles fading out after a job.

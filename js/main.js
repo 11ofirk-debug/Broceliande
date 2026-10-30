@@ -71,7 +71,7 @@ function restart(options) {
   afterRestart();
 }
 
-// Start again / Shift+R (M2a §2.1, §8): a new run on the map.
+// Start again (M2a §2.1): a new run on the map. (The old debug Shift+R new run is gone, M2k §4.)
 function startNewRun() {
   newRun(game);
   afterRestart();
@@ -141,7 +141,10 @@ const input = createInput(stage, canvas, () => scale, {
         if (e.shiftKey) skipWave(game);
         else if (game.state === GameState.PREP) startCombat(game);
         break;
-      case 'r': if (e.shiftKey) startNewRun(); else if (game.state !== GameState.MAP) { restartEncounter(game); afterRestart(); } break; // M2a §8: R this encounter again, Shift+R a new run
+      case 'r': // M2k §4: R the Slow Wisp shortcut; Shift+R (debug) this encounter again
+        if (!e.shiftKey) summonShortcut(key);
+        else if (game.state !== GameState.MAP) { restartEncounter(game); afterRestart(); }
+        break;
       case 'w': // Shift+W (debug): win the battle now (Combat only); W alone is the Squirrel shortcut
         if (e.shiftKey) winNow(game); else summonShortcut(key);
         break;
@@ -189,7 +192,7 @@ function setSpeed(speed) {
   if (game.state === GameState.COMBAT) setChosenSpeed(speed);
 }
 
-// Q / W / E (SUMMON_KEYS): the summon shortcuts, Combat only (ignored in Prep, on the map, in ENDING).
+// Q / W / E / R (SUMMON_KEYS): the summon shortcuts, Combat only (ignored in Prep, on the map, in ENDING).
 function summonShortcut(key) {
   const kind = Object.keys(C.SUMMON_KEYS).find((k) => C.SUMMON_KEYS[k] === key);
   if (kind) interaction.onSummonKey(kind);

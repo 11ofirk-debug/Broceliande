@@ -115,7 +115,8 @@ function subscribe() {
   events.on('doubleCraftHit', (e) => play('doubleCraftHit', e));
   events.on('doubleCancelled', (e) => play('doubleCancelled', e));
   events.on('upgradeCompleted', (e) => play('upgradeDone', e));
-  events.on('summonPlaced', (e) => play('summon', e));
+  events.on('summonPlaced', (e) => play(e.kind === 'slowWisp' ? 'wispSummoned' : 'summon', e));
+  events.on('wispBursts', (e) => play('wispBursts', e)); // M2k §3.5
 }
 
 // Plays a sound unless audio is not started, muted, disabled, within its minGap of the last
@@ -604,6 +605,23 @@ const RECIPES = {
   },
 
   // Short rising shimmer, pitched by summon (Vulture lower, Squirrel higher).
+  // Slow Wisp summoned (M2k §3.5): a soft airy whistle, gently rising and wavering.
+  wispSummoned(t, out, p) {
+    const f = C.SOUND_WISP_FREQ * p;
+    tone(t, out, { freq: f, to: f * 1.35, dur: 0.5, attack: 0.12, gain: 0.35 });
+    tone(t, out, { freq: f * 2.01, to: f * 2.6, dur: 0.4, attack: 0.15, gain: 0.08 });
+    noise(t, out, { freq: f * 3, to: f * 4, q: 6, dur: 0.5, attack: 0.15, gain: 0.35 });
+    return 0.52;
+  },
+
+  // Slow Wisp bursts (M2k §3.5): a gentle whoosh with a low, stretched chime.
+  wispBursts(t, out, p) {
+    noise(t, out, { freq: 1800 * p, to: 500 * p, q: 0.8, dur: 0.5, attack: 0.04, gain: 0.7 });
+    tone(t, out, { freq: 330 * p, to: 300 * p, dur: 1.2, attack: 0.03, gain: 0.45, delay: 0.05 });
+    tone(t, out, { freq: 330 * 2.76 * p, to: 300 * 2.76 * p, dur: 0.6, attack: 0.02, gain: 0.1, delay: 0.05 });
+    return 1.25;
+  },
+
   summon(t, out, p, data) {
     const f = (C.SOUND_SUMMON_FREQ[data.kind] ?? C.SOUND_SUMMON_FREQ.vulture) * p;
     [1, 1.5, 2, 2.5].forEach((k, i) => {

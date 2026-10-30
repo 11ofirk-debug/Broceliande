@@ -88,6 +88,13 @@ export function validateTables(t, problems) {
     if (r.key !== undefined && r.key.length !== 1) err('summons', r, 'key', 'key must be a single character');
     resourceColumns('summons', r, 'cost_', '');
   }
+  // The Slow Wisp's values (M2k §3.6): all needed.
+  const wisp = t.summons.find((r) => r.id === 'slowWisp');
+  if (wisp) {
+    for (const col of ['speed', 'max', 'radius', 'burstRadius', 'slowMult', 'slowDuration']) {
+      if (wisp[col] === undefined) err('summons', wisp, col, `the Slow Wisp needs ${col}`);
+    }
+  }
 
   // stats and items
   const stats = ids('stats', 'stat');

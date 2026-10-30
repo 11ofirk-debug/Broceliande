@@ -74,6 +74,7 @@ export const TABS = {
       hp: { type: 'number' }, damage: { type: 'number' }, attackInterval: { type: 'number' }, duration: { type: 'number' },
       speed: { type: 'number' }, max: { type: 'int' }, radius: { type: 'number' }, meleeRange: { type: 'number' },
       blockRadius: { type: 'number' }, pickupRange: { type: 'number' }, blocks: { type: 'bool' }, wispTime: { type: 'number' },
+      burstRadius: { type: 'number' }, slowMult: { type: 'number' }, slowDuration: { type: 'number' }, // Slow Wisp (M2k §3.6)
     },
     pattern: [/^cost_[a-z][a-zA-Z0-9]*$/, COST],
   },

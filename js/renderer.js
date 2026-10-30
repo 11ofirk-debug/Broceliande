@@ -5,7 +5,7 @@ import { GameState, ActionState } from './states.js';
 import { drawDebugOverlay } from './debug/debugOverlay.js';
 import { drawFloor, drawCorridors, drawFlats, drawDecor, drawStream, drawAshFlecks, drawLaneGlow } from './render/environment.js';
 import {
-  drawTurretSlot, drawDruid, drawFeature, drawWolf, drawBear, drawOgre, drawStirge, drawEnemyHpBar, drawDruidHpBar, drawDustRing, drawLanePulse,
+  drawTurretSlot, drawDruid, drawFeature, drawWolf, drawBear, drawOgre, drawStirge, drawEnemyHpBar, enemyBarY, drawDruidHpBar, drawDustRing, drawLanePulse,
   drawTurret, drawToader, toaderMouthOpen, drawPellet, drawCloud, drawRange, drawProgressBar, drawFloatingText, drawPebble,
   drawVulture, drawVultureStatus, drawVultureGhost, featureBase, slotBase, drawDrop,
   drawSquirrel, drawSquirrelStatus, drawSquirrelGhost, drawSwipe, drawSpark, drawNextRange, DRUID_REST_POSE,
@@ -20,6 +20,8 @@ import { drawFootsteps, drawTrail } from './render/footsteps.js';
 import { animationTime } from './game.js';
 import { drawMap } from './render/map.js';
 import { drawSlotFloater } from './render/items.js';
+import { drawWisp, drawWispTarget, drawWispGhost, drawWispBurst, drawSlowSpiral } from './render/wisp.js';
+import { isSlowed } from './systems/statusSystem.js';
 
 const HIT_FLASH_TIME = 0.15; // s of hit flash on the Druid (bite) or an enemy (pebble); visual only
 // Draw function per enemy type (M1e §3.4): ENEMY_TYPES holds the data, this holds the look.
@@ -97,6 +99,18 @@ export function createRenderer(canvas) {
     const anim = animationTime(game);
     const recent = (time) => anim - time < HIT_FLASH_TIME;
     const hurt = recent(game.druidLastHitTime);
+    // An enemy, with a pale silver-blue tint while slowed (M2k §3.5).
+    const drawEnemy = (e) => {
+      const slowed = isSlowed(e);
+      if (slowed) {
+        ctx.save();
+        ctx.filter = C.SLOW_TINT_FILTER;
+      }
+      ENEMY_DRAW[e.type](ctx, knockedBack(e, anim), strikeFlash(e, anim) ? 'strike' : recent(e.lastHitTime), recent(e.lastBiteTime), anim);
+      if (slowed) ctx.restore();
+    };
+    // Slow Wisps' target points while they travel (M2k §3.3): on the ground, under everything upright.
+    for (const w of game.wisps) drawWispTarget(ctx, w);
     const drawables = [
       ...decorOf(scene),
       ...game.features.map((f) => ({
@@ -108,7 +122,7 @@ export function createRenderer(canvas) {
       { y: druidPos.y + C.DRUID_RADIUS * 0.6, draw: () => drawDruid(ctx, druidPos.x, druidPos.y, hurt, defeatProgress(game), druidPose(game)) },
       ...game.enemies.filter((e) => !e.flying).map((e) => ({ // flyers: drawn after, above them
         y: e.y + e.radius * 0.5,
-        draw: () => ENEMY_DRAW[e.type](ctx, knockedBack(e, anim), strikeFlash(e, anim) ? 'strike' : recent(e.lastHitTime), recent(e.lastBiteTime), anim),
+        draw: () => drawEnemy(e),
       })),
       ...game.vultures.map((v) => ({
         y: v.y + C.VULTURE_RADIUS * 0.4,
@@ -122,9 +136,12 @@ export function createRenderer(canvas) {
     for (const d of drawables) d.draw();
     // Flyers (M2h §5): above every ground enemy (not y-sorted with them), below projectiles and UI.
     for (const e of game.enemies) {
-      if (e.flying) ENEMY_DRAW[e.type](ctx, knockedBack(e, anim), strikeFlash(e, anim) ? 'strike' : recent(e.lastHitTime), recent(e.lastBiteTime), anim);
+      if (e.flying) drawEnemy(e);
     }
     drawAshFlecks(ctx, scene, performance.now() / 1000); // M2f §4.7: ambient, over the ground and entities
+    // Slow Wisp bursts and Wisps in flight (M2k §3.5): over the field and the flyers.
+    for (const b of game.wispBursts) drawWispBurst(ctx, b);
+    for (const w of game.wisps) drawWisp(ctx, w);
     for (const p of game.projectiles) (p.kind === 'pellet' ? drawPellet : drawPebble)(ctx, p);
     for (const s of game.swipes) drawSwipe(ctx, s, s.age / C.DRUID_SWIPE_TIME);
     for (const s of game.sparks) drawSpark(ctx, s, s.age / C.STRIKE_SPARK_TIME);
@@ -142,6 +159,8 @@ export function createRenderer(canvas) {
 
     // Bars and text on top of everything so they stay readable.
     for (const e of game.enemies) drawEnemyHpBar(ctx, e);
+    // Slowed (M2k §3.5): a small turning spiral above the head, clear of the HP bar.
+    for (const e of game.enemies) if (isSlowed(e)) drawSlowSpiral(ctx, e.x, enemyBarY(e) - C.SLOW_SPIRAL_SIZE - 6, anim);
     for (const v of game.vultures) drawVultureStatus(ctx, v);
     for (const s of game.squirrels) drawSquirrelStatus(ctx, s);
     // Nothing can hurt the Druid in Prep, so his world HP bar only appears from Combat on.
@@ -165,7 +184,7 @@ export function createRenderer(canvas) {
     // Summon placement ghost of the chosen summon under the cursor (§15.1, M1d §2.1). The Bough
     // Double's ghost is drawn with its targeting overlay.
     if (game.action.state === ActionState.SUMMON_PLACEMENT && !isDoubleTargeting(game) && view.pointer && view.pointer.y >= C.HUD_STRIP_HEIGHT) {
-      const drawGhost = game.action.target === 'squirrel' ? drawSquirrelGhost : drawVultureGhost;
+      const drawGhost = { squirrel: drawSquirrelGhost, slowWisp: drawWispGhost }[game.action.target] ?? drawVultureGhost;
       drawGhost(ctx, view.pointer, performance.now() / 1000);
     }
 

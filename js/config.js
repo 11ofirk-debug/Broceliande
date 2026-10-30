@@ -139,6 +139,19 @@ export const WAVE_ICON_SIZE = 30;       // px, enemy images in the wave preview 
 // Summon shortcuts in Combat (same as choosing the summon in the Druid's menu), shown as key badges there.
 export const SUMMON_DENIED_FLASH_TIME = 0.45; // s an unavailable summon's option flashes in the open Druid menu
 
+// Slow Wisp (M2k §3.5), visual only; its stats are in data/summons.csv.
+export const WISP_COLOR = '#c8dcf0';          // pale silver-blue: the orb, its trail, the burst and the slowed tint
+export const WISP_GLOW = 'rgba(190, 215, 245, 0.35)';
+export const WISP_TRAIL_POINTS = 10;          // TUNING — trail length, in past positions
+export const WISP_TRAIL_SPACING = 0.05;       // s of flight between trail points
+export const WISP_SPIRAL_RADIUS = 6;          // TUNING — px, the lazy spiral the orb and trail wobble along
+export const WISP_SPIRAL_RATE = 3;            // rad/s of that wobble
+export const WISP_BURST_TIME = 0.8;           // s the burst takes to fade out
+export const SLOW_TINT_FILTER = 'grayscale(0.55) sepia(0.25) hue-rotate(175deg) brightness(1.25)'; // TUNING — pale silver-blue tint on a slowed enemy (canvas filter)
+export const SLOW_SPIRAL_SIZE = 7;            // px, radius of the spiral floating above a slowed enemy's head
+export const SLOW_SPIRAL_TURN_RATE = 1.2;     // rad/s it turns
+export const SOUND_WISP_FREQ = 620;           // TUNING — Hz, the Wisp's airy whistle
+
 // Bough Double (M1i §2): a summon that does one build or upgrade job at a turret slot in
 // Combat, then disappears. Its full cost (the job's cost plus BOUGH_DOUBLE_COST) is paid at
 // once; cancelling refunds it all. It appears beside its target at DRUID_ACTION_OFFSET.
@@ -1151,7 +1164,7 @@ export const EQUIP_CLEARING_RAGGED = 0.2;
 
 // Code-side lists the data must match: the resources the game draws (icons, HUD) and its summons.
 export const RESOURCE_IDS = ['pits', 'reeds', 'feathers', 'boughs', 'shells'];
-export const SUMMON_KINDS = ['vulture', 'squirrel', 'double'];
+export const SUMMON_KINDS = ['vulture', 'squirrel', 'double', 'slowWisp'];
 
 // globals tab
 export let PREP_DURATION, END_DELAY, STEP_PX, TRAVEL_TWEEN_TIME;
@@ -1192,6 +1205,7 @@ export let VULTURE_COST, VULTURE_HP, VULTURE_DAMAGE, VULTURE_ATTACK_INTERVAL, VU
   VULTURE_SPEED, VULTURE_RADIUS, VULTURE_MELEE_RANGE, VULTURE_BLOCK_RADIUS;
 export let SQUIRREL_COST, SQUIRREL_HP, SQUIRREL_DURATION, SQUIRREL_SPEED, MAX_SQUIRRELS, SQUIRREL_RADIUS,
   SQUIRREL_PICKUP_RANGE, SQUIRREL_BLOCKS_WOLVES, SQUIRREL_DAMAGE, SQUIRREL_ATTACK_INTERVAL, SQUIRREL_BLOCK_RADIUS;
+export let WISP_COST, WISP_SPEED, MAX_WISPS, WISP_RADIUS, WISP_BURST_RADIUS, WISP_SLOW_MULT, WISP_SLOW_DURATION; // Slow Wisp (M2k §3)
 export let BOUGH_DOUBLE_COST, MAX_BOUGH_DOUBLES, DOUBLE_WISP_TIME;
 // items: id → { slot, name, description, effects: [{ stat, op, value }], colors: [main, accent], mark }
 export let ITEMS;
@@ -1276,6 +1290,9 @@ export function applyData(t) {
   SQUIRREL_DAMAGE = s.damage; SQUIRREL_ATTACK_INTERVAL = s.attackInterval; SQUIRREL_BLOCK_RADIUS = s.blockRadius;
   const d = SUMMON_TYPES.double;
   BOUGH_DOUBLE_COST = d.cost; MAX_BOUGH_DOUBLES = d.max; DOUBLE_WISP_TIME = d.wispTime;
+  const w = SUMMON_TYPES.slowWisp;
+  WISP_COST = w.cost; WISP_SPEED = w.speed; MAX_WISPS = w.max; WISP_RADIUS = w.radius;
+  WISP_BURST_RADIUS = w.burstRadius; WISP_SLOW_MULT = w.slowMult; WISP_SLOW_DURATION = w.slowDuration;
 
   ITEMS = byId(t.items, (r) => {
     const effects = [];

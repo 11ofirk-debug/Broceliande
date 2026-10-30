@@ -806,6 +806,7 @@ const summonDetail = (game) => ({
   squirrel: `Lasts ${game.stats['squirrel.duration']} s · collects the nearest drop`
     + (C.SQUIRREL_BLOCKS_WOLVES ? ' · blocks wolves while waiting' : ''),
   double: 'Builds or upgrades one turret, then vanishes · plus that job\'s cost',
+  slowWisp: `Floats to the point and bursts · slows enemies within ${C.WISP_BURST_RADIUS} px (flyers too) to ×${C.WISP_SLOW_MULT} for ${C.WISP_SLOW_DURATION} s`,
 });
 
 // Turret choice for a Bough Double's build job (M1i §2.4 step 3): one card per turret type, its
@@ -1034,7 +1035,7 @@ const fmt = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
 function runLines(game) {
   const r = game.run;
   return [
-    `Run seed: ${r.seed}  (Shift+R new run)`,
+    `Run seed: ${r.seed}  (reload for a new run)`,
     `Node:   ${r.currentNodeId ?? '—'}   completed: ${r.completedNodeIds.join(', ') || '—'}${isRunComplete(r) ? '   RUN COMPLETE' : ''}`,
     `Carried: ${resourceLine(r.inventory)}   Druid HP ${r.druidHp.toFixed(1)}${C.CARRY_DRUID_HP ? ' (carried)' : ' (not carried)'}`,
     ...equipmentLines(game),

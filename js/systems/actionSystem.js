@@ -9,6 +9,7 @@ import { searchTime, completeSearch } from './searchSystem.js';
 import { turretOnSlot, completeBuild } from './buildSystem.js';
 import { createVulture } from '../entities/vulture.js';
 import { createSquirrel } from '../entities/squirrel.js';
+import { createWisp } from '../entities/wisp.js';
 import { canVisit, stepCost, markerPos, legFootprints } from './stepSystem.js';
 import { buildCost, buildTime } from '../entities/turret.js';
 import { doubleAvailability } from './doubleSystem.js';
@@ -132,7 +133,16 @@ export const SUMMONS = {
   squirrel: { kind: 'squirrel', name: C.SUMMON_TYPES.squirrel.name, plural: C.SUMMON_TYPES.squirrel.plural, cost: C.SQUIRREL_COST, max: C.MAX_SQUIRRELS, active: (g) => g.squirrels, create: createSquirrel },
   // The Bough Double's cap is the effective double.max (M2e), checked in doubleSystem.js.
   double: { kind: 'double', name: C.SUMMON_TYPES.double.name, plural: C.SUMMON_TYPES.double.plural, cost: C.BOUGH_DOUBLE_COST, active: (g) => g.doubles, targeted: true },
+  // Slow Wisp (M2k §3.2): placed like the Vulture, but it starts at the Druid and floats to the point.
+  slowWisp: { kind: 'slowWisp', name: C.SUMMON_TYPES.slowWisp.name, plural: C.SUMMON_TYPES.slowWisp.plural, cost: C.WISP_COST, max: C.MAX_WISPS, active: (g) => g.wisps, activeLabel: 'in flight',
+    create: (id, x, y, duration, game) => createWisp(id, wispStart(game), { x, y }) },
 };
+
+// Where a Slow Wisp appears: just above the Druid's head (the Bough Double's wisp starts there too).
+export function wispStart(game) {
+  const p = druidDisplayPos(game);
+  return { x: p.x, y: p.y - C.DRUID_RADIUS * 0.8 };
+}
 
 // A summon's cap: its config max, or for the Bough Double the effective double.max (M2e).
 export function summonMax(game, kind) {
@@ -152,7 +162,7 @@ export function summonAvailability(game, kind) {
   if (game.state !== GameState.COMBAT) return { available: false, reason: '' };
   if (game.action.state !== ActionState.IDLE) return { available: false, reason: 'Druid is busy' };
   if (s.targeted) return doubleAvailability(game);
-  if (s.active(game).length >= s.max) return { available: false, reason: `${s.max} ${s.max === 1 ? s.name : s.plural} already active` };
+  if (s.active(game).length >= s.max) return { available: false, reason: `${s.max} ${s.max === 1 ? s.name : s.plural} ${s.activeLabel ?? 'already active'}` };
   if (!canAfford(game.resources, s.cost)) return { available: false, reason: shortfallReason(game.resources, s.cost) };
   return { available: true, reason: '' };
 }
@@ -188,7 +198,7 @@ export function placeSummon(game, p) {
   game.action = createIdleAction();
   if (s.active(game).length >= s.max || !canAfford(game.resources, s.cost)) return false;
   deduct(game.resources, s.cost);
-  s.active(game).push(s.create(game.nextEntityId++, p.x, p.y, game.stats[`${s.kind}.duration`])); // effective duration (M2e)
+  s.active(game).push(s.create(game.nextEntityId++, p.x, p.y, game.stats[`${s.kind}.duration`], game)); // effective duration (M2e)
   events.emit('summonPlaced', { kind: s.kind, x: p.x, y: p.y });
   return true;
 }

@@ -1590,3 +1590,8 @@ export function drawVultureGhost(ctx, p, t) {
   ctx.restore();
   drawVulture(ctx, { x: p.x, y: p.y, state: 'HOVERING', facing: 1, id: 0 }, t, false, false, true);
 }
+
+// Where an enemy's HP bar sits (its top), so marks above the head clear it (M2k §3.5).
+export function enemyBarY(enemy) {
+  return enemy.y - enemy.radius * HP_BAR[enemy.type].lift;
+}

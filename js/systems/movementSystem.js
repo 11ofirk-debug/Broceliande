@@ -4,7 +4,7 @@
 // so enemies never overlap. Per-type values come from ENEMY_TYPES; everything else is shared.
 
 import * as C from '../config.js';
-import { EnemyState, AttackState, enemyType, maxOffset, laneWorldPos, remainingDistance } from '../entities/enemy.js';
+import { EnemyState, AttackState, enemyType, enemySpeed, moveMult, maxOffset, laneWorldPos, remainingDistance } from '../entities/enemy.js';
 import { findBlocker } from './collisionSystem.js';
 import { events } from '../events.js';
 import { stuckTime } from '../levelSettings.js';
@@ -65,7 +65,7 @@ function flyAlongLane(game, enemy, dt) {
     enemy.wanderTarget = game.rng.range(-max, max);
     enemy.wanderTimer = game.rng.range(C.STIRGE_WANDER_INTERVAL[0], C.STIRGE_WANDER_INTERVAL[1]);
   }
-  let offset = enemy.offset + clamp(enemy.wanderTarget - enemy.offset, -C.STIRGE_WANDER_SPEED * dt, C.STIRGE_WANDER_SPEED * dt);
+  let offset = enemy.offset + clamp(enemy.wanderTarget - enemy.offset, -C.STIRGE_WANDER_SPEED * moveMult(enemy) * dt, C.STIRGE_WANDER_SPEED * moveMult(enemy) * dt);
   // Light separation from other flyers on the same lane: ease apart sideways, never blocked.
   for (const other of game.enemies) {
     if (other === enemy || !other.flying || other.lane !== lane || other.state !== EnemyState.WALKING) continue;
@@ -75,7 +75,7 @@ function flyAlongLane(game, enemy, dt) {
   }
   offset = clamp(offset, -max, max);
   const exitS = lane.path.length - C.ENEMY_SLOT_CLAIM_DISTANCE;
-  const s = Math.min(enemy.s + enemyType(enemy).speed * dt, exitS);
+  const s = Math.min(enemy.s + enemySpeed(enemy) * dt, exitS);
   const p = laneWorldPos(lane, s, offset);
   if (Math.abs(p.x - enemy.x) > 0.01) enemy.facing = Math.sign(p.x - enemy.x);
   enemy.stride += Math.hypot(p.x - enemy.x, p.y - enemy.y);
@@ -95,7 +95,7 @@ function flyToStand(game, enemy, dt) {
   const dx = enemy.stand.x - enemy.x;
   const dy = enemy.stand.y - enemy.y;
   const dist = Math.hypot(dx, dy);
-  const step = Math.min(enemyType(enemy).speed * dt, dist);
+  const step = Math.min(enemySpeed(enemy) * dt, dist);
   if (dist > 0) {
     if (Math.abs(dx) > 0.01) enemy.facing = Math.sign(dx);
     enemy.x += (dx / dist) * step;
@@ -115,7 +115,7 @@ function flyToStand(game, enemy, dt) {
 function footsteps(enemy, before, dt) {
   const interval = enemyType(enemy).stepSoundInterval;
   if (!interval || (enemy.x === before.x && enemy.y === before.y)) return;
-  enemy.stepTimer += dt;
+  enemy.stepTimer += dt * moveMult(enemy); // slowed: slower steps (M2k §3.5)
   if (enemy.stepTimer < interval) return;
   enemy.stepTimer -= interval;
   events.emit('enemyStep', { type: enemy.type, x: enemy.x, y: enemy.y });
@@ -160,8 +160,8 @@ function walk(game, enemy, dt) {
   const s0 = enemy.s;
   updateWander(game, enemy, dt);
 
-  const ds = enemyType(enemy).speed * dt;
-  const drift = clamp(enemy.wanderTarget - enemy.offset, -C.ENEMY_WANDER_SPEED * dt, C.ENEMY_WANDER_SPEED * dt);
+  const ds = enemySpeed(enemy) * dt;
+  const drift = clamp(enemy.wanderTarget - enemy.offset, -C.ENEMY_WANDER_SPEED * moveMult(enemy) * dt, C.ENEMY_WANDER_SPEED * moveMult(enemy) * dt);
   const blocker = tryLaneMove(game, enemy, Math.min(enemy.s + ds, exitS), clampOffset(enemy, enemy.offset + drift));
 
   if (blocker) {
@@ -169,7 +169,7 @@ function walk(game, enemy, dt) {
     // otherwise slow down, otherwise stop and queue.
     const n = enemy.lane.path.normalAt(enemy.s);
     let dir = Math.sign(n.x * (enemy.x - blocker.x) + n.y * (enemy.y - blocker.y)) || (enemy.id % 2 ? 1 : -1);
-    const step = C.ENEMY_SIDESTEP_SPEED * dt;
+    const step = C.ENEMY_SIDESTEP_SPEED * moveMult(enemy) * dt;
     if (Math.abs(enemy.offset + dir * step) > maxOffset(enemy.type, enemy.lane)) dir = -dir;
     const side = clampOffset(enemy, enemy.offset + dir * step);
     const candidates = [
@@ -209,7 +209,8 @@ function updateStuck(enemy, blocker, dt, limit) {
     // actually moving (not queued behind enemies waiting for melee slots), or held up by this
     // enemy in turn (two enemies blocking each other on a bend)
     && (blocker.advancing || blocker.blockerId === enemy.id)
-    && enemyType(blocker).speed < enemyType(enemy).speed;
+    // current speeds, so a faster enemy can pass a slowed one (M2k §3.4)
+    && enemySpeed(blocker) < enemySpeed(enemy);
   if (!slower) {
     // A free step lets the timer run down rather than reset it, so an enemy that creeps behind
     // its blocker (blocked on most steps, now and then a free one) still counts as held up.
@@ -307,7 +308,7 @@ function approach(game, enemy, dt) {
   const dx = target.x - enemy.x;
   const dy = target.y - enemy.y;
   const dist = Math.hypot(dx, dy);
-  const step = Math.min(enemyType(enemy).speed * dt, dist);
+  const step = Math.min(enemySpeed(enemy) * dt, dist);
   const heading = Math.atan2(dy, dx);
   const minDruidDist = C.DRUID_RADIUS + enemy.radius;
   for (const turn of STEER_ANGLES) {

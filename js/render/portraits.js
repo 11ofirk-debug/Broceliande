@@ -5,6 +5,7 @@
 
 import * as C from '../config.js';
 import { drawVulture, drawSquirrel, drawTurretSlot, drawTurret, drawToader, drawDruid, DRUID_REST_POSE, drawWolf, drawBear, drawOgre, drawStirge } from './entities.js';
+import { drawWisp } from './wisp.js';
 
 const SCRATCH = 240;   // px, scratch canvas the entity is first drawn on
 const RESOLUTION = 2;  // bitmap pixels per CSS pixel, so portraits stay sharp when the stage scales
@@ -19,6 +20,8 @@ const PORTRAIT_DRAW = {
   squirrel: (ctx, x, y) => drawSquirrel(ctx, { x, y, state: 'WAITING', facing: 1, id: 0, stride: 0 }, 0, false),
   // Bough Double (M1i §2.7): the Druid's drawing, monochrome brown and translucent.
   double: (ctx, x, y) => drawDruid(ctx, x, y, false, 0, DRUID_REST_POSE, { tint: C.DOUBLE_TINT, alpha: C.DOUBLE_ALPHA }),
+  // Slow Wisp (M2k §3.2): its orb, as in flight.
+  slowWisp: (ctx, x, y) => drawWisp(ctx, { x, y, from: { x, y }, to: { x, y }, age: 0 }),
   // Turrets on their slot pad, level 1 (M1f §5.2 build menu).
   // Enemies (M2i §4.2), with their battlefield draw functions.
   wolf: (ctx, x, y) => drawWolf(ctx, restingEnemy('wolf', x, y), false, false, 0),
