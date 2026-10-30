@@ -4,7 +4,8 @@
 // copy of that bitmap.
 
 import * as C from '../config.js';
-import { drawVulture, drawSquirrel, drawTurretSlot, drawTurret, drawToader, drawDruid, DRUID_REST_POSE, drawWolf, drawBear, drawOgre, drawStirge } from './entities.js';
+import { drawVulture, drawSquirrel, drawTurretSlot, drawTurret, drawToader, drawDruid, DRUID_REST_POSE } from './entities.js';
+import { drawEnemyLook } from './enemyLook.js';
 import { drawWisp } from './wisp.js';
 
 const SCRATCH = 240;   // px, scratch canvas the entity is first drawn on
@@ -33,10 +34,9 @@ const PORTRAIT_DRAW = {
   },
 };
 
-// Enemies (M2i §4.2) by base type; a variant (a Grim, M2l §2.1) is drawn with its base type's
-// function, which gives it its variant look.
-const ENEMY_PORTRAIT = { wolf: drawWolf, bear: drawBear, ogre: drawOgre, stirge: drawStirge };
-const enemyPortrait = (kind) => (ctx, x, y) => ENEMY_PORTRAIT[C.ENEMY_TYPES[kind].baseType](ctx, restingEnemy(kind, x, y), false, false, 0);
+// Enemies (M2i §4.2) with their battlefield look, a Grim's outline, cracks and features included
+// (M2l §2.1); not its smoke, which would only make the cropped icon smaller.
+const enemyPortrait = (kind) => (ctx, x, y) => drawEnemyLook(ctx, restingEnemy(kind, x, y), false, false, 0, { smoke: false });
 
 const cache = new Map();
 

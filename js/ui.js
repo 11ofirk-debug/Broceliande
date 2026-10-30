@@ -452,10 +452,14 @@ function enemyDisplayOrder() {
 }
 
 function wavePreviewEntries(wave) {
-  const totals = waveTotals(wave);
-  const types = enemyDisplayOrder();
+  return enemyIconEntries(waveTotals(wave));
+}
+
+// Enemy icons with counts, in display order, from { type: count } (wave preview, map tooltip):
+// each type's portrait with its full look, Grims included (M2l §2.1), a boss with its name.
+function enemyIconEntries(totals) {
   const row = document.createDocumentFragment();
-  for (const type of types.filter((t) => totals[t])) {
+  for (const type of enemyDisplayOrder().filter((t) => totals[t])) {
     const t = C.ENEMY_TYPES[type];
     const entry = document.createElement('span');
     entry.className = t.boss ? 'wave-entry boss' : 'wave-entry';
@@ -724,7 +728,8 @@ function mapTooltip(nodeId) {
   const counts = (types) => [waves, ...types.map(([type, n]) => `${C.ENEMY_TYPES[type].plural} ${n}`)].join(' · ');
   const totals = levelTotals(level);
   const entries = enemyDisplayOrder().filter((type) => totals[type] > 0).map((type) => [type, totals[type]]);
-  if (node.type === 'wilds') return { title: `${node.name} — ${level.description}`, lines: [['', counts(entries)]], anchor };
+  const icons = totals; // M2l §2.1: a row of enemy icons, so Grims show with their look
+  if (node.type === 'wilds') return { title: `${node.name} — ${level.description}`, lines: [['', counts(entries)]], icons, anchor };
   // Fell Wilds: "Mini-boss: Ogre"; the Boss node (M2f §2): "Bosses: Ogre ×2" (counted from its level).
   const bosses = entries.filter(([type]) => C.ENEMY_TYPES[type].boss)
     .map(([type, n]) => (n > 1 ? `${C.ENEMY_TYPES[type].name} ×${n}` : C.ENEMY_TYPES[type].name)).join(', ');
@@ -735,6 +740,7 @@ function mapTooltip(nodeId) {
       ['', counts(entries.filter(([type]) => !C.ENEMY_TYPES[type].boss))],
       ['tip-boss', `${node.type === 'boss' ? 'Bosses' : 'Mini-boss'}: ${bosses || '—'}`],
     ],
+    icons,
     anchor,
   };
 }
@@ -758,6 +764,12 @@ function updateTooltip(el, game, view, prevKey) {
     line.className = cls;
     line.textContent = text;
     el.tooltip.append(line);
+  }
+  if (content.icons) {
+    const row = document.createElement('div');
+    row.className = 'tip-enemies';
+    row.append(enemyIconEntries(content.icons));
+    el.tooltip.append(row);
   }
   const { x, y, halfWidth } = content.anchor;
   placeBeside(el.tooltip, x, y, halfWidth);

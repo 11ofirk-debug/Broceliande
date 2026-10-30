@@ -5,7 +5,7 @@ import { GameState, ActionState } from './states.js';
 import { drawDebugOverlay } from './debug/debugOverlay.js';
 import { drawFloor, drawCorridors, drawFlats, drawDecor, drawStream, drawAshFlecks, drawLaneGlow } from './render/environment.js';
 import {
-  drawTurretSlot, drawDruid, drawFeature, drawWolf, drawBear, drawOgre, drawStirge, drawEnemyHpBar, enemyBarY, drawArmorSpark, drawHealSparkle, drawDruidHpBar, drawDustRing, drawLanePulse,
+  drawTurretSlot, drawDruid, drawFeature, drawEnemyHpBar, enemyBarY, drawArmorSpark, drawHealSparkle, drawDruidHpBar, drawDustRing, drawLanePulse,
   drawTurret, drawToader, toaderMouthOpen, drawPellet, drawCloud, drawRange, drawProgressBar, drawFloatingText, drawPebble,
   drawVulture, drawVultureStatus, drawVultureGhost, featureBase, slotBase, drawDrop,
   drawSquirrel, drawSquirrelStatus, drawSquirrelGhost, drawSwipe, drawSpark, drawNextRange, DRUID_REST_POSE,
@@ -22,11 +22,10 @@ import { drawMap } from './render/map.js';
 import { drawSlotFloater } from './render/items.js';
 import { drawWisp, drawWispTarget, drawWispGhost, drawWispBurst, drawSlowSpiral } from './render/wisp.js';
 import { isSlowed } from './systems/statusSystem.js';
+import { drawEnemyLook } from './render/enemyLook.js'; // an enemy's look, Grims included (M2l §2.1)
+import { drawShowcase } from './debug/showcase.js';
 
 const HIT_FLASH_TIME = 0.15; // s of hit flash on the Druid (bite) or an enemy (pebble); visual only
-// Draw function per enemy type (M1e §3.4): ENEMY_TYPES holds the data, this holds the look. A
-// variant (a Grim, M2l §2.1) uses its base type's, which draws its variant look.
-const ENEMY_DRAW = { wolf: drawWolf, bear: drawBear, ogre: drawOgre, stirge: drawStirge };
 const PROGRESS_GAP = 12;     // px between the top of a location's footprint and its progress bar
 
 const COLORS = {
@@ -107,7 +106,7 @@ export function createRenderer(canvas) {
         ctx.save();
         ctx.filter = C.SLOW_TINT_FILTER;
       }
-      ENEMY_DRAW[C.ENEMY_TYPES[e.type].baseType](ctx, scaledForDrawing(knockedBack(e, anim)), strikeFlash(e, anim) ? 'strike' : recent(e.lastHitTime), recent(e.lastBiteTime), anim);
+      drawEnemyLook(ctx, knockedBack(e, anim), strikeFlash(e, anim) ? 'strike' : recent(e.lastHitTime), recent(e.lastBiteTime), anim);
       if (slowed) ctx.restore();
     };
     // Slow Wisps' target points while they travel (M2k §3.3): on the ground, under everything upright.
@@ -169,6 +168,7 @@ export function createRenderer(canvas) {
     // Slowed (M2k §3.5): a small turning spiral above the head, clear of the HP bar.
     // Dogged (M2l §2.2): on a slow-resistant enemy it spins faster and fainter (only partly slowed).
     for (const e of game.enemies) if (isSlowed(e)) drawSlowSpiral(ctx, e.x, enemyBarY(e) - C.SLOW_SPIRAL_SIZE - 6, anim, !!C.ENEMY_TYPES[e.type].slowResist);
+    if (view.showcase) drawShowcase(ctx, view.showcase, anim); // debug Shift+C: normal and Grim enemies side by side
     for (const v of game.vultures) drawVultureStatus(ctx, v);
     for (const s of game.squirrels) drawSquirrelStatus(ctx, s);
     // Nothing can hurt the Druid in Prep, so his world HP bar only appears from Combat on.
@@ -400,13 +400,6 @@ function druidPose(game) {
     lunge = C.STRIKE_LUNGE_PX * q;
   }
   return { staffAngle: angle, lungeX: s.dirX * lunge, lungeY: s.dirY * lunge, facing };
-}
-
-// Drawn size (M2l §2.1): drawScale (a Grim's 6 %) enlarges the drawing only, about its feet.
-function scaledForDrawing(e) {
-  const s = C.ENEMY_TYPES[e.type].drawScale ?? 1;
-  if (s === 1) return e;
-  return { ...e, radius: e.radius * s, y: e.y + e.radius * 0.5 * (1 - s) };
 }
 
 // Where an enemy is drawn: pushed back a few px just after a Druid strike, settling over

@@ -508,6 +508,15 @@ html, body {
   font-weight: bold;
 }
 
+/* Map node tooltip: the level's enemies as icons with counts (M2l §2.1). */
+#tooltip .tip-enemies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  margin-top: 4px;
+}
+
 /* An optional header line (step-mode travel cost, M1f §5.2) above the options, which sit side
    by side (one per summon or turret type). */
 #menu {

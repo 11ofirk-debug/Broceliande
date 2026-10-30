@@ -56,14 +56,26 @@ export const BOSS_LANE_PULSE_RADIUS = 90; // px
 
 // Grim enemies (M2l). Their stats, traits, drawScale and soundPitch are in data/enemies.csv; this is
 // their look and debug only.
-export const GRIM_SMOKE_PUFFS = 3;          // TUNING — faint smoke wisps rising off each Grim at once
+export const GRIM_OUTLINE_COLOR = '#ff8a2a'; // TUNING — ember outline round the whole silhouette
+export const GRIM_OUTLINE_WIDTH = 1.6;      // px
+export const GRIM_OUTLINE_PERIOD = 1;       // s per pulse
+export const GRIM_OUTLINE_ALPHA = [0.55, 1]; // its opacity at the pulse's low and high
+export const GRIM_CRACK_COLOR = '#ff9a3a';  // glowing crack lines across the body
+export const GRIM_SPIKE_COLOR = '#b9b4aa';  // the Grim Ogre's club spikes (iron)
+export const GRIM_SMOKE_PUFFS = 5;          // TUNING — pale ash puffs rising off each Grim at once
+export const GRIM_SMOKE_RGB = '214, 208, 200'; // pale ash grey
+export const GRIM_SMOKE_ALPHA = 0.62;       // a puff's peak opacity
 export const GRIM_SMOKE_RATE = 0.55;        // TUNING — rises per s (each puff's cycle)
 export const GRIM_SMOKE_RISE = 1.6;         // × radius a puff rises before it fades
+export const GRIM_SPARKS = 3;               // tiny ember sparks rising through the smoke
+export const GRIM_SPARK_RATE = 0.9;         // rises per s
 export const ARMOR_SPARK_TIME = 0.18;       // s the grey spark shows where armor reduced a hit
 export const HEAL_SPARKLE_TIME = 0.4;       // s the red sparkle shows on a biter that healed
 export const DOGGED_SPIRAL_SPEED = 3;       // × the slow spiral's turn rate on a slow-resistant enemy
 export const DOGGED_SPIRAL_ALPHA = 0.5;     // its opacity
 export const DEBUG_GRIM_WOLVES = 4;         // debug Shift+G: Grim Wolves spawned at once
+export const SHOWCASE_GAP = 28;             // debug Shift+C: px between the figures in the comparison row
+export const SHOWCASE_PAIR_GAP = 70;        // px between one normal / Grim pair and the next
 
 
 // ---------------------------------------------------------------------------

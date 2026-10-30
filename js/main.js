@@ -19,6 +19,7 @@ import { validateItems } from './stats.js';
 import { createRng } from './rng.js';
 import { events } from './events.js';
 import { chosenSpeed, setChosenSpeed } from './gameSpeed.js';
+import { buildShowcase } from './debug/showcase.js';
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('game-canvas');
@@ -55,7 +56,7 @@ const game = createGame(mapNode(C.MAP_START_NODE).levelId);
 const clock = { speed: 1, paused: false };
 // UI-only state: never read by the simulation.
 let wavesLogged = C.DEBUG_START_ENABLED; // per-wave totals logged (M2i §2)
-const view = { debug: C.DEBUG_START_ENABLED, revealItem: false, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null, menuHoverType: null, mapHover: null }; // menuHoverType: build-menu card under the pointer (range preview); mapHover: available map node under the pointer
+const view = { debug: C.DEBUG_START_ENABLED, showcase: null, revealItem: false, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null, menuHoverType: null, mapHover: null }; // menuHoverType: build-menu card under the pointer (range preview); mapHover: available map node under the pointer; showcase: debug Shift+C comparison row
 const interaction = createInteraction(game, view);
 
 // UI state to clear whenever an encounter (re)starts or the map opens.
@@ -155,6 +156,9 @@ const input = createInput(stage, canvas, () => scale, {
         if (game.state !== GameState.MAP) { restartEncounter(game); afterRestart(); }
         break;
       case 'u': undoLastMove(game); break;              // M1b §8: undo last step-mode move
+      case 'c': // debug Shift+C: each normal enemy beside its Grim, standing still mid-stage; again to remove
+        if (e.shiftKey && game.state !== GameState.MAP) view.showcase = view.showcase ? null : buildShowcase();
+        break;
       case 'k': killAllEnemies(game); break; // extra debug key (not in §18.1): kill all living enemies
       // M1e §6, M2c §4, M2h §6: B / O / S spawn a Bear / an Ogre / a flock of Stirges at a random lane
       // (Combat only); with Shift, their Grim versions (M2l §4).
