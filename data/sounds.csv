@@ -35,3 +35,5 @@ ogreWindup,0.55,1,0.3,1,TRUE
 ogreBlow,1,1,0.3,2,TRUE
 ogreDies,0.9,1,1,1,TRUE
 shellChime,0.45,1,0.05,4,TRUE
+wispSummoned,0.5,1,0.1,2,TRUE
+wispBursts,0.6,1,0.1,2,TRUE
