@@ -85,15 +85,15 @@ const ENEMY_WINDUP_SOUND = { ogre: 'ogreWindup' };
 function subscribe() {
   events.on('turretFired', (e) => play(TURRET_FIRE_SOUND[e.type], e));
   events.on('cloudBurst', (e) => play('cloudBurst', e));
-  events.on('enemyAttacked', (e) => play(ENEMY_ATTACK_SOUND[e.type], e));
+  events.on('enemyAttacked', (e) => playEnemy(ENEMY_ATTACK_SOUND, e));
   events.on('druidSwing', (e) => play('druidWhoosh', e));
   events.on('druidImpact', (e) => play('druidThud', e));
   events.on('vulturePecked', (e) => play('vulturePeck', e));
   events.on('squirrelStrikes', (e) => play('squirrelScratch', e));
-  events.on('enemyDied', (e) => play(ENEMY_DEATH_SOUND[e.type], e));
-  events.on('enemySpawned', (e) => { if (e.first !== false) play(ENEMY_SPAWN_SOUND[e.type], e); });
-  events.on('enemyStep', (e) => play(ENEMY_STEP_SOUND[e.type], e));
-  events.on('enemyWindup', (e) => play(ENEMY_WINDUP_SOUND[e.type], e));
+  events.on('enemyDied', (e) => playEnemy(ENEMY_DEATH_SOUND, e));
+  events.on('enemySpawned', (e) => { if (e.first !== false) playEnemy(ENEMY_SPAWN_SOUND, e); });
+  events.on('enemyStep', (e) => playEnemy(ENEMY_STEP_SOUND, e));
+  events.on('enemyWindup', (e) => playEnemy(ENEMY_WINDUP_SOUND, e));
   events.on('resourcesGained', (e) => { // M2k §2.1: Shells have their own chime (and sounds row)
     const resources = e.resources ?? [];
     const others = resources.filter((r) => r !== 'shells');
@@ -119,8 +119,17 @@ function subscribe() {
   events.on('wispBursts', (e) => play('wispBursts', e)); // M2k §3.5
 }
 
+// An enemy's sound from a per-type table (M2l §2.3): a variant (a Grim) plays its base type's,
+// pitched by its soundPitch (enemies tab), with no sound of its own.
+function playEnemy(table, e) {
+  const t = C.ENEMY_TYPES[e.type];
+  if (!t) return;
+  play(table[t.baseType], { ...e, pitchMult: t.soundPitch ?? 1 });
+}
+
 // Plays a sound unless audio is not started, muted, disabled, within its minGap of the last
-// play, or already at maxVoices (§3.5). Each play is pitched by ±SOUND_PITCH_JITTER.
+// play, or already at maxVoices (§3.5). Each play is pitched by ±SOUND_PITCH_JITTER, and by
+// data.pitchMult if given (a Grim's lower voice, M2l §2.3).
 function play(name, data) {
   const def = C.SOUNDS[name];
   if (!def || !def.enabled || muted || !ctx || ctx.state !== 'running') return;
@@ -138,7 +147,7 @@ function play(name, data) {
   const out = ctx.createGain();
   out.gain.value = def.volume;
   out.connect(master);
-  const pitch = def.pitch * (1 + rng.range(-C.SOUND_PITCH_JITTER, C.SOUND_PITCH_JITTER));
+  const pitch = def.pitch * (data?.pitchMult ?? 1) * (1 + rng.range(-C.SOUND_PITCH_JITTER, C.SOUND_PITCH_JITTER));
   const duration = RECIPES[name](now, out, pitch, data);
   live.push(now + duration);
   lastPlayed[name] = now;

@@ -23,11 +23,6 @@ const PORTRAIT_DRAW = {
   // Slow Wisp (M2k §3.2): its orb, as in flight.
   slowWisp: (ctx, x, y) => drawWisp(ctx, { x, y, from: { x, y }, to: { x, y }, age: 0 }),
   // Turrets on their slot pad, level 1 (M1f §5.2 build menu).
-  // Enemies (M2i §4.2), with their battlefield draw functions.
-  wolf: (ctx, x, y) => drawWolf(ctx, restingEnemy('wolf', x, y), false, false, 0),
-  bear: (ctx, x, y) => drawBear(ctx, restingEnemy('bear', x, y), false, false, 0),
-  ogre: (ctx, x, y) => drawOgre(ctx, restingEnemy('ogre', x, y), false, false, 0),
-  stirge: (ctx, x, y) => drawStirge(ctx, restingEnemy('stirge', x, y), false, false, 0),
   sprinkler: (ctx, x, y) => {
     drawTurretSlot(ctx, { x, y }, false, false);
     drawTurret(ctx, { x, y, level: 1, angle: -0.5 }, false);
@@ -38,6 +33,11 @@ const PORTRAIT_DRAW = {
   },
 };
 
+// Enemies (M2i §4.2) by base type; a variant (a Grim, M2l §2.1) is drawn with its base type's
+// function, which gives it its variant look.
+const ENEMY_PORTRAIT = { wolf: drawWolf, bear: drawBear, ogre: drawOgre, stirge: drawStirge };
+const enemyPortrait = (kind) => (ctx, x, y) => ENEMY_PORTRAIT[C.ENEMY_TYPES[kind].baseType](ctx, restingEnemy(kind, x, y), false, false, 0);
+
 const cache = new Map();
 
 // Render once: draw on a scratch canvas, find the painted bounding box, fit it into a
@@ -47,7 +47,7 @@ function renderBitmap(kind) {
   scratch.width = SCRATCH;
   scratch.height = SCRATCH;
   const sctx = scratch.getContext('2d');
-  PORTRAIT_DRAW[kind](sctx, SCRATCH / 2, SCRATCH * 0.6);
+  (PORTRAIT_DRAW[kind] ?? enemyPortrait(kind))(sctx, SCRATCH / 2, SCRATCH * 0.6);
   const { data } = sctx.getImageData(0, 0, SCRATCH, SCRATCH);
   let x0 = SCRATCH, y0 = SCRATCH, x1 = 0, y1 = 0;
   for (let y = 0; y < SCRATCH; y++) {

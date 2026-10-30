@@ -516,11 +516,109 @@ function drawDruidBody(ctx, x, y, r, feet, hurt, staffAngle) {
   }
 }
 
+// Grim variants (M2l §2.1): each enemy's draw function takes its colours from its look, the
+// normal one or the Grim one (charcoal, with glowing ember eyes; see drawEyes).
+export function isGrim(enemy) {
+  return C.ENEMY_TYPES[enemy.type].variant === 'grim';
+}
+
+const WOLF_LOOK = { body: COLORS.wolf, dark: COLORS.wolfDark, hit: COLORS.wolfHit };
+const GRIM_WOLF_LOOK = { body: '#353437', dark: '#161617', hit: '#b4b0b4' };
+
+// An enemy's eye at (x, y), size its radius: the usual red eye with a faint glow, or a Grim's
+// brighter ember eye with a soft halo and a hot centre.
+function drawEyes(ctx, x, y, size, grim) {
+  if (!grim) {
+    ctx.fillStyle = COLORS.wolfEyeGlow;
+    ctx.beginPath();
+    ctx.arc(x, y, size * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = COLORS.wolfEye;
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  const halo = ctx.createRadialGradient(x, y, 0, x, y, size * 3.6);
+  halo.addColorStop(0, 'rgba(255, 110, 30, 0.75)');
+  halo.addColorStop(0.45, 'rgba(255, 70, 20, 0.3)');
+  halo.addColorStop(1, 'rgba(255, 60, 20, 0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(x, y, size * 3.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ff5a1a';
+  ctx.beginPath();
+  ctx.arc(x, y, size * 1.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffd890';
+  ctx.beginPath();
+  ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Faint smoke wisps rising off a Grim's body (M2l §2.1): a few soft grey puffs, each rising and
+// fading over its cycle. Drawn from the animation clock alone (no particles to update).
+// top: y of the top of its body; width: how far apart the puffs start.
+export function drawGrimSmoke(ctx, x, top, width, r, anim, seed) {
+  ctx.save();
+  for (let i = 0; i < C.GRIM_SMOKE_PUFFS; i++) {
+    const k = (anim * C.GRIM_SMOKE_RATE + i / C.GRIM_SMOKE_PUFFS + seed * 0.37) % 1;
+    const px = x + (((i * 0.618 + seed * 0.29) % 1) - 0.5) * width + Math.sin(k * 5 + i) * r * 0.15;
+    const py = top - k * r * C.GRIM_SMOKE_RISE;
+    ctx.fillStyle = `rgba(70, 66, 72, ${0.32 * Math.sin(k * Math.PI)})`;
+    ctx.beginPath();
+    ctx.arc(px, py, r * (0.16 + 0.22 * k), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Where armor reduced a hit (M2l §2.2, Thick hide): a tiny grey spark. progress 0 → 1.
+export function drawArmorSpark(ctx, s, progress) {
+  const a = 1 - progress;
+  ctx.save();
+  ctx.strokeStyle = `rgba(215, 215, 210, ${a})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const ang = i * (Math.PI / 2) + 0.4;
+    const r0 = 2 + progress * 3;
+    ctx.moveTo(s.x + Math.cos(ang) * r0, s.y + Math.sin(ang) * r0);
+    ctx.lineTo(s.x + Math.cos(ang) * (r0 + 4), s.y + Math.sin(ang) * (r0 + 4));
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// A biter that just healed (M2l §2.2, Bloodsucker): a tiny red sparkle on it. progress 0 → 1.
+export function drawHealSparkle(ctx, x, y, progress) {
+  const a = 1 - progress;
+  const s = 2.5 + progress * 2;
+  ctx.save();
+  ctx.translate(x, y - progress * 6);
+  ctx.fillStyle = `rgba(255, 60, 70, ${a})`;
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 1.6);
+  ctx.lineTo(s * 0.45, -s * 0.45);
+  ctx.lineTo(s * 1.6, 0);
+  ctx.lineTo(s * 0.45, s * 0.45);
+  ctx.lineTo(0, s * 1.6);
+  ctx.lineTo(-s * 0.45, s * 0.45);
+  ctx.lineTo(-s * 1.6, 0);
+  ctx.lineTo(-s * 0.45, -s * 0.45);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 // Demonic Wolf: side-view quadruped with red eyes, standing on its collision centre.
 // hit: brief pale flash when a pebble lands; lunging: just bit something.
-export function drawWolf(ctx, wolf, hit, lunging) { // (enemy of type wolf)
+export function drawWolf(ctx, wolf, hit, lunging, anim = 0) { // (enemy of type wolf, or its Grim)
   const r = wolf.radius;
   const feet = wolf.y + r * 0.5;
+  const grim = isGrim(wolf);
+  const look = grim ? GRIM_WOLF_LOOK : WOLF_LOOK;
   drawShadow(ctx, wolf.x, feet, r * 1.1, r * 0.3);
 
   ctx.save();
@@ -530,7 +628,7 @@ export function drawWolf(ctx, wolf, hit, lunging) { // (enemy of type wolf)
 
   // Legs, swinging with distance walked.
   const swing = Math.sin(wolf.stride * 0.3) * 4;
-  ctx.strokeStyle = COLORS.wolfDark;
+  ctx.strokeStyle = look.dark;
   ctx.lineWidth = 3.5;
   ctx.lineCap = 'round';
   ctx.beginPath();
@@ -546,7 +644,7 @@ export function drawWolf(ctx, wolf, hit, lunging) { // (enemy of type wolf)
   ctx.moveTo(-14, -17);
   ctx.quadraticCurveTo(-22, -18, -25, -26);
   ctx.stroke();
-  ctx.fillStyle = hit === 'strike' ? COLORS.strikeFlash : hit ? COLORS.wolfHit : COLORS.wolf; // 'strike': white flash from a Druid strike (M1f §4)
+  ctx.fillStyle = hit === 'strike' ? COLORS.strikeFlash : hit ? look.hit : look.body; // 'strike': white flash from a Druid strike (M1f §4)
   ctx.beginPath();
   ctx.ellipse(0, -16, 16, 8, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -561,7 +659,7 @@ export function drawWolf(ctx, wolf, hit, lunging) { // (enemy of type wolf)
   ctx.lineTo(18, -18);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = COLORS.wolfDark;
+  ctx.fillStyle = look.dark;
   ctx.beginPath();
   ctx.moveTo(9, -28);
   ctx.lineTo(11, -37);
@@ -569,16 +667,9 @@ export function drawWolf(ctx, wolf, hit, lunging) { // (enemy of type wolf)
   ctx.closePath();
   ctx.fill();
 
-  // Glowing red eyes.
-  ctx.fillStyle = COLORS.wolfEyeGlow;
-  ctx.beginPath();
-  ctx.arc(17.5, -25, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = COLORS.wolfEye;
-  ctx.beginPath();
-  ctx.arc(17.5, -25, 2, 0, Math.PI * 2);
-  ctx.fill();
+  drawEyes(ctx, 17.5, -25, 2, grim); // glowing red eyes
   ctx.restore();
+  if (grim) drawGrimSmoke(ctx, wolf.x, feet - r * 1.5, r * 1.6, r, anim, wolf.id);
 }
 
 // Small world-space HP bar centred on x with its top at y.
@@ -605,16 +696,21 @@ export function drawEnemyHpBar(ctx, enemy) {
   const t = C.ENEMY_TYPES[enemy.type];
   const maxHp = enemy.maxHp; // scaled by the level's enemyHpMult (M2f §3.1)
   if (enemy.hp >= maxHp && !t.boss) return;
-  const bar = HP_BAR[enemy.type];
+  const bar = HP_BAR[t.baseType]; // a Grim uses its base type's (M2l §1.1)
   drawHpBar(ctx, enemy.x, enemy.y - enemy.radius * bar.lift, bar.width, enemy.hp / maxHp);
 }
+
+const BEAR_LOOK = { body: COLORS.bear, dark: COLORS.bearDark, hit: COLORS.bearHit, muzzle: COLORS.bearMuzzle, nose: COLORS.wolfDark };
+const GRIM_BEAR_LOOK = { body: '#34302e', dark: '#1a1817', hit: '#aaa29c', muzzle: '#4a4440', nose: '#0e0d0d' };
 
 // Demonic Bear (M1e §3.7): bulky side-view quadruped, dark brown with hunched shoulders and
 // the wolves' glowing red eyes. Drawn at radius 26 facing right, feet below its centre.
 // hit: brief pale flash; lunging: just struck something.
-export function drawBear(ctx, bear, hit, lunging) {
+export function drawBear(ctx, bear, hit, lunging, anim = 0) {
   const r = bear.radius;
   const feet = bear.y + r * 0.5;
+  const grim = isGrim(bear);
+  const look = grim ? GRIM_BEAR_LOOK : BEAR_LOOK;
   drawShadow(ctx, bear.x, feet, r * 1.25, r * 0.32);
 
   ctx.save();
@@ -624,14 +720,14 @@ export function drawBear(ctx, bear, hit, lunging) {
 
   // Heavy legs with a slow lumbering swing.
   const swing = Math.sin(bear.stride * 0.18) * 3;
-  ctx.fillStyle = COLORS.bearDark;
+  ctx.fillStyle = look.dark;
   for (const [x, dir] of [[-17, 1], [-8, -1], [9, -1], [18, 1]]) {
     ctx.beginPath();
     ctx.roundRect(x - 4 + swing * dir * 0.5, -16, 8, 16, 3);
     ctx.fill();
   }
 
-  const body = hit === 'strike' ? COLORS.strikeFlash : hit ? COLORS.bearHit : COLORS.bear;
+  const body = hit === 'strike' ? COLORS.strikeFlash : hit ? look.hit : look.body;
   ctx.fillStyle = body;
   ctx.beginPath(); // stubby tail
   ctx.arc(-26, -26, 4.5, 0, Math.PI * 2);
@@ -647,25 +743,18 @@ export function drawBear(ctx, bear, hit, lunging) {
   ctx.arc(19, -35, 4, 0, Math.PI * 2);
   ctx.arc(26, -36, 4, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = COLORS.bearMuzzle;
+  ctx.fillStyle = look.muzzle;
   ctx.beginPath();
   ctx.ellipse(33, -24, 6.5, 4.5, 0.15, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = COLORS.wolfDark;
+  ctx.fillStyle = look.nose;
   ctx.beginPath(); // nose
   ctx.arc(38.5, -25, 2, 0, Math.PI * 2);
   ctx.fill();
 
-  // Glowing red eyes, like the wolf's.
-  ctx.fillStyle = COLORS.wolfEyeGlow;
-  ctx.beginPath();
-  ctx.arc(28, -30, 4.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = COLORS.wolfEye;
-  ctx.beginPath();
-  ctx.arc(28, -30, 2.2, 0, Math.PI * 2);
-  ctx.fill();
+  drawEyes(ctx, 28, -30, 2.2, grim); // glowing red eyes, like the wolf's
   ctx.restore();
+  if (grim) drawGrimSmoke(ctx, bear.x, feet - r * 1.6, r * 1.4, r, anim, bear.id);
 }
 
 // The Stirge (M2h §5): a small bat-like flyer with leathery wings flapping fast, a long thin
@@ -674,15 +763,17 @@ export function drawBear(ctx, bear, hit, lunging) {
 export function drawStirge(ctx, s, hit, lunging, anim) {
   const r = s.radius;
   drawShadow(ctx, s.x, s.y, r * 0.8, r * 0.28);
+  const grim = isGrim(s);
+  const look = grim ? GRIM_STIRGE : STIRGE;
   const bob = Math.sin(anim * 9 + s.id) * 1.5;
   const flap = Math.sin(anim * 38 + s.id * 1.7); // fast wingbeat
   ctx.save();
   ctx.translate(s.x, s.y - C.ENEMY_TYPES[s.type].flyHeight + bob);
   ctx.scale(s.facing * (r / 12), r / 12);
   if (lunging) ctx.translate(3, 2);
-  const body = hit === 'strike' ? COLORS.strikeFlash : hit ? STIRGE.hit : STIRGE.body;
+  const body = hit === 'strike' ? COLORS.strikeFlash : hit ? look.hit : look.body;
   // Wings: two leathery fans hinged at the shoulders, swinging up and down.
-  ctx.fillStyle = STIRGE.wing;
+  ctx.fillStyle = look.wing;
   for (const side of [-1, 1]) {
     const tip = -10 * flap * side;
     ctx.beginPath();
@@ -702,23 +793,16 @@ export function drawStirge(ctx, s, hit, lunging, anim) {
   ctx.arc(7, -2, 4.2, 0, Math.PI * 2);
   ctx.fill();
   // Long thin proboscis.
-  ctx.strokeStyle = STIRGE.proboscis;
+  ctx.strokeStyle = look.proboscis;
   ctx.lineWidth = 1.4;
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(10.5, -1);
   ctx.lineTo(19, 2.5);
   ctx.stroke();
-  // Red eye, like the other enemies.
-  ctx.fillStyle = COLORS.wolfEyeGlow;
-  ctx.beginPath();
-  ctx.arc(8.5, -3.5, 2.6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = COLORS.wolfEye;
-  ctx.beginPath();
-  ctx.arc(8.5, -3.5, 1.3, 0, Math.PI * 2);
-  ctx.fill();
+  drawEyes(ctx, 8.5, -3.5, 1.3, grim); // red eye, like the other enemies
   ctx.restore();
+  if (grim) drawGrimSmoke(ctx, s.x, s.y - C.ENEMY_TYPES[s.type].flyHeight + bob - r * 0.4, r, r, anim, s.id);
 }
 
 const STIRGE = {
@@ -727,6 +811,7 @@ const STIRGE = {
   wing: 'rgba(58, 34, 44, 0.9)',
   proboscis: '#c8a090',
 };
+const GRIM_STIRGE = { body: '#2e2a2d', hit: '#aca4a8', wing: 'rgba(26, 24, 27, 0.9)', proboscis: '#8a7a74' };
 
 // Club angles (rad; 0 = straight ahead, positive = downward) for the Ogre's poses (M2c §2.8).
 const OGRE_CLUB_WALK = 0.95;   // carried low in front
@@ -738,8 +823,10 @@ const OGRE_CLUB_DOWN = 1.35;   // blow: slammed down to the ground in front
 // heavy step. Pose from its attack: walk, wind-up (club rising overhead), blow (club down for
 // OGRE_BLOW_POSE_TIME). Drawn at radius 52 facing right, feet below its centre.
 export function drawOgre(ctx, ogre, hit, lunging, anim) {
-  const t = C.ENEMY_TYPES.ogre;
+  const t = C.ENEMY_TYPES[ogre.type]; // its own type: the Grim Ogre's wind-up is inherited (M2l §1.1)
   const r = ogre.radius;
+  const grim = isGrim(ogre);
+  const look = grim ? GRIM_OGRE : OGRE;
   const feet = ogre.y + r * 0.5;
   drawShadow(ctx, ogre.x, feet, r * 1.05, r * 0.26);
 
@@ -759,14 +846,14 @@ export function drawOgre(ctx, ogre, hit, lunging, anim) {
   ctx.rotate(step * 0.045); // heavy side-to-side sway
 
   // Legs: thick, stepping in turn.
-  ctx.fillStyle = OGRE.skinDark;
+  ctx.fillStyle = look.skinDark;
   for (const [x, dir] of [[-15, 1], [13, -1]]) {
     ctx.beginPath();
     ctx.roundRect(x - 10 + step * dir * 5, -46, 20, 46, 7);
     ctx.fill();
   }
   // Loincloth.
-  ctx.fillStyle = OGRE.cloth;
+  ctx.fillStyle = look.cloth;
   ctx.beginPath();
   ctx.moveTo(-28, -50);
   ctx.lineTo(26, -50);
@@ -775,9 +862,9 @@ export function drawOgre(ctx, ogre, hit, lunging, anim) {
   ctx.closePath();
   ctx.fill();
 
-  const skin = hit === 'strike' ? COLORS.strikeFlash : hit ? OGRE.skinHit : OGRE.skin;
+  const skin = hit === 'strike' ? COLORS.strikeFlash : hit ? look.skinHit : look.skin;
   // Back arm behind the body.
-  ctx.strokeStyle = OGRE.skinDark;
+  ctx.strokeStyle = look.skinDark;
   ctx.lineCap = 'round';
   ctx.lineWidth = 15;
   ctx.beginPath();
@@ -792,7 +879,7 @@ export function drawOgre(ctx, ogre, hit, lunging, anim) {
   ctx.beginPath();
   ctx.ellipse(-12, -92, 24, 18, -0.4, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = OGRE.belly;
+  ctx.fillStyle = look.belly;
   ctx.beginPath();
   ctx.ellipse(12, -64, 18, 20, 0.1, 0, Math.PI * 2);
   ctx.fill();
@@ -801,21 +888,14 @@ export function drawOgre(ctx, ogre, hit, lunging, anim) {
   ctx.beginPath();
   ctx.ellipse(24, -98, 13, 12, 0.15, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = OGRE.tusk;
+  ctx.fillStyle = look.tusk;
   ctx.beginPath();
   ctx.moveTo(31, -91);
   ctx.lineTo(34, -98);
   ctx.lineTo(36, -90);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = COLORS.wolfEyeGlow;
-  ctx.beginPath();
-  ctx.arc(29, -102, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = COLORS.wolfEye;
-  ctx.beginPath();
-  ctx.arc(29, -102, 2.6, 0, Math.PI * 2);
-  ctx.fill();
+  drawEyes(ctx, 29, -102, 2.6, grim);
 
   // Club arm and the club along one line from the shoulder: arm, fist, handle, knotted head.
   const shoulder = { x: 10, y: -86 };
@@ -831,7 +911,7 @@ export function drawOgre(ctx, ogre, hit, lunging, anim) {
   ctx.save();
   ctx.translate(hand.x, hand.y);
   ctx.rotate(club);
-  ctx.fillStyle = OGRE.club;
+  ctx.fillStyle = look.club;
   ctx.fillRect(-6, -4.5, 34, 9); // handle
   ctx.beginPath();               // head, widening to the end
   ctx.moveTo(24, -6);
@@ -840,7 +920,7 @@ export function drawOgre(ctx, ogre, hit, lunging, anim) {
   ctx.lineTo(24, 6);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = OGRE.clubDark;
+  ctx.fillStyle = look.clubDark;
   for (const [x, y] of [[40, -6], [52, 5], [60, -8]]) {
     ctx.beginPath();
     ctx.arc(x, y, 3, 0, Math.PI * 2);
@@ -852,6 +932,7 @@ export function drawOgre(ctx, ogre, hit, lunging, anim) {
   ctx.arc(hand.x, hand.y, 9, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+  if (grim) drawGrimSmoke(ctx, ogre.x, feet - r * 1.9, r * 1.1, r * 0.7, anim, ogre.id);
 }
 
 const OGRE = {
@@ -864,11 +945,12 @@ const OGRE = {
   club: '#6e4a2a',
   clubDark: '#4a3019',
 };
+const GRIM_OGRE = { skin: '#4c4b47', skinDark: '#302f2c', skinHit: '#b2b0a8', belly: '#5c5a54', cloth: '#2e2620', tusk: '#d8d0bc', club: '#3e2e22', clubDark: '#241a12' };
 
 // Dust ring where an Ogre blow lands (M2c §2.5): a flattened ring spreading to OGRE_DUST_RADIUS
 // and fading, with a few puffs. progress 0 → 1.
 export function drawDustRing(ctx, d, progress) {
-  const r = C.OGRE_DUST_RADIUS * (0.35 + 0.65 * progress);
+  const r = (d.radius ?? C.OGRE_DUST_RADIUS) * (0.35 + 0.65 * progress); // wider for a splash blow (M2l §2.2)
   const a = 1 - progress;
   ctx.save();
   ctx.strokeStyle = `rgba(190, 170, 130, ${0.7 * a})`;
@@ -1593,5 +1675,5 @@ export function drawVultureGhost(ctx, p, t) {
 
 // Where an enemy's HP bar sits (its top), so marks above the head clear it (M2k §3.5).
 export function enemyBarY(enemy) {
-  return enemy.y - enemy.radius * HP_BAR[enemy.type].lift;
+  return enemy.y - enemy.radius * HP_BAR[C.ENEMY_TYPES[enemy.type].baseType].lift;
 }

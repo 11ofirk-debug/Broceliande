@@ -1,7 +1,7 @@
 // Bootstrap, stage scaling and the fixed-timestep loop (spec §3.4, §3.5).
 
 import * as C from './config.js';
-import { GameState, createGame, startEncounter, startCombat, beginEnding, updateGame, validateConfig, killAllEnemies, spawnDebugBear, spawnDebugOgre, spawnDebugStirges, grantResources, togglePrepMode, newRun, restartEncounter, continueRun, winNow } from './game.js';
+import { GameState, createGame, startEncounter, startCombat, beginEnding, updateGame, validateConfig, killAllEnemies, spawnDebugBear, spawnDebugOgre, spawnDebugStirges, spawnDebugGrimWolves, grantResources, togglePrepMode, newRun, restartEncounter, continueRun, winNow } from './game.js';
 import { createInput } from './input.js';
 import { createRenderer } from './renderer.js';
 import { createUI, checkLevelNameLabel, checkBossBar, checkWavePreview } from './ui.js';
@@ -156,12 +156,14 @@ const input = createInput(stage, canvas, () => scale, {
         break;
       case 'u': undoLastMove(game); break;              // M1b §8: undo last step-mode move
       case 'k': killAllEnemies(game); break; // extra debug key (not in §18.1): kill all living enemies
-      case 'b': spawnDebugBear(game); break;  // M1e §6: spawn a Bear at the start of a random lane (Combat only)
-      case 'o': spawnDebugOgre(game); break;  // M2c §4: spawn an Ogre likewise (an error if the corridors are too narrow)
-      case 's': spawnDebugStirges(game); break; // M2h §6: spawn a flock of Stirges at the start of a random lane (Combat only)
+      // M1e §6, M2c §4, M2h §6: B / O / S spawn a Bear / an Ogre / a flock of Stirges at a random lane
+      // (Combat only); with Shift, their Grim versions (M2l §4).
+      case 'b': spawnDebugBear(game, e.shiftKey ? 'grimBear' : 'bear'); break;
+      case 'o': spawnDebugOgre(game, e.shiftKey ? 'grimOgre' : 'ogre'); break; // (an error if the corridors are too narrow)
+      case 's': spawnDebugStirges(game, e.shiftKey ? 'grimStirge' : 'stirge'); break;
       case '[': switchLevel(-1); break;                 // M2a §8: previous / next level in LEVELS,
       case ']': switchLevel(1); break;                  //   starting its Prep with the current resources
-      case 'g': grantResources(game); break;
+      case 'g': if (e.shiftKey) spawnDebugGrimWolves(game); else grantResources(game); break; // Shift+G (M2l §4): 4 Grim Wolves
       case 'v': toggleMute(); break;                    // M1g §3.6: mute / unmute sound
       case 'x': toggleDropMult(game); break;            // M1d §3: enemy drop chances ×1 / ×DEBUG_DROP_MULT
       case 'i': // M2e §6: on the map, add a random unowned item; in battle, reveal the hidden item's spot (debug overlay)

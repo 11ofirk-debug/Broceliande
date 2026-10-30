@@ -63,7 +63,25 @@ export function validateTables(t, problems) {
     if (r.chance < 0 || r.chance > 1) err('drops', r, 'chance', 'chance must be between 0 and 1');
     if (r.min > r.max) err('drops', r, 'min', 'min is more than max');
   }
-  for (const r of t.enemies) if (r.flying && r.flyHeight === undefined) err('enemies', r, 'flyHeight', 'a flying enemy needs flyHeight');
+  // Variant rows (M2l §1.1) inherit their blank cells from a base row, so the checks below run on
+  // the merged row; base rows need every stat themselves.
+  const enemyRows = Object.fromEntries(t.enemies.map((r) => [r.id, r]));
+  for (const r of t.enemies) {
+    if (r.baseType !== undefined) {
+      const base = enemyRows[r.baseType];
+      if (!base) err('enemies', r, 'baseType', `unknown enemy "${r.baseType}"`);
+      else if (base.baseType !== undefined) err('enemies', r, 'baseType', `"${r.baseType}" is itself a variant; name its base row`);
+      continue;
+    }
+    for (const c of ['hp', 'speed', 'radius', 'damage', 'attackInterval', 'meleeSlots', 'hitHeight']) {
+      if (r[c] === undefined) err('enemies', r, c, 'a value is required (only variant rows with a baseType may leave it blank)');
+    }
+  }
+  for (const r of t.enemies) {
+    const m = { ...enemyRows[r.baseType], ...r };
+    if (m.flying && m.flyHeight === undefined) err('enemies', r, 'flyHeight', 'a flying enemy needs flyHeight');
+    if ((m.splashRatio === undefined) !== (m.splashRadius === undefined)) err('enemies', r, 'splashRatio', 'splashRatio and splashRadius must both be set or both blank');
+  }
 
   // turrets: levels 1, 2, 3… per turret; cloud attacks need their cloud values.
   const turretLevels = {};

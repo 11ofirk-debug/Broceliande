@@ -65,8 +65,16 @@ function layoutDebugLines(scene) {
 function enemyDebugLines(game) {
   return Object.entries(game.enemyCounts).map(([type, c]) => {
     const name = C.ENEMY_TYPES[type].plural;
-    return `${`${name}:`.padEnd(9)} spawned ${c.spawned}/${waveCounts(game)[type] ?? 0}  alive ${c.alive}  killed ${c.killed}`;
+    return `${`${name}:`.padEnd(14)} spawned ${c.spawned}/${waveCounts(game)[type] ?? 0}  alive ${c.alive}  killed ${c.killed}`;
   });
+}
+
+// Grim traits this battle (M2l §4): damage armor blocked, splash damage on summons, HP healed by lifesteal.
+function traitDebugLine(game) {
+  const s = game.traitStats;
+  if (!s) return 'Grim traits: —';
+  const n = (v) => (Number.isInteger(v) ? v : v.toFixed(2));
+  return `Grim traits: armor blocked ${n(s.armorBlocked)}  splash ${n(s.splashDamage)}  lifesteal healed ${n(s.lifestealHealed)}`;
 }
 
 // Waves (M2i §7): the wave and its sub-state, this wave's spawned / alive / left, and the countdown.
@@ -432,11 +440,20 @@ function livingBoss(game) {
 // banner fading out over its last third (M2c §2.6–2.7).
 // Wave preview (M2i §4.2): during the countdown and gaps, the next wave's number, countdown and
 // enemies (icons with counts, an Ogre outlined in red), with Call next wave.
+// Enemy types in display order: by base type, each followed by its variants (a Grim, M2l §2.1).
 const PREVIEW_ORDER = ['wolf', 'stirge', 'bear', 'ogre'];
+function enemyDisplayOrder() {
+  const rank = (type) => {
+    const base = C.ENEMY_TYPES[type].baseType;
+    const i = PREVIEW_ORDER.indexOf(base);
+    return (i < 0 ? PREVIEW_ORDER.length : i) * 2 + (type === base ? 0 : 1);
+  };
+  return Object.keys(C.ENEMY_TYPES).sort((a, b) => rank(a) - rank(b));
+}
 
 function wavePreviewEntries(wave) {
   const totals = waveTotals(wave);
-  const types = [...PREVIEW_ORDER, ...Object.keys(totals).filter((t) => !PREVIEW_ORDER.includes(t))];
+  const types = enemyDisplayOrder();
   const row = document.createDocumentFragment();
   for (const type of types.filter((t) => totals[t])) {
     const t = C.ENEMY_TYPES[type];
@@ -498,6 +515,7 @@ function updateBoss(el, game) {
   const inBattle = game.state === GameState.COMBAT || game.state === GameState.ENDING;
   const boss = inBattle ? livingBoss(game) : null;
   el.bossBar.hidden = !boss;
+  el.bossBar.classList.toggle('grim', !!boss && C.ENEMY_TYPES[boss.type].variant === 'grim'); // darker frame (M2l §2.1)
   el.uiLayer.classList.toggle('boss-active', !!boss);
   if (boss) {
     const max = boss.maxHp; // scaled by the level's enemyHpMult (M2f §3.1)
@@ -705,7 +723,7 @@ function mapTooltip(nodeId) {
   const waves = `${levelWaves(level).length} waves`;
   const counts = (types) => [waves, ...types.map(([type, n]) => `${C.ENEMY_TYPES[type].plural} ${n}`)].join(' · ');
   const totals = levelTotals(level);
-  const entries = PREVIEW_ORDER.filter((type) => totals[type] > 0).map((type) => [type, totals[type]]);
+  const entries = enemyDisplayOrder().filter((type) => totals[type] > 0).map((type) => [type, totals[type]]);
   if (node.type === 'wilds') return { title: `${node.name} — ${level.description}`, lines: [['', counts(entries)]], anchor };
   // Fell Wilds: "Mini-boss: Ogre"; the Boss node (M2f §2): "Bosses: Ogre ×2" (counted from its level).
   const bosses = entries.filter(([type]) => C.ENEMY_TYPES[type].boss)
@@ -1093,6 +1111,7 @@ function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
     `Druid HP: ${game.druidHp.toFixed(1)} / ${game.stats['druid.maxHp']}`,
     druidMeleeLine(game),
     ...enemyDebugLines(game),
+    traitDebugLine(game),
     ...bossDebugLines(game),
     ...waveDebugLines(game),
     `Resources: ${resourceLine(game.resources)}`,

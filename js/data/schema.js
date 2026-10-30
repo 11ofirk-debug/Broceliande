@@ -47,14 +47,21 @@ export const TABS = {
     columns: { id: { type: 'id', required: true }, name: { type: 'text', required: true }, mainResource: { type: 'id', required: true }, searchTime: { type: 'number', required: true } },
     pattern: [/^[a-z][a-zA-Z0-9]*_(min|max)$/, { type: 'int' }],
   },
+  // Variant rows (M2l §1.1, e.g. the Grims) name a baseType and leave blank every cell that matches
+  // it, so the stats are only required on base rows (checked in validate.js).
   enemies: {
     columns: {
       id: { type: 'id', required: true }, name: { type: 'text', required: true }, plural: { type: 'text', required: true },
-      hp: { type: 'number', required: true }, speed: { type: 'number', required: true }, radius: { type: 'number', required: true },
-      collisionRadius: { type: 'number' }, damage: { type: 'number', required: true }, attackInterval: { type: 'number', required: true },
-      windup: { type: 'number' }, meleeSlots: { type: 'int', required: true }, flying: { type: 'bool' }, flyHeight: { type: 'number' },
-      hitHeight: { type: 'number', required: true }, burstStagger: { type: 'number' }, dropSpacing: { type: 'number' },
+      hp: { type: 'number' }, speed: { type: 'number' }, radius: { type: 'number' },
+      collisionRadius: { type: 'number' }, damage: { type: 'number' }, attackInterval: { type: 'number' },
+      windup: { type: 'number' }, meleeSlots: { type: 'int' }, flying: { type: 'bool' }, flyHeight: { type: 'number' },
+      hitHeight: { type: 'number' }, burstStagger: { type: 'number' }, dropSpacing: { type: 'number' },
       keepSide: { type: 'bool' }, sideWander: { type: 'number' }, boss: { type: 'bool' }, stepSoundInterval: { type: 'number' },
+      baseType: { type: 'id' }, variant: { type: 'id' },
+      // Traits (M2l §1.3); blank = none.
+      slowResist: { type: 'number' }, armor: { type: 'number' }, splashRatio: { type: 'number' }, splashRadius: { type: 'number' },
+      lifesteal: { type: 'number' },
+      drawScale: { type: 'number' }, soundPitch: { type: 'number' }, // drawing size only; its sounds' pitch multiplier
     },
   },
   drops: { columns: { enemy: { type: 'id', required: true }, resource: { type: 'id', required: true }, chance: { type: 'number', required: true }, min: { type: 'int', required: true }, max: { type: 'int', required: true } } },

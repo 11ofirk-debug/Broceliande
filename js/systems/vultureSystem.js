@@ -3,7 +3,7 @@
 
 import * as C from '../config.js';
 import { VultureState } from '../entities/vulture.js';
-import { damageEnemy } from './combatSystem.js';
+import { damageEnemy, lifestealOnBite } from './combatSystem.js';
 import { enemyType } from '../entities/enemy.js';
 import { blockingSquirrels } from './squirrelSystem.js';
 import { events } from '../events.js';
@@ -108,6 +108,7 @@ export function updateBlocking(game, dt) {
       enemy.lastBiteTime = game.combatTime;
       blocker.hp -= t.damage;
       blocker.lastHitTime = game.combatTime;
+      lifestealOnBite(game, enemy);
       events.emit('enemyAttacked', { type: enemy.type, target: 'summon' });
     }
   }

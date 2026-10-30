@@ -54,6 +54,17 @@ export const BOSS_BANNER_TIME = 2;        // s the "An Ogre approaches!" banner 
 export const BOSS_LANE_PULSE_TIME = 2;    // s the boss's lane entrance pulses red
 export const BOSS_LANE_PULSE_RADIUS = 90; // px
 
+// Grim enemies (M2l). Their stats, traits, drawScale and soundPitch are in data/enemies.csv; this is
+// their look and debug only.
+export const GRIM_SMOKE_PUFFS = 3;          // TUNING — faint smoke wisps rising off each Grim at once
+export const GRIM_SMOKE_RATE = 0.55;        // TUNING — rises per s (each puff's cycle)
+export const GRIM_SMOKE_RISE = 1.6;         // × radius a puff rises before it fades
+export const ARMOR_SPARK_TIME = 0.18;       // s the grey spark shows where armor reduced a hit
+export const HEAL_SPARKLE_TIME = 0.4;       // s the red sparkle shows on a biter that healed
+export const DOGGED_SPIRAL_SPEED = 3;       // × the slow spiral's turn rate on a slow-resistant enemy
+export const DOGGED_SPIRAL_ALPHA = 0.5;     // its opacity
+export const DEBUG_GRIM_WOLVES = 4;         // debug Shift+G: Grim Wolves spawned at once
+
 
 // ---------------------------------------------------------------------------
 // Turrets — visual only (their stats are in data/turrets.csv)
@@ -1190,7 +1201,7 @@ export let DRUID_HP, DRUID_RADIUS, DRUID_MELEE_RADIUS, DRUID_MELEE_SLOTS, DRUID_
 export let RESOURCES, RESOURCE_ORDER;
 // features: id → { name, searchTime, yields: { resource: [min, max] }, mainResource }
 export let FEATURE_TYPES;
-// enemies + drops: id → { name, plural, hp, speed, radius, damage, attackInterval, meleeSlotsUsed,
+// enemies + drops: id → { baseType (its own id for a base row), variant (e.g. 'grim', or null), name, plural, hp, speed, radius, damage, attackInterval, meleeSlotsUsed,
 // hitHeight, drops: [{ resource, chance, min, max }], and optional collisionRadius, windupTime,
 // flying, flyHeight, burstStagger, dropSpacing, keepSide, sideWander, boss, stepSoundInterval }
 export let ENEMY_TYPES;
@@ -1260,11 +1271,15 @@ export function applyData(t) {
     return { name: r.name, searchTime: r.searchTime, yields, mainResource: r.mainResource };
   });
 
-  ENEMY_TYPES = byId(t.enemies, (r) => {
-    const e = { name: r.name, plural: r.plural, hp: r.hp, speed: r.speed, radius: r.radius, damage: r.damage, attackInterval: r.attackInterval, meleeSlotsUsed: r.meleeSlots, hitHeight: r.hitHeight };
+  // Variant rows (M2l §1.1): every blank cell takes the baseType row's value.
+  const enemyRows = byId(t.enemies, (r) => r);
+  ENEMY_TYPES = byId(t.enemies.map((r) => (r.baseType ? { ...enemyRows[r.baseType], ...r } : r)), (r) => {
+    const e = { baseType: r.baseType ?? r.id, variant: r.variant ?? null, name: r.name, plural: r.plural, hp: r.hp, speed: r.speed, radius: r.radius, damage: r.damage, attackInterval: r.attackInterval, meleeSlotsUsed: r.meleeSlots, hitHeight: r.hitHeight };
     opt(e, 'collisionRadius', r.collisionRadius);
     opt(e, 'windupTime', r.windup);
     for (const k of ['flying', 'flyHeight', 'burstStagger', 'dropSpacing', 'keepSide', 'sideWander', 'boss', 'stepSoundInterval']) opt(e, k, r[k]);
+    // Traits (M2l §1.3) and look; absent = none / ×1.
+    for (const k of ['slowResist', 'armor', 'splashRatio', 'splashRadius', 'lifesteal', 'drawScale', 'soundPitch']) opt(e, k, r[k]);
     e.drops = t.drops.filter((d) => d.enemy === r.id).map((d) => ({ resource: d.resource, chance: d.chance, min: d.min, max: d.max }));
     return e;
   });

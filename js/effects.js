@@ -48,6 +48,11 @@ export function updateEffects(game, dt) {
   // Mini-boss feedback (M2c §2.5–2.6): dust rings, screen shake, arrival banner, lane pulses.
   for (const d of game.dustRings) d.age += dt;
   game.dustRings = game.dustRings.filter((d) => d.age < C.OGRE_DUST_TIME);
+  // Grim trait feedback (M2l §2.2): armor sparks and lifesteal sparkles.
+  for (const s of game.armorSparks) s.age += dt;
+  game.armorSparks = game.armorSparks.filter((s) => s.age < C.ARMOR_SPARK_TIME);
+  for (const s of game.healSparkles) s.age += dt;
+  game.healSparkles = game.healSparkles.filter((s) => s.age < C.HEAL_SPARKLE_TIME);
   if (game.shake) {
     game.shake.age += dt;
     if (game.shake.age >= C.OGRE_SHAKE_TIME) game.shake = null;

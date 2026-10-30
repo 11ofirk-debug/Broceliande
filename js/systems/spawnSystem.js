@@ -77,7 +77,7 @@ function trySpawn(game, lane, type, first = true) {
   if (game.wave) { game.wave.spawned++; game.wave.lastSpawnAt = game.waveTime; } // this wave's figures (M2i §7); its gap timer
   // A mini-boss arrives (M2c §2.6): banner, its lane's entrance pulses red, roar (audio).
   if (t.boss) {
-    game.bossAnnouncement = { text: `An ${t.name} approaches!`, age: 0 };
+    game.bossAnnouncement = { text: `${/^[AEIOU]/.test(t.name) ? 'An' : 'A'} ${t.name} approaches!`, age: 0 }; // "A Grim Ogre approaches!" (M2l §1.1)
     game.lanePulses.push({ laneId: lane.id, age: 0 });
   }
   events.emit('enemySpawned', { type, lane: lane.id, first }); // first: of its burst (one flock sound)

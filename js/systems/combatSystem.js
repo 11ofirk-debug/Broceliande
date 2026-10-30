@@ -134,12 +134,30 @@ export function updateProjectiles(game, dt) {
 
 // source: what dealt it, '<turretType>:impact:<level>', '<turretType>:cloud:<level>' or
 // 'squirrel', for the debug panel's damage figures (M1f §7, M1h §4). Only damage actually taken
-// is counted (no overkill).
+// is counted (no overkill). Every damage source goes through here, so armor (M2l §1.3, the Grim
+// Bear's Thick hide) applies to all of them: each hit loses `armor`, but never below 1 (a hit of 1
+// or less stays as it is). A reduced hit throws a small grey spark.
 export function damageEnemy(game, enemy, damage, source = null) {
-  if (source) recordDamage(game, source, Math.min(damage, Math.max(0, enemy.hp)));
-  enemy.hp -= damage;
+  const armor = enemyType(enemy).armor ?? 0;
+  const dealt = armor > 0 ? Math.min(damage, Math.max(1, damage - armor)) : damage;
+  if (dealt < damage) {
+    game.traitStats.armorBlocked += damage - dealt;
+    game.armorSparks.push({ x: enemy.x, y: enemy.y - enemyType(enemy).hitHeight * 0.6, age: 0 });
+  }
+  if (source) recordDamage(game, source, Math.min(dealt, Math.max(0, enemy.hp)));
+  enemy.hp -= dealt;
   enemy.lastHitTime = game.combatTime;
   if (enemy.hp <= 0) killEnemy(game, enemy);
+}
+
+// After one of its bites or blows lands on anything (M2l §1.3, the Grim Stirge's Bloodsucker):
+// heals its type's lifesteal, up to its max HP, with a tiny red sparkle.
+export function lifestealOnBite(game, enemy) {
+  const heal = Math.min(enemyType(enemy).lifesteal ?? 0, enemy.maxHp - enemy.hp);
+  if (heal <= 0) return;
+  enemy.hp += heal;
+  game.traitStats.lifestealHealed += heal;
+  game.healSparkles.push({ enemyId: enemy.id, age: 0 });
 }
 
 function recordDamage(game, source, amount) {
@@ -162,6 +180,7 @@ export function updateMelee(game, dt) {
       enemy.lastBiteTime = game.combatTime;
       game.druidHp = Math.max(0, game.druidHp - t.damage);
       game.druidLastHitTime = game.combatTime;
+      lifestealOnBite(game, enemy);
       events.emit('enemyAttacked', { type: enemy.type, target: 'druid' });
     }
   }
@@ -208,15 +227,20 @@ export function updateWindupAttacks(game, dt) {
 
 // The blow: damage to the wind-up's target if it is still there and still this enemy's target.
 // Dust ring at the target (or in front of the club if it hit nothing), flash, screen shake.
+// Splash (M2l §1.3, the Grim Ogre's Crushing blow): a blow that lands also hits every other
+// summon within splashRadius of its target for splashRatio × its damage (never the Druid, who is
+// only hurt as the target), and its dust ring spreads to splashRadius.
 function blow(game, enemy, t) {
   const aim = enemy.windupTarget;
   const now = currentAttackTarget(enemy);
   const same = now && now.kind === aim.kind && now.id === aim.id;
   let at = { x: enemy.x + enemy.facing * enemy.radius * 1.1, y: enemy.y + enemy.radius * 0.4 };
+  let landed = false;
   if (same && aim.kind === 'druid') {
     game.druidHp = Math.max(0, game.druidHp - t.damage);
     game.druidLastHitTime = game.combatTime;
     at = { ...game.scene.level.druidPos };
+    landed = true;
     events.emit('enemyAttacked', { type: enemy.type, target: 'druid' });
   } else if (same) {
     const unit = summonById(game, aim.id);
@@ -224,11 +248,16 @@ function blow(game, enemy, t) {
       unit.hp -= t.damage;
       unit.lastHitTime = game.combatTime;
       at = { x: unit.x, y: unit.y };
+      landed = true;
       events.emit('enemyAttacked', { type: enemy.type, target: 'summon' });
     }
   }
   if (!same) events.emit('enemyAttacked', { type: enemy.type, target: 'nothing' });
-  game.dustRings.push({ x: at.x, y: at.y, age: 0 });
+  if (landed) {
+    lifestealOnBite(game, enemy);
+    if (t.splashRatio) splash(game, at, aim.kind === 'summon' ? aim.id : null, t);
+  }
+  game.dustRings.push({ x: at.x, y: at.y, age: 0, radius: landed && t.splashRatio ? t.splashRadius : C.OGRE_DUST_RADIUS });
   game.shake = { age: 0 };
   enemy.attack = AttackState.READY;
   enemy.sinceBlow = 0;
@@ -236,6 +265,19 @@ function blow(game, enemy, t) {
   enemy.lastBlowTime = game.combatTime;
   enemy.lastBiteTime = game.combatTime;
   enemy.bites++;
+}
+
+// Splash damage on the Vultures and Squirrels near a blow's target, except the target itself.
+// They flash like any hit.
+function splash(game, at, targetId, t) {
+  const damage = t.damage * t.splashRatio;
+  for (const unit of [...game.vultures, ...game.squirrels]) {
+    if (unit.id === targetId || unit.hp <= 0) continue;
+    if (Math.hypot(unit.x - at.x, unit.y - at.y) > t.splashRadius) continue;
+    game.traitStats.splashDamage += Math.min(damage, unit.hp);
+    unit.hp -= damage;
+    unit.lastHitTime = game.combatTime;
+  }
 }
 
 // Remove an enemy immediately, release all its melee slots and roll its drops (§12.5, §13,

@@ -131,11 +131,12 @@ export function drawWispBurst(ctx, b) {
 }
 
 // A slowed enemy's mark (M2k §3.5): a small slowly turning spiral (snail-shell-like) floating at
-// (x, y), above its head.
-export function drawSlowSpiral(ctx, x, y, anim) {
+// (x, y), above its head. dogged (M2l §2.2): faster and fainter, on an enemy only partly slowed.
+export function drawSlowSpiral(ctx, x, y, anim, dogged = false) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(anim * C.SLOW_SPIRAL_TURN_RATE);
+  ctx.rotate(anim * C.SLOW_SPIRAL_TURN_RATE * (dogged ? C.DOGGED_SPIRAL_SPEED : 1));
+  if (dogged) ctx.globalAlpha = C.DOGGED_SPIRAL_ALPHA;
   ctx.strokeStyle = C.WISP_COLOR;
   ctx.lineWidth = 2;
   ctx.lineCap = 'round';

@@ -411,6 +411,12 @@ html, body {
   white-space: nowrap;
   pointer-events: none;
 }
+/* A Grim boss (M2l §2.1): darker frame. */
+#boss-bar.grim {
+  background: rgba(8, 6, 6, 0.9);
+  border-color: #3a2a26;
+  box-shadow: 0 0 6px rgba(255, 80, 20, 0.35);
+}
 #boss-name {
   letter-spacing: 0.12em;
 }

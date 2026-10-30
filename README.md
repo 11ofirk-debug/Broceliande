@@ -43,9 +43,11 @@ Then open http://localhost:8000 in Chrome.
 | `B` | Spawn a Bear at the start of a random lane (Combat only) — see `docs/M1E_ADDENDUM.md` |
 | `O` | Spawn an Ogre at the start of a random lane (Combat only; not in levels with narrow corridors) |
 | `S` | Spawn a flock of 4 Stirges at the start of a random lane (Combat only) |
+| `Shift+B` / `Shift+O` / `Shift+S` | The same, but the Grim version (a Grim Bear / a Grim Ogre / a flock of 4 Grim Stirges) |
 | `I` | On the map: add a random unowned item. In battle: show the hidden item's spot (debug overlay) |
 | `[` / `]` | Previous / next level |
 | `G` | Grant +10 of each resource |
+| `Shift+G` | Spawn 4 Grim Wolves at a random lane (Combat only) |
 | `X` | Toggle enemy drop chances between ×1 and ×`DEBUG_DROP_MULT` (×10) — see `docs/M1D_DROPS_SQUIRREL_ADDENDUM.md` |
 
 Balancing data (stats, costs, levels, waves, candidates, palettes, sounds…) lives in `data/*.csv`, one file per tab of the Google Sheet, loaded at start-up; data problems show in the page. Code-side settings (lane geometry, decoration, UI and drawing sizes, debug) live in `js/config.js`. See `docs/M2J_DATA_SHEET_ADDENDUM.md`.

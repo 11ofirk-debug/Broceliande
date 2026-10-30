@@ -12,3 +12,16 @@ ogre,feathers,1,2,3
 ogre,reeds,0.6,1,2
 ogre,boughs,1,1,2
 stirge,feathers,0.1,1,1
+grimWolf,feathers,0.09,1,2
+grimWolf,pits,0.12,1,2
+grimWolf,reeds,0.06,1,1
+grimWolf,boughs,0.105,1,1
+grimBear,feathers,0.525,1,2
+grimBear,pits,0.75,2,3
+grimBear,reeds,0.3,1,1
+grimBear,boughs,0.375,1,1
+grimOgre,pits,1,3,5
+grimOgre,feathers,1,2,3
+grimOgre,reeds,0.9,1,2
+grimOgre,boughs,1,1,2
+grimStirge,feathers,0.15,1,1

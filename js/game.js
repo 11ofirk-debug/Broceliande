@@ -198,7 +198,10 @@ export function startEncounter(game, { newSeed = false, levelId = null, resource
   game.hudPulses = {};
   game.bossAnnouncement = null; // M2c §2.6: { text, age } of the arrival banner
   game.lanePulses = [];         // M2c §2.6: { laneId, age }, a boss's lane entrance pulsing red
-  game.dustRings = [];          // M2c §2.5: { x, y, age } at each Ogre blow
+  game.dustRings = [];          // M2c §2.5: { x, y, age, radius } at each Ogre blow
+  game.armorSparks = [];        // M2l §2.2: { x, y, age } where armor reduced a hit (visual only)
+  game.healSparkles = [];       // M2l §2.2: { enemyId, age } when a bite healed its biter (visual only)
+  game.traitStats = { armorBlocked: 0, splashDamage: 0, lifestealHealed: 0 }; // M2l §4: this battle's figures
   game.shake = null;            // M2c §2.5: { age } of the screen shake after a blow (drawing only)
   game.nextEntityId = 1;
   game.enemies = [];
@@ -383,29 +386,38 @@ export function killAllEnemies(game) {
   for (const enemy of [...game.enemies]) killEnemy(game, enemy);
 }
 
-// Debug key B (M1e §6): spawn one Bear at the start of a random lane. Combat only.
-export function spawnDebugBear(game) {
+// Debug key B (M1e §6): spawn one Bear at the start of a random lane. Combat only. Shift+B: a
+// Grim Bear (M2l §4).
+export function spawnDebugBear(game, type = 'bear') {
   if (game.state !== GameState.COMBAT) return;
-  queueDebugEnemy(game, 'bear');
+  queueDebugEnemy(game, type);
 }
 
 // Debug key O (M2c §4): spawn an Ogre at the start of a random lane. Combat only; nothing but an
-// error if the level's corridors are too narrow for it.
-export function spawnDebugOgre(game) {
+// error if the level's corridors are too narrow for it. Shift+O: a Grim Ogre (M2l §4).
+export function spawnDebugOgre(game, type = 'ogre') {
   if (game.state !== GameState.COMBAT) return false;
   const width = corridorWidth(game.scene.level);
-  if (!fitsCorridor('ogre', width)) {
-    console.error(`${game.levelId}: corridors are ${width} px, too narrow for an Ogre (needs ${2 * C.ENEMY_TYPES.ogre.radius + 2})`);
+  if (!fitsCorridor(type, width)) {
+    console.error(`${game.levelId}: corridors are ${width} px, too narrow for the ${C.ENEMY_TYPES[type].name} (needs ${2 * C.ENEMY_TYPES[type].radius + 2})`);
     return false;
   }
-  queueDebugEnemy(game, 'ogre');
+  queueDebugEnemy(game, type);
   return true;
 }
 
 // Debug key S (M2h §6): spawn a flock of Stirges at the start of a random lane. Combat only.
-export function spawnDebugStirges(game) {
+// Shift+S: a flock of Grim Stirges (M2l §4).
+export function spawnDebugStirges(game, type = 'stirge') {
   if (game.state !== GameState.COMBAT) return false;
-  queueDebugEnemy(game, 'stirge', C.DEBUG_STIRGE_FLOCK);
+  queueDebugEnemy(game, type, C.DEBUG_STIRGE_FLOCK);
+  return true;
+}
+
+// Debug key Shift+G (M2l §4): spawn DEBUG_GRIM_WOLVES Grim Wolves at a random lane. Combat only.
+export function spawnDebugGrimWolves(game) {
+  if (game.state !== GameState.COMBAT) return false;
+  queueDebugEnemy(game, 'grimWolf', C.DEBUG_GRIM_WOLVES);
   return true;
 }
 
