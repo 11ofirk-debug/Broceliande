@@ -12,7 +12,8 @@ export const STAGE_HEIGHT = 1080;
 export const SIM_STEP = 1 / 60;          // seconds, fixed timestep
 export const MAX_FRAME_DT = 0.05;        // real seconds; larger frame gaps (tab switch) are clamped
 export const MAX_STEPS_PER_FRAME = 12;   // hard cap on sim steps per animation frame (covers ×4 speed)
-export const SIM_SPEEDS = [1, 2, 4];     // debug speed multipliers (keys 1 / 2 / 4)
+export const SIM_SPEEDS = [1, 2, 4];     // game speeds for the player in Combat (M2k §1: HUD buttons, keys 1 / 2 / 4)
+export const GAME_SPEED_KEY = 'broceliande.gameSpeed'; // localStorage key for the chosen game speed (M2k §1.2)
 
 // ---------------------------------------------------------------------------
 // M1b addendum §9 — step-budget Prep (docs/M1B_STEPS_ADDENDUM.md)
@@ -159,7 +160,7 @@ export const DROP_SETTLE_TIME = 0.08;     // s of squash-and-settle on landing (
 // ---------------------------------------------------------------------------
 // Sound (M1g §3) — synthesised in js/audio.js, triggered by gameplay events. Never affects the simulation.
 // ---------------------------------------------------------------------------
-export const SOUND_RESOURCE_FREQ = { pits: 440, reeds: 660, feathers: 990, boughs: 300 }; // TUNING — Hz, chime pitch per resource (Boughs lowest and woody, M1i §1.3)
+export const SOUND_RESOURCE_FREQ = { pits: 440, reeds: 660, feathers: 990, boughs: 300, shells: 520 }; // TUNING — Hz, chime pitch per resource (Boughs lowest and woody, M1i §1.3; Shells soft and hollow, M2k §2.1)
 export const SOUND_CHIME_STAGGER = 0.07;  // s between chimes when one search finds several resources
 export const SOUND_SUMMON_FREQ = { vulture: 330, squirrel: 880 }; // TUNING — Hz, shimmer base pitch per summon
 export const SOUND_STATS_WINDOW = 5;      // s, debug panel: sounds played / skipped over this much real time (M1g §5)
@@ -1149,7 +1150,7 @@ export const EQUIP_CLEARING_RAGGED = 0.2;
 // ===========================================================================
 
 // Code-side lists the data must match: the resources the game draws (icons, HUD) and its summons.
-export const RESOURCE_IDS = ['pits', 'reeds', 'feathers', 'boughs'];
+export const RESOURCE_IDS = ['pits', 'reeds', 'feathers', 'boughs', 'shells'];
 export const SUMMON_KINDS = ['vulture', 'squirrel', 'double'];
 
 // globals tab

@@ -1,6 +1,6 @@
-id,name,mainResource,searchTime,pits_min,pits_max,reeds_min,reeds_max,feathers_min,feathers_max,boughs_min,boughs_max
-tree,Tree,pits,1.2,2,4,,,,,1,3
-reedPatch,Reed Patch,reeds,1.4,,,2,3,,,,
-shrub,Shrub,feathers,1.7,,,,,2,3,1,2
-ruins,Ruins,pits,1.8,2,3,,,1,3,,
-pond,Pond,reeds,2,2,3,1,3,,,,
+id,name,mainResource,searchTime,pits_min,pits_max,reeds_min,reeds_max,feathers_min,feathers_max,boughs_min,boughs_max,shells_min,shells_max
+tree,Tree,pits,1.2,2,4,,,,,1,3,,
+reedPatch,Reed Patch,reeds,1.4,,,2,3,,,,,,
+shrub,Shrub,feathers,1.7,,,,,2,3,1,2,0,1
+ruins,Ruins,pits,1.8,2,3,,,1,3,,,0,1
+pond,Pond,reeds,2,2,3,1,3,,,,,1,2

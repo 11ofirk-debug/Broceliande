@@ -1,4 +1,4 @@
-// Resource helpers (spec §8.1, M1i §1). An amount/cost is { pits, reeds, feathers, boughs };
+// Resource helpers (spec §8.1, M1i §1, M2k §2). An amount/cost is { pits, reeds, feathers, boughs, shells };
 // a missing key counts as 0. RESOURCE_KEYS is the display order everywhere (HUD, tooltips, cost rows).
 
 import * as C from './config.js';

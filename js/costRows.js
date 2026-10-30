@@ -1,6 +1,6 @@
 // Cost rows (M1f §3): the single component for every cost shown in the UI (build menu, step-mode
 // slot tooltip, upgrade menu, summon menu). One row per resource the cost uses, in the order
-// Pits, Reeds, Feathers, Boughs (up to four rows, M1i §1.1): [icon] × N. A row the player cannot cover turns red: × N (have M).
+// Pits, Reeds, Feathers, Boughs, Shells (up to five rows, M1i §1.1, M2k §2.1): [icon] × N. A row the player cannot cover turns red: × N (have M).
 // Icons come from the shared resource-icon definition (icons.js).
 
 import * as C from './config.js';

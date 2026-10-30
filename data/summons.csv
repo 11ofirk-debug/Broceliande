@@ -1,4 +1,4 @@
-id,name,plural,key,cost_pits,cost_reeds,cost_feathers,cost_boughs,hp,damage,attackInterval,duration,speed,max,radius,meleeRange,blockRadius,pickupRange,blocks,wispTime
-vulture,Vulture,Vultures,q,0,0,1,,16,6,0.7,12,160,2,14,34,36,,,
-squirrel,Squirrel,Squirrels,w,1,0,0,,15,1,2.1,12,110,3,12,,36,14,TRUE,
-double,Bough Double,Bough Doubles,e,,,,1,,,,,,2,,,,,,0.25
+id,name,plural,key,cost_pits,cost_reeds,cost_feathers,cost_boughs,cost_shells,hp,damage,attackInterval,duration,speed,max,radius,meleeRange,blockRadius,pickupRange,blocks,wispTime
+vulture,Vulture,Vultures,q,0,0,1,,,16,6,0.7,12,160,2,14,34,36,,,
+squirrel,Squirrel,Squirrels,w,1,0,0,,,15,1,2.1,12,110,3,12,,36,14,TRUE,
+double,Bough Double,Bough Doubles,e,,,,1,,,,,,,2,,,,,,0.25

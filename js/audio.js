@@ -94,7 +94,13 @@ function subscribe() {
   events.on('enemySpawned', (e) => { if (e.first !== false) play(ENEMY_SPAWN_SOUND[e.type], e); });
   events.on('enemyStep', (e) => play(ENEMY_STEP_SOUND[e.type], e));
   events.on('enemyWindup', (e) => play(ENEMY_WINDUP_SOUND[e.type], e));
-  events.on('resourcesGained', (e) => play('resourceChime', e));
+  events.on('resourcesGained', (e) => { // M2k §2.1: Shells have their own chime (and sounds row)
+    const resources = e.resources ?? [];
+    const others = resources.filter((r) => r !== 'shells');
+    if (others.length) play('resourceChime', { ...e, resources: others });
+    const i = resources.indexOf('shells');
+    if (i >= 0) play('shellChime', { delay: i * C.SOUND_CHIME_STAGGER }); // keeps its turn in the sequence
+  });
   events.on('searchStarted', (e) => play('searchRustle', e));
   events.on('turretBuilt', (e) => play('build', e));
   events.on('mapNodeHover', (e) => play('mapNodeHover', e));
@@ -515,6 +521,16 @@ const RECIPES = {
       }
     });
     return end;
+  },
+
+  // Snail Shell gained (M2k §2.1): a soft, slightly hollow tone, like blowing across a shell.
+  shellChime(t, out, p, data) {
+    const freq = C.SOUND_RESOURCE_FREQ.shells * p;
+    const delay = data.delay ?? 0;
+    tone(t, out, { freq, to: freq * 0.94, dur: 0.38, gain: 0.7, delay, attack: 0.02 });
+    tone(t, out, { freq: freq * 1.5, to: freq * 1.42, dur: 0.24, gain: 0.18, delay, attack: 0.02 });
+    noise(t, out, { freq: freq * 2, q: 8, dur: 0.18, gain: 0.25, delay, attack: 0.02 });
+    return delay + 0.38;
   },
 
   // Leafy rustle: a handful of short, uneven high noise bursts.

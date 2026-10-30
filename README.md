@@ -21,6 +21,7 @@ Then open http://localhost:8000 in Chrome.
 | `W` | Summon a Squirrel (Combat only) |
 | `E` | Summon a Bough Double (Combat only) — straight into targeting |
 | `Space` | Call next wave (during the countdown or a gap between waves) |
+| `1` / `2` / `4` | Game speed ×1 / ×2 / ×4 (Combat only; also the HUD buttons, remembered between battles) |
 | `V` | Mute / unmute sound |
 | `Esc` / right-click | Close menu, otherwise cancel the current action or placement |
 
@@ -30,7 +31,6 @@ Then open http://localhost:8000 in Chrome.
 |---|---|
 | `D` | Toggle debug overlay and panel |
 | `P` | Pause / resume simulation |
-| `1` / `2` / `4` | Simulation speed ×1 / ×2 / ×4 |
 | `N` | Skip to next phase (Prep → Combat) |
 | `Shift+N` | Kill all current enemies and skip the rest of this wave's spawns (straight to the gap) |
 | `R` | Restart this encounter (same node, layout and starting resources) |

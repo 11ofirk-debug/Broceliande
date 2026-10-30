@@ -23,6 +23,7 @@ import { buildCost, levelStats, levelRange, nextLevelStats, maxLevel, turretType
 import { isStepMode, stepCost, canVisit, anyVisitable, routePreview, calibrationFigures, affordableTurretTypes } from './systems/stepSystem.js';
 import { enemyTotals, waveCounts } from './game.js';
 import { isMuted, soundStats, audioStatus } from './audio.js';
+import { chosenSpeed } from './gameSpeed.js';
 import { isRunComplete, mapNode, nodeRadius } from './run.js';
 import { resolveStats, changedStats, statLabel } from './stats.js';
 import { drawSlotIcon } from './render/items.js';
@@ -257,9 +258,11 @@ export function createUI(callbacks) {
       reeds: document.getElementById('res-reeds'),
       feathers: document.getElementById('res-feathers'),
       boughs: document.getElementById('res-boughs'),
+      shells: document.getElementById('res-shells'),
     },
     startCombat: document.getElementById('btn-start-combat'),
     mute: document.getElementById('btn-mute'),
+    speed: document.getElementById('hud-speed'),
     endOverlay: document.getElementById('end-overlay'),
     endTitle: document.getElementById('end-title'),
     endStats: document.getElementById('end-stats'),
@@ -315,6 +318,12 @@ export function createUI(callbacks) {
     callbacks.onToggleMute();
     el.mute.blur(); // so Space / Enter later don't toggle it again
   });
+  el.speed.addEventListener('click', (e) => {
+    const button = e.target.closest('button');
+    if (!button) return;
+    callbacks.onSetSpeed(Number(button.dataset.speed));
+    button.blur();
+  });
   // Menu option buttons are created per menu (see updateMenu); clicks report the option index.
   // The whole option card is the click target (M1f §2), button or not.
   el.menu.addEventListener('click', (e) => {
@@ -340,6 +349,7 @@ export function createUI(callbacks) {
       lastState = game.state;
     }
     updateHud(el, game);
+    updateSpeedButtons(el, game);
     updateStepBar(el, game, view);
     tooltipKey = updateTooltip(el, game, view, tooltipKey);
     menuKey = updateMenu(el, game, view, menuKey, menuHoverIndex);
@@ -1031,6 +1041,17 @@ function runLines(game) {
     // M2d §4: items the field sweep gathered on the last Victory.
     `Last sweep: ${game.lastSweep ? `${game.lastSweep.items} items  ${resourceLine(game.lastSweep.gathered)}` : 'none yet'}`,
   ];
+}
+
+// M2k §1.1: ×1 / ×2 / ×4 in Combat (countdown, waves and gaps), the chosen one highlighted.
+function updateSpeedButtons(el, game) {
+  el.speed.hidden = game.state !== GameState.COMBAT;
+  if (el.speed.hidden) return;
+  const speed = chosenSpeed();
+  for (const button of el.speed.children) {
+    const active = Number(button.dataset.speed) === speed;
+    if (button.classList.contains('active') !== active) button.classList.toggle('active', active);
+  }
 }
 
 function updateDebugPanel(el, game, clock, view, layoutLines, scene) {

@@ -20,6 +20,12 @@ export const RESOURCE_ICON_SVG = {
     + '<ellipse cx="7.5" cy="14.6" rx="2.9" ry="1.9" fill="#6fa13a"/>'
     + '<ellipse cx="16.8" cy="11.2" rx="2.6" ry="1.7" fill="#7fb446"/>'
     + '<circle cx="12.2" cy="14.2" r="1.3" fill="#5c8f2f"/></svg>',
+  // Snail Shell (M2k §2.1): a small cream spiral shell with brown whorls, resting on its lip.
+  shells: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="M3.5 19.5 Q3 10 11.5 4.5 Q19.5 4 20.5 11.5 Q21 18.5 13 19.5 Z" fill="#efe1c0"/>'
+    + '<path d="M12 12.2 Q12.2 10.6 13.6 10.8 Q15.4 11.2 15 13.2 Q14.4 15.6 11.6 15.4 Q8.4 14.8 8.8 11.4 Q9.4 7.6 13.6 7.6 Q18 8 18.2 12.6 Q18.2 17.2 13 18"'
+    + ' stroke="#8a5a2e" stroke-width="1.6" stroke-linecap="round" fill="none"/>'
+    + '<path d="M3.5 19.5 L13 19.5" stroke="#8a5a2e" stroke-width="1.4" stroke-linecap="round"/></svg>',
 };
 
 // Canvas images built from the same SVG source, created on first use. An image that has not

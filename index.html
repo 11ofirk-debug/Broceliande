@@ -33,6 +33,10 @@
               <span class="res-icon" data-resource="boughs"></span>
               <span id="res-boughs">0</span>
             </span>
+            <span class="res" title="Snail Shells">
+              <span class="res-icon" data-resource="shells"></span>
+              <span id="res-shells">0</span>
+            </span>
           </div>
           <!-- M2e §3.2: reminder that an item was found this battle (its slot type only). -->
           <span id="hud-item" hidden title="You found an item this battle"><canvas id="hud-item-icon" width="34" height="34"></canvas></span>
@@ -56,6 +60,12 @@
         </div>
         <div class="hud-right">
           <button id="btn-start-combat" type="button">Start Combat</button>
+          <!-- Game speed (M2k §1), Combat only; also keys 1 / 2 / 4. -->
+          <div id="hud-speed" hidden>
+            <button type="button" data-speed="1" title="Normal speed (1)">×1</button>
+            <button type="button" data-speed="2" title="Double speed (2)">×2</button>
+            <button type="button" data-speed="4" title="Quadruple speed (4)">×4</button>
+          </div>
           <!-- Mute toggle (M1g §3.6); also the V key. -->
           <button id="btn-mute" type="button" title="Sound on (V to mute)">
             <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">

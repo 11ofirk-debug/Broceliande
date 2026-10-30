@@ -18,6 +18,7 @@ import { createEquipmentPanel } from './equipmentPanel.js';
 import { validateItems } from './stats.js';
 import { createRng } from './rng.js';
 import { events } from './events.js';
+import { chosenSpeed, setChosenSpeed } from './gameSpeed.js';
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('game-canvas');
@@ -49,7 +50,9 @@ validateMap();    // MAP_NODES links and levels (M2a §4.1)
 validateItems();  // ITEMS slots, stats and ops (M2e §2)
 
 const game = createGame(mapNode(C.MAP_START_NODE).levelId);
-const clock = { speed: 1, paused: false };            // acts on simulation time only
+// Acts on simulation time only. speed: the speed in effect this frame, the player's chosen speed in
+// Combat and ×1 everywhere else (M2k §1.2); paused: debug P.
+const clock = { speed: 1, paused: false };
 // UI-only state: never read by the simulation.
 let wavesLogged = C.DEBUG_START_ENABLED; // per-wave totals logged (M2i §2)
 const view = { debug: C.DEBUG_START_ENABLED, revealItem: false, clickMarker: null, fps: 0, hover: null, menu: null, pointer: null, menuHoverType: null, mapHover: null }; // menuHoverType: build-menu card under the pointer (range preview); mapHover: available map node under the pointer
@@ -103,6 +106,7 @@ const ui = createUI({
   onMenuAction: (option) => interaction.onMenuAction(option),
   onToggleMute: toggleMute,
   onCallNextWave: () => callNextWave(game), // M2i §3.2
+  onSetSpeed: setSpeed,                     // M2k §1.1
 });
 checkLevelNameLabel(LEVEL_IDS.map(sceneFor)); // M2a §6: the label must not cover a candidate in any level
 checkBossBar(LEVEL_IDS.map(sceneFor));        // M2c §2.7: nor may the boss HP bar
@@ -132,9 +136,7 @@ const input = createInput(stage, canvas, () => scale, {
         break;
       case ' ': callNextWave(game); e.preventDefault(); break; // M2i §3.2: Call next wave (countdown / gap only)
       case 'p': clock.paused = !clock.paused; break;
-      case '1': case '2': case '4':
-        if (C.SIM_SPEEDS.includes(Number(key))) clock.speed = Number(key);
-        break;
+      case '1': case '2': case '4': setSpeed(Number(key)); break; // M2k §1: game speed (Combat only)
       case 'n': // N: start Combat from Prep; Shift+N (M2i §7): kill all and skip the rest of this wave
         if (e.shiftKey) skipWave(game);
         else if (game.state === GameState.PREP) startCombat(game);
@@ -182,6 +184,11 @@ window.broceliande = {
   unequip: (slot) => unequipSlot(game.run, slot),
 };
 
+// M2k §1.1: the HUD speed buttons and keys 1 / 2 / 4 choose the game speed, in Combat only.
+function setSpeed(speed) {
+  if (game.state === GameState.COMBAT) setChosenSpeed(speed);
+}
+
 // Q / W / E (SUMMON_KEYS): the summon shortcuts, Combat only (ignored in Prep, on the map, in ENDING).
 function summonShortcut(key) {
   const kind = Object.keys(C.SUMMON_KEYS).find((k) => C.SUMMON_KEYS[k] === key);
@@ -208,6 +215,7 @@ function frame(now) {
   lastTime = now;
   if (realDt > 0) view.fps = view.fps * 0.9 + (1 / realDt) * 0.1;
 
+  clock.speed = game.state === GameState.COMBAT ? chosenSpeed() : 1; // M2k §1.2
   if (!clock.paused) accumulator += realDt * clock.speed;
 
   let steps = 0;

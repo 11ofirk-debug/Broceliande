@@ -188,6 +188,28 @@ html, body {
 }
 
 /* Mute toggle (M1g §3.6): speaker with waves when on, with a cross when muted. */
+/* M2k §1: game speed buttons, the active one highlighted. */
+#hud-speed {
+  display: flex;
+  gap: 4px;
+}
+#hud-speed[hidden] { display: none; }
+#hud-speed button {
+  font: bold 18px/1 sans-serif;
+  padding: 6px 9px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #c9c3ad;
+  border: 1px solid rgba(233, 228, 208, 0.35);
+  border-radius: 4px;
+  cursor: pointer;
+}
+#hud-speed button:hover { color: #fff; }
+#hud-speed button.active {
+  background: #6a7a3a;
+  color: #fff8e0;
+  border-color: #c8d890;
+}
+
 #btn-mute {
   background: none;
   border: none;
