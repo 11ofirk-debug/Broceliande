@@ -71,7 +71,7 @@ function roadStyle(run, from, to) {
 }
 
 // Icon draw functions named by NODE_TYPES (M2c §1.1).
-const NODE_ICONS = { wolfHead: drawWolfHead };
+const NODE_ICONS = { wolfHead: drawWolfHead, lantern: drawLanternIcon };
 
 const STATE_ALPHA = { available: 1, completed: 1, locked: 0.5, bypassed: 0.3 };
 
@@ -92,16 +92,18 @@ function drawNode(ctx, node, state, hovered, t) {
     ctx.fill();
   }
   if (type.large) drawBossPulse(ctx, x, y, r, t); // M2f §2: a slow, faint red pulse round the Boss
-  ctx.fillStyle = COLORS.node;
+  ctx.fillStyle = type.fill ?? COLORS.node;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = type.large ? COLORS.bossRim : COLORS.rim;
+  ctx.strokeStyle = type.rim ?? (type.large ? COLORS.bossRim : COLORS.rim);
   ctx.lineWidth = type.large ? 6 : 4;
   ctx.stroke();
   // Icon per node type (M2c §1.1): the wolf's head, with red eyes for Fell Wilds and the Boss.
-  NODE_ICONS[type.icon](ctx, x, y + r * 0.04, r * 0.62, COLORS.head, COLORS.node, { redEyes: type.redEyes });
-  if (state === 'completed') {
+  NODE_ICONS[type.icon](ctx, x, y + r * 0.04, r * 0.62, COLORS.head, type.fill ?? COLORS.node, { redEyes: type.redEyes });
+  if (state === 'completed' && type.completedMark === 'coin') {
+    drawCoinMark(ctx, x + r * 0.55, y + r * 0.5, r * 0.42); // M2n §2.2: a visited Trader
+  } else if (state === 'completed') {
     // A bold red V over the circle.
     ctx.strokeStyle = COLORS.victory;
     ctx.lineWidth = r * 0.23; // scales with the node (M2e §4.6)
@@ -120,6 +122,57 @@ function drawNode(ctx, node, state, hovered, t) {
   ctx.shadowBlur = 6;
   ctx.fillStyle = COLORS.label;
   labelLines(ctx, node.name).forEach((line, i) => ctx.fillText(line, x, y + nodeRadius(node) + 8 + i * (C.MAP_LABEL_FONT_PX + 2)));
+  ctx.restore();
+}
+
+// The Trader node's icon (M2n §2.2): a lantern silhouette with a warm glowing pane. Same
+// signature as the other node icons; size: about its half-height.
+function drawLanternIcon(ctx, x, y, size, color, cutColor) {
+  const s = size;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = s * 0.12;
+  ctx.beginPath();
+  ctx.arc(x, y - s * 0.78, s * 0.2, Math.PI, 0); // the ring on top
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x - s * 0.42, y - s * 0.5);       // the cap
+  ctx.lineTo(x + s * 0.42, y - s * 0.5);
+  ctx.lineTo(x + s * 0.22, y - s * 0.72);
+  ctx.lineTo(x - s * 0.22, y - s * 0.72);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillRect(x - s * 0.5, y + s * 0.5, s, s * 0.16); // the base
+  ctx.fillStyle = '#ffd77a';                   // the glowing pane
+  ctx.shadowColor = 'rgba(255, 200, 90, 0.9)';
+  ctx.shadowBlur = s * 0.5;
+  ctx.fillRect(x - s * 0.34, y - s * 0.5, s * 0.68, s);
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = cutColor;                  // the frame bars
+  ctx.lineWidth = s * 0.08;
+  ctx.beginPath();
+  ctx.moveTo(x, y - s * 0.5);
+  ctx.lineTo(x, y + s * 0.5);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// A visited Trader's mark (M2n §2.2), in place of the red V: a small gold coin.
+function drawCoinMark(ctx, x, y, r) {
+  ctx.save();
+  ctx.fillStyle = '#e8b830';
+  ctx.strokeStyle = '#8a6414';
+  ctx.lineWidth = r * 0.18;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = '#fff0b0';
+  ctx.lineWidth = r * 0.12;
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.6, Math.PI * 1.1, Math.PI * 1.6);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -211,7 +264,7 @@ export function drawMap(ctx, run, hoverId, t, debug) {
     ];
     head.forEach((line, i) => ctx.fillText(line, C.EQUIP_PANEL_WIDTH + 24, C.HUD_STRIP_HEIGHT + 16 + i * 20));
     map.nodes.forEach((n, i) => {
-      ctx.fillText(`${n.id} (${n.levelId}) → [${n.next.join(', ')}]  ${nodeState(run, n.id)}`, C.EQUIP_PANEL_WIDTH + 24, C.HUD_STRIP_HEIGHT + 60 + i * 20);
+      ctx.fillText(`${n.id} (${n.levelId ?? n.type}) → [${n.next.join(', ')}]  ${nodeState(run, n.id)}`, C.EQUIP_PANEL_WIDTH + 24, C.HUD_STRIP_HEIGHT + 60 + i * 20);
       ctx.fillText(`${n.id}  in ${deg[n.id].in} / out ${deg[n.id].out}`, n.pos.x - C.MAP_NODE_RADIUS, n.pos.y - C.MAP_NODE_RADIUS - 22);
     });
     ctx.restore();

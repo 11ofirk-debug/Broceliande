@@ -27,7 +27,7 @@ import { chosenSpeed } from './gameSpeed.js';
 import { isRunComplete, mapNode, nodeRadius } from './run.js';
 import { resolveStats, changedStats, statLabel } from './stats.js';
 import { drawSlotIcon } from './render/items.js';
-import { tradeValue, exactCost, tradeRatio } from './trade.js';
+import { tradeValue, exactCost, tradeRatio, goodsTag, packTag } from './trade.js';
 
 const RESOURCE_LABELS = Object.fromEntries(Object.entries(C.RESOURCES).map(([k, r]) => [k, r.name])); // full names (data/resources.csv)
 // "Pits 3  Reeds 0  Feathers 2  Boughs 1": every resource, in display order (debug panel).
@@ -723,8 +723,9 @@ function combatTooltip(game, hover) {
 function mapTooltip(run, nodeId) {
   if (!nodeId) return null;
   const node = mapNode(run, nodeId);
-  const level = C.LEVELS[node.levelId];
   const anchor = { x: node.pos.x, y: node.pos.y, halfWidth: nodeRadius(node) * C.MAP_HOVER_SCALE };
+  if (node.type === 'trader') return traderTooltip(run.traders[node.id], anchor);
+  const level = C.LEVELS[node.levelId];
   // M2i §4.3: "3 waves · Wolves 42 · Stirges 4 · Bears 3" (types in display order, from the waves).
   const waves = `${levelWaves(level).length} waves`;
   const counts = (types) => [waves, ...types.map(([type, n]) => `${C.ENEMY_TYPES[type].plural} ${n}`)].join(' · ');
@@ -745,6 +746,20 @@ function mapTooltip(run, nodeId) {
     icons,
     anchor,
   };
+}
+
+// A Trader node (M2n §2.3): "Wandering Trader — Old Marrow", then the bargains (resources it sells
+// cheap, resources it pays well for) and its Bough stock, each line left out when empty. The
+// prices and stock were rolled with the run, so the hints are accurate.
+function traderTooltip(trader, anchor) {
+  const names = (tag) => RESOURCE_KEYS.filter((k) => tag(trader, k)).map((k) => C.RESOURCES[k].plural);
+  const cheap = names((t, k) => goodsTag(t, k) === 'cheap');
+  const paysWell = names((t, k) => packTag(t, k) === 'sellsWell');
+  const lines = [];
+  if (cheap.length) lines.push(['', `Cheap: ${cheap.join(', ')}`]);
+  if (paysWell.length) lines.push(['', `Pays well for: ${paysWell.join(', ')}`]);
+  if (trader.stock.boughs > 0) lines.push(['', `Has ${C.RESOURCES.boughs.plural}: ${trader.stock.boughs}`]);
+  return { title: `${C.NODE_TYPES.trader.label} — ${trader.name}`, lines, anchor };
 }
 
 function updateTooltip(el, game, view, prevKey) {

@@ -19,9 +19,10 @@ export { nodeRadius };
 // rolled trader (name, multipliers, stock), by node id, rolled with the run.
 export function createRun() {
   const seed = C.DEBUG_SEED ?? makeRandomSeed(); // DEBUG_SEED reproduces the whole run
+  const map = generateMap(mapSeedFor(seed));
   return {
     seed,
-    map: generateMap(mapSeedFor(seed)),
+    map,
     currentNodeId: null,
     completedNodeIds: [],
     inventory: emptyResources(),
@@ -29,16 +30,18 @@ export function createRun() {
     items: [],
     equipped: Object.fromEntries(Object.keys(C.SLOT_TYPES).map((slot) => [slot, null])),
     seenItems: [],
-    traders: rollRunTraders(seed),
+    traders: rollRunTraders(seed, map),
   };
 }
 
 // M2n §5: a trader for every Trader node on the map, seeded from the run seed, no name used twice.
-function rollRunTraders(seed) {
+// keep: traders already rolled (by node id), kept as they are (debug L, regenerateMap).
+function rollRunTraders(seed, map, keep = {}) {
   const rng = createRng((seed ^ 0x7a3d1) >>> 0);
-  const traders = {};
-  for (const node of C.MAP_NODES.filter((n) => n.type === 'trader')) {
-    traders[node.id] = rollTrader(rng, Object.values(traders).map((t) => t.name));
+  const nodes = map.nodes.filter((n) => n.type === 'trader');
+  const traders = Object.fromEntries(nodes.filter((n) => keep[n.id]).map((n) => [n.id, keep[n.id]]));
+  for (const node of nodes) {
+    if (!traders[node.id]) traders[node.id] = rollTrader(rng, Object.values(traders).map((t) => t.name));
   }
   return traders;
 }
@@ -187,6 +190,7 @@ export function markSlotSeen(run, slot) {
 export function regenerateMap(run, seed) {
   const was = run.currentNodeId ? mapNode(run, run.currentNodeId) : null;
   run.map = generateMap(seed);
+  run.traders = rollRunTraders(seed, run.map, run.traders); // M2n §5: the same traders where their nodes remain
   if (!was) return true;
   const now = mapNode(run, was.id);
   return !!now && now.row === was.row;

@@ -1110,6 +1110,9 @@ export const NODE_TYPES = {
   // M2f §2: the final node, drawn MAP_BOSS_SCALE × as large with a dark red rim and a slow red
   // pulse; winning it completes the run with finalLine.
   boss:  { label: 'Boss', icon: 'wolfHead', redEyes: true, large: true, finalLine: 'The Heartwood is cleansed. Broceliande breathes again.' },
+  // M2n §2.2: a Wandering Trader (no battle): a warm amber rim, a lantern, and a gold coin mark
+  // instead of the red V once visited. Generated with the map, not listed in MAP_NODES.
+  trader: { label: 'Wandering Trader', icon: 'lantern', rim: '#e0a63c', fill: '#5a3c1e', completedMark: 'coin' },
 };
 
 // M2e §4.6 (as revised): the map's ground runs across the whole screen; its nodes use the right

@@ -2,6 +2,7 @@
 // node's row is its level's); what varies is the order and x position of the nodes within a row,
 // the roads between adjacent rows and their curves.
 //
+// The run's Trader nodes (M2n §2) are generated here too: ids trader1, trader2…, no level.
 // A map: { nodes: [{ id, levelId, name, type, row, pos: { x, y }, next: [ids] }],
 //          roads: [{ from, to, bend }] (bend: px the curve bows sideways, + to the road's left),
 //          attempts, failed: [check names the chosen map fails], failCounts: { check: attempts it failed } }.
@@ -10,8 +11,9 @@
 import * as C from './config.js';
 import { createRng } from './rng.js';
 
-// The whole-map checks (§2.3), plus roads clear of other nodes and labels (§2.4).
-const CHECKS = ['reachable', 'fellAvoidable', 'variety', 'choice', 'roadsClear'];
+// The whole-map checks (§2.3), plus roads clear of other nodes and labels (§2.4) and every node's
+// roads within 1–3 each way (§2.2; a row with a Trader can need more than the sweep allows).
+const CHECKS = ['reachable', 'fellAvoidable', 'variety', 'choice', 'roadsClear', 'degrees'];
 
 // The map for a seed: up to MAP_MAX_ATTEMPTS whole maps from one RNG stream, the first passing
 // every check, or else the one failing the fewest (with a warning).
@@ -37,19 +39,42 @@ export function mapSeedFor(runSeed) {
   return C.MAP_RANDOMISE ? (runSeed ^ 0x5bd1e995) >>> 0 : C.MAP_FIXED_SEED;
 }
 
-// The map's rows, bottom to top: [[node, …], …], each node a fresh copy with its row.
-function rowsOf() {
+// The map's rows, bottom to top: [[node, …], …], each node a fresh copy with its row, plus the
+// run's Trader nodes (M2n §2.1) in rows picked with the rng.
+function rowsOf(rng) {
   const byRow = new Map();
   for (const n of C.MAP_NODES) {
     const row = C.LEVELS[n.levelId].row;
     if (!byRow.has(row)) byRow.set(row, []);
     byRow.get(row).push({ id: n.id, levelId: n.levelId, name: n.name, type: n.type, row, pos: null, next: [] });
   }
-  return [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r));
+  const rows = [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r));
+  traderRows(rng, rows).forEach((index, k) => {
+    rows[index].push({ id: `trader${k + 1}`, levelId: null, name: C.NODE_TYPES.trader.label, type: 'trader', row: rows[index][0].row, pos: null, next: [] });
+  });
+  return rows;
+}
+
+// M2n §2.1: TRADERS_PER_RUN Trader rows (as indexes into rows), never the first or last row, at
+// most one per row: the rows between are split into that many bands, bottom to top (with 2 and 8
+// rows: rows 2–4 and 5–7), and each Trader goes in a random row of its band. A row only qualifies
+// if each neighbouring row can still take its roads within 3 per node (so not the row under a
+// single boss node when it already has 3 nodes).
+function traderRows(rng, rows) {
+  const inner = rows.map((_, i) => i).slice(1, -1);
+  const n = Math.min(C.TRADERS_PER_RUN, inner.length);
+  const fits = (i) => [i - 1, i + 1].every((j) => rows[i].length + 1 <= 3 * rows[j].length);
+  const picked = [];
+  for (let k = 0; k < n; k++) {
+    const band = inner.slice(Math.floor((k * inner.length) / n), Math.floor(((k + 1) * inner.length) / n)).filter(fits);
+    if (band.length) picked.push(band[rng.int(0, band.length - 1)]);
+    else console.warn(`Map: no row in Trader band ${k + 1} can take a Trader`);
+  }
+  return picked;
 }
 
 function attempt(rng) {
-  const rows = rowsOf();
+  const rows = rowsOf(rng);
   rows.forEach((row, i) => {
     shuffle(rng, row);                // §2.1: order within the row
     placeRow(rng, row, i);            // x positions, the row's height with a little jitter
@@ -91,8 +116,8 @@ const reach = (a, b) => Math.exp(-Math.abs(a.pos.x - b.pos.x) / C.MAP_ROAD_REACH
 
 // §2.2: roads from a lower row up to the next, both sorted left to right. A sweep links the
 // current pair and moves the lower pointer, the upper one or both (weighted toward the shorter
-// next road), so every node gets a road and none cross; then a few extra roads that cross none
-// and keep every degree within 3.
+// next road, and never giving a node a 4th road while another move is possible), so every node gets
+// a road and none cross; then a few extra roads that cross none and keep every degree within 3.
 function connectRows(rng, lower, upper) {
   const links = []; // [i, j]: lower[i] → upper[j]
   let i = 0;
@@ -103,7 +128,9 @@ function connectRows(rng, lower, upper) {
     if (i < lower.length - 1) moves.push([i + 1, j]);
     if (j < upper.length - 1) moves.push([i, j + 1]);
     if (i < lower.length - 1 && j < upper.length - 1) moves.push([i + 1, j + 1]);
-    [i, j] = pickWeighted(rng, moves, ([a, b]) => reach(lower[a], upper[b]));
+    // Moving one pointer alone adds a road to the node the other stays on.
+    const roomy = moves.filter(([a, b]) => (a === i ? outCount(links, i) < 3 : true) && (b === j ? inCount(links, j) < 3 : true));
+    [i, j] = pickWeighted(rng, roomy.length ? roomy : moves, ([a, b]) => reach(lower[a], upper[b]));
     links.push([i, j]);
   }
   for (let a = 0; a < lower.length; a++) {
@@ -111,12 +138,15 @@ function connectRows(rng, lower, upper) {
       if (links.some(([p, q]) => p === a && q === b)) continue;
       if (rng.next() >= C.MAP_EXTRA_ROAD_CHANCE * reach(lower[a], upper[b])) continue;
       const crosses = links.some(([p, q]) => (p < a && q > b) || (p > a && q < b));
-      const full = links.filter(([p]) => p === a).length >= 3 || links.filter(([, q]) => q === b).length >= 3;
+      const full = outCount(links, a) >= 3 || inCount(links, b) >= 3;
       if (!crosses && !full) links.push([a, b]);
     }
   }
   return links.map(([a, b]) => ({ from: lower[a].id, to: upper[b].id, bend: 0 }));
 }
+
+const outCount = (links, a) => links.filter(([p]) => p === a).length;
+const inCount = (links, b) => links.filter(([, q]) => q === b).length;
 
 function pickWeighted(rng, options, weight) {
   const w = options.map(weight);
@@ -248,6 +278,12 @@ const CHECK_FNS = {
   // §2.4: every road has a curve clear of other nodes and labels.
   roadsClear(map) {
     return map.roads.every((r) => r.bend !== null);
+  },
+  // §2.2: 1–3 roads up from every node but the last row's, 1–3 in to every node but the first row's.
+  degrees(map) {
+    const deg = nodeDegrees(map);
+    const last = map.rows.length - 1;
+    return map.rows.every((row, r) => row.every((n) => (r === last || (deg[n.id].out >= 1 && deg[n.id].out <= 3)) && (r === 0 || (deg[n.id].in >= 1 && deg[n.id].in <= 3))));
   },
 };
 
