@@ -5,6 +5,7 @@
 
 import * as C from '../config.js';
 import { drawVulture, drawSquirrel, drawTurretSlot, drawTurret, drawToader, drawDruid, DRUID_REST_POSE } from './entities.js';
+import { drawCinderjaw } from './cinderjaw.js';
 import { drawEnemyLook } from './enemyLook.js';
 import { drawWisp } from './wisp.js';
 
@@ -31,6 +32,10 @@ const PORTRAIT_DRAW = {
   toader: (ctx, x, y) => {
     drawTurretSlot(ctx, { x, y }, false, false);
     drawToader(ctx, { x, y }, false, 0);
+  },
+  cinderjaw: (ctx, x, y) => { // M2o §4.1
+    drawTurretSlot(ctx, { x, y }, false, false);
+    drawCinderjaw(ctx, { x, y, level: 1, angle: -0.3, lastFireTime: -Infinity }, false, 1);
   },
 };
 

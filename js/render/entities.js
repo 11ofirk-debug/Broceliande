@@ -1198,7 +1198,7 @@ export function drawTurret(ctx, turret, upgrading, anim = 0) {
 
 // Level rings round a turret's pad: one at level 2, two at 3, three from level 4 (M2m §2.5).
 // The outermost stays inside LOCATION_RADIUS.
-function levelRingRadii(level) {
+export function levelRingRadii(level) {
   return [C.TURRET_SLOT_RADIUS - 2, C.TURRET_SLOT_RADIUS + 3, C.TURRET_SLOT_RADIUS + 8].slice(0, Math.min(3, level - 1));
 }
 

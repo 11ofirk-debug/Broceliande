@@ -42,3 +42,6 @@ tradeComplete,0.5,1,0.05,3,TRUE
 tradeUndo,0.45,1,0.05,3,TRUE
 traderGreet,0.5,1,0.3,1,TRUE
 soldOut,0.5,1,0.15,2,TRUE
+cinderjawFires,0.55,1,0.15,2,TRUE
+burnTick,0.12,1,0.25,1,TRUE
+wildfireSpread,0.45,1,0.12,2,TRUE

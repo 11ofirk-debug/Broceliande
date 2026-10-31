@@ -18,6 +18,7 @@ import { updateVultures, updateBlocking, expireVultures } from './systems/vultur
 import { updateSquirrels, updateSquirrelStrikes, expireSquirrels } from './systems/squirrelSystem.js';
 import { updateWisps } from './systems/wispSystem.js';
 import { updateStatuses } from './systems/statusSystem.js';
+import { updateBurns } from './systems/burnSystem.js';
 import { isStepMode } from './systems/stepSystem.js';
 import { GameState, PrepMode, ActionState } from './states.js';
 import { sceneFor } from './scene.js';
@@ -203,8 +204,10 @@ export function startEncounter(game, { newSeed = false, levelId = null, resource
   game.lanePulses = [];         // M2c §2.6: { laneId, age }, a boss's lane entrance pulsing red
   game.dustRings = [];          // M2c §2.5: { x, y, age, radius } at each Ogre blow
   game.armorSparks = [];        // M2l §2.2: { x, y, age } where armor reduced a hit (visual only)
+  game.coneBursts = [];         // M2o §4.2: Cinderjaw breaths { x, y, aim, half, range, level, age } (visual only)
+  game.emberJumps = [];         // M2o §4.2: Wildfire embers { from, toId, to, age } (visual only)
   game.healSparkles = [];       // M2l §2.2: { enemyId, age } when a bite healed its biter (visual only)
-  game.traitStats = { armorBlocked: 0, splashDamage: 0, lifestealHealed: 0, twinShotDamage: 0, corrosionExtra: 0 }; // M2l §4, M2m §3: this battle's figures
+  game.traitStats = { armorBlocked: 0, splashDamage: 0, lifestealHealed: 0, twinShotDamage: 0, corrosionExtra: 0, wildfireSpreads: 0 }; // M2l §4, M2m §3, M2o §5: this battle's figures
   game.shake = null;            // M2c §2.5: { age } of the screen shake after a blow (drawing only)
   game.nextEntityId = 1;
   game.enemies = [];
@@ -465,6 +468,7 @@ export function updateGame(game, dt) {
       updateDrops(game, dt);         // drop pop flight (M1g §1); before Squirrels so a just-landed item can be claimed
       updateSquirrels(game, dt);
       updateWisps(game, dt);         // M2k §3.3: Slow Wisps fly and burst
+      updateBurns(game);             // M2o §2.2: burn ticks (before burns run out)
       updateStatuses(game);          // M2k §3.4: timed statuses (slowed) run out
       updateDoubles(game, dt);       // Bough Double jobs (M1i §2)
       updateMelee(game, dt);

@@ -85,6 +85,9 @@ export const CLOUD_GROW_TIME = 0.3;       // s, a cloud grows from pellet size t
 export const CLOUD_FADE_TIME = 0.6;       // s, it fades out over its last moments (visual only)
 export const TURRET_TURN_SPEED = 9;       // TUNING — rad/s, how fast a turret visibly turns toward its target (visual; firing does not wait for it)
 export const TWIN_SHOT_SPREAD = 5;        // px either side of the muzzle the Stormspinner's two pebbles leave from (M2m §2.5, visual)
+export const CONE_BURST_TIME = 0.4;       // s a Cinderjaw breath shows (M2o §4.2, visual; the damage is instant)
+export const EMBER_JUMP_TIME = 0.45;      // s Wildfire embers take to jump to a newly lit enemy (M2o §4.2)
+export const CINDERJAW_TONGUE_PERIOD = 2.6; // s between idle tongue flicks (visual)
 
 // ---------------------------------------------------------------------------
 // 17.5 Vulture
@@ -1266,9 +1269,10 @@ export let FEATURE_TYPES;
 // hitHeight, drops: [{ resource, chance, min, max }], and optional collisionRadius, windupTime,
 // flying, flyHeight, burstStagger, dropSpacing, keepSide, sideWander, boss, stepSoundInterval }
 export let ENEMY_TYPES;
-// turrets: id → { name, attack: 'projectile' | 'cloud', range (level 1), projectileSpeed,
+// turrets: id → { name, attack: 'projectile' | 'cloud' | 'cone', range (level 1), projectileSpeed (not for a cone),
 // muzzleHeight, levels: [{ damage, fireInterval, range, cost, time, name (or null), targets (M2m §2.3:
-// pebbles per volley), cloud?: { radius, duration, tickInterval, tickDamage, corrode?: { mult, linger } } }] }.
+// pebbles per volley), cloud?: { radius, duration, tickInterval, tickDamage, corrode?: { mult, linger } },
+// cone?: { angle (degrees), burn: { duration, tickInterval, tickDamage, spreadRadius } } }] }.
 // Level 1's cost / time are the build; later levels' the upgrade to that level.
 export let TURRET_TYPES;
 export let TURRET_RANGE; // the Pebble Sprinkler's level-1 range: lane coverage for layouts (M1c §4.1)
@@ -1359,6 +1363,8 @@ export function applyData(t) {
     const level = { damage: r.damage, fireInterval: r.fireInterval, range: r.range, cost: cost(r), time: r.time, name: r.levelName ?? null, targets: r.targets ?? 1 };
     if (r.attack === 'cloud') level.cloud = { radius: r.cloudRadius, duration: r.cloudDuration, tickInterval: r.cloudTick, tickDamage: r.cloudTickDamage };
     if (r.corrodeMult !== undefined) level.cloud.corrode = { mult: r.corrodeMult, linger: r.corrodeLinger }; // M2m §2.4: Corrosion
+    // M2o §3.1: the Cinderjaw's cone (total angle, degrees) and the burn it sets; spreadRadius: Wildfire.
+    if (r.attack === 'cone') level.cone = { angle: r.coneAngle, burn: { duration: r.burnDuration, tickInterval: r.burnTick, tickDamage: r.burnTickDamage, spreadRadius: r.spreadRadius ?? 0 } };
     type.levels.push(level);
   }
   TURRET_RANGE = TURRET_TYPES.sprinkler.range;

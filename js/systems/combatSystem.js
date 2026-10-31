@@ -4,11 +4,12 @@
 
 import * as C from '../config.js';
 import { EnemyState, AttackState, enemyType, remainingDistance } from '../entities/enemy.js';
-import { turretType, turretRange, turretDamage, turretFireInterval, turretMuzzle, turretTargets } from '../entities/turret.js';
+import { turretType, turretRange, turretDamage, turretFireInterval, turretMuzzle, turretTargets, levelStats } from '../entities/turret.js';
 import { createProjectile } from '../entities/projectile.js';
 import { dropLoot } from './dropSystem.js';
 import { createCloud, isInsideCloud } from './cloudSystem.js';
-import { corrodeMult } from './statusSystem.js';
+import { corrodeMult, applyBurn } from './statusSystem.js';
+import { spreadWildfire } from './burnSystem.js';
 import { isBeingUpgraded } from './doubleSystem.js';
 import { events } from '../events.js';
 
@@ -60,6 +61,10 @@ export function updateTurrets(game, dt) {
 
     turnToward(turret, target, dt);
     if (turret.cooldown > 0) continue;
+    if (turretType(turret.type).attack === 'cone') {
+      breatheFire(game, turret, target);
+      continue;
+    }
     // Twin shot (M2m §2.3): one pebble per target, leaving side by side; one sound per volley.
     const muzzle = turretMuzzle(turret);
     targets.forEach((t, i) => {
@@ -72,6 +77,32 @@ export function updateTurrets(game, dt) {
     turret.lastFireTime = game.combatTime;
     turret.cooldown += turretFireInterval(turret); // carry the remainder so the rate is exact
   }
+}
+
+// Cinderjaw (M2o §2.1): a cone from the turret's centre, `range` long and the level's angle wide,
+// pointed at the target. Every enemy whose centre is inside it, ground or flying, catches fire and
+// takes the hit, once, now (burning first, so a breath that kills spreads Wildfire at level 5).
+// The cone shows briefly (game.coneBursts, visual only).
+function breatheFire(game, turret, target) {
+  const stats = levelStats(turret.type, turret.level);
+  const range = turretRange(turret);
+  const aim = Math.atan2(target.y - turret.y, target.x - turret.x);
+  const half = (stats.cone.angle / 2) * (Math.PI / 180);
+  const inCone = game.enemies.filter((e) => {
+    const dx = e.x - turret.x;
+    const dy = e.y - turret.y;
+    if (Math.hypot(dx, dy) > range) return false;
+    return Math.abs(Math.atan2(Math.sin(Math.atan2(dy, dx) - aim), Math.cos(Math.atan2(dy, dx) - aim))) <= half;
+  });
+  for (const e of inCone) {
+    applyBurn(game, e, stats.cone.burn, turret.id, turret.level);
+    damageEnemy(game, e, stats.damage, `${turret.type}:impact:${turret.level}`);
+  }
+  game.coneBursts.push({ x: turret.x, y: turret.y, aim, half, range, level: turret.level, age: 0 });
+  turret.aim = aim;
+  events.emit('turretFired', { type: turret.type, x: turret.x, y: turret.y });
+  turret.lastFireTime = game.combatTime;
+  turret.cooldown += stats.fireInterval;
 }
 
 // Poison Toader targeting (M1f §6.3): among enemies in range, prefer those not already inside
@@ -301,4 +332,5 @@ export function killEnemy(game, enemy) {
   game.enemyCounts[enemy.type].killed++;
   events.emit('enemyDied', { type: enemy.type, x: enemy.x, y: enemy.y });
   dropLoot(game, enemy);
+  spreadWildfire(game, enemy); // M2o §2.3: a burning enemy with a Wildfire burn lights those near it
 }

@@ -51,6 +51,10 @@ export function updateEffects(game, dt) {
   // Grim trait feedback (M2l §2.2): armor sparks and lifesteal sparkles.
   for (const s of game.armorSparks) s.age += dt;
   game.armorSparks = game.armorSparks.filter((s) => s.age < C.ARMOR_SPARK_TIME);
+  for (const b of game.coneBursts) b.age += dt;   // M2o §4.2
+  game.coneBursts = game.coneBursts.filter((b) => b.age < C.CONE_BURST_TIME);
+  for (const j of game.emberJumps) j.age += dt;
+  game.emberJumps = game.emberJumps.filter((j) => j.age < C.EMBER_JUMP_TIME);
   for (const s of game.healSparkles) s.age += dt;
   game.healSparkles = game.healSparkles.filter((s) => s.age < C.HEAL_SPARKLE_TIME);
   if (game.shake) {

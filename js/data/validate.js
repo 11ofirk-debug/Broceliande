@@ -88,7 +88,13 @@ export function validateTables(t, problems) {
   for (const r of t.turrets) {
     resourceColumns('turrets', r, 'cost_', '');
     (turretLevels[r.turret] ??= []).push(r);
-    if (r.attack !== 'projectile' && r.attack !== 'cloud') err('turrets', r, 'attack', `attack must be projectile or cloud, not "${r.attack}"`);
+    if (!['projectile', 'cloud', 'cone'].includes(r.attack)) err('turrets', r, 'attack', `attack must be projectile, cloud or cone, not "${r.attack}"`);
+    if (r.attack !== 'cone' && r.projectileSpeed === undefined) err('turrets', r, 'projectileSpeed', 'a projectile or cloud turret needs a value');
+    // M2o §3.1: a cone (Cinderjaw) needs its cone and burn values; spreadRadius (Wildfire) is optional.
+    if (r.attack === 'cone') {
+      for (const c of ['coneAngle', 'burnDuration', 'burnTick', 'burnTickDamage']) if (r[c] === undefined) err('turrets', r, c, 'a cone turret needs a value');
+    }
+    if (r.spreadRadius !== undefined && r.attack !== 'cone') err('turrets', r, 'spreadRadius', 'only a cone turret spreads fire');
     if (r.attack === 'cloud') {
       for (const c of ['cloudRadius', 'cloudDuration', 'cloudTick', 'cloudTickDamage']) if (r[c] === undefined) err('turrets', r, c, 'a cloud turret needs a value');
     }

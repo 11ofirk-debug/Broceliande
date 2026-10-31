@@ -7,7 +7,7 @@ import * as C from '../config.js';
 import { GameState } from '../states.js';
 import { isStepMode, isVisitTarget, stepCost } from '../systems/stepSystem.js';
 import { candidateProblems } from '../scene.js';
-import { turretMuzzle } from '../entities/turret.js';
+import { turretMuzzle, turretRange, levelStats } from '../entities/turret.js';
 import { doubleStandPos } from '../systems/doubleSystem.js';
 import { geometricZone } from '../zones.js';
 import { AttackState } from '../entities/enemy.js';
@@ -68,6 +68,7 @@ export function drawDebugOverlay(ctx, game, scene, revealItem = false) {
 
   drawEnemies(ctx, game);
   drawTurretTargets(ctx, game);
+  drawCinderjawCones(ctx, game); // M2o §5
   drawVultureTargets(ctx, game);
   drawSquirrelTargets(ctx, game);
   drawCloudsAndPellets(ctx, game);
@@ -252,8 +253,32 @@ function drawTurretTargets(ctx, game) {
       ctx.lineTo(target.x, target.y - C.ENEMY_TYPES[target.type].hitHeight);
       ctx.stroke();
     }
-    label(ctx, `T#${t.id} ${t.type === 'toader' ? 'Toader' : 'Spr'} L${t.level}`, t.x - 16, muzzle.y - 20);
+    label(ctx, `T#${t.id} ${{ sprinkler: 'Spr', toader: 'Toader', cinderjaw: 'Cinder' }[t.type] ?? t.type} L${t.level}`, t.x - 16, muzzle.y - 20);
   }
+}
+
+// M2o §5: each Cinderjaw's cone at its current aim (always, not only while it breathes), and each
+// burning enemy's remaining burn time.
+function drawCinderjawCones(ctx, game) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 150, 60, 0.9)';
+  ctx.lineWidth = 1.5;
+  for (const t of game.turrets) {
+    const cone = levelStats(t.type, t.level).cone;
+    if (!cone) continue;
+    const half = (cone.angle / 2) * (Math.PI / 180);
+    ctx.beginPath();
+    ctx.moveTo(t.x, t.y);
+    ctx.arc(t.x, t.y, turretRange(t), t.angle - half, t.angle + half);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255, 170, 80, 0.95)';
+  for (const e of game.enemies) {
+    const b = e.statuses.burning;
+    if (b) ctx.fillText(`burn ${Math.max(0, b.until - game.combatTime).toFixed(1)}s L${b.level}${b.spreadRadius ? ' WF' : ''}`, e.x - 26, e.y + e.radius + 14);
+  }
+  ctx.restore();
 }
 
 // Vulture IDs and state, block radius, and a line to the current target (§18.2).

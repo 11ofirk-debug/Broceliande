@@ -20,9 +20,10 @@ import { drawFootsteps, drawTrail } from './render/footsteps.js';
 import { animationTime } from './game.js';
 import { drawMap } from './render/map.js';
 import { drawTraderScene } from './render/trader.js';
+import { drawCinderjaw, drawConeBurst, drawBurning, drawEmberJump } from './render/cinderjaw.js';
 import { drawSlotFloater } from './render/items.js';
 import { drawWisp, drawWispTarget, drawWispGhost, drawWispBurst, drawSlowSpiral } from './render/wisp.js';
-import { isSlowed, isCorroded } from './systems/statusSystem.js';
+import { isSlowed, isCorroded, isBurning } from './systems/statusSystem.js';
 import { drawEnemyLook } from './render/enemyLook.js'; // an enemy's look, Grims included (M2l §2.1)
 import { drawShowcase } from './debug/showcase.js';
 
@@ -155,6 +156,16 @@ export function createRenderer(canvas) {
     for (const s of game.swipes) drawSwipe(ctx, s, s.age / C.DRUID_SWIPE_TIME);
     for (const s of game.sparks) drawSpark(ctx, s, s.age / C.STRIKE_SPARK_TIME);
     // Grim trait feedback (M2l §2.2): armor sparks; lifesteal sparkles on the biter, wherever it is now.
+    // Cinderjaw breaths and Wildfire embers (M2o §4.2), over the field and the flyers.
+    for (const b of game.coneBursts) drawConeBurst(ctx, b);
+    for (const j of game.emberJumps) {
+      const to = game.enemies.find((e) => e.id === j.toId); // it may have moved (or died: its last spot)
+      drawEmberJump(ctx, j, to ? { x: to.x, y: to.y - (C.ENEMY_TYPES[to.type].flyHeight ?? 0) } : j.to);
+    }
+    // Burning (M2o §4.2): small flames and sparks on the body while it lasts.
+    for (const e of game.enemies) {
+      if (isBurning(e)) drawBurning(ctx, e.x, e.y - (C.ENEMY_TYPES[e.type].flyHeight ?? 0) - C.ENEMY_TYPES[e.type].hitHeight * 0.3, e.radius, anim, e.id);
+    }
     // Corroded (M2m §2.5): drips falling from the body while it lasts.
     for (const e of game.enemies) {
       if (isCorroded(e)) drawCorrodeDrips(ctx, e.x, e.y - (C.ENEMY_TYPES[e.type].flyHeight ?? 0) - C.ENEMY_TYPES[e.type].hitHeight * 0.5, e.radius, anim, e.id);
@@ -353,7 +364,8 @@ function drawTargeting(ctx, game, view) {
 }
 
 // Turret drawing per type (M1f §5): the Sprinkler, or the Toader with its mouth animation.
-// The canvas filter tinting an enemy by its statuses (M2k §3.5, M2m §2.5), or null.
+// The canvas filter tinting an enemy by its statuses (M2k §3.5, M2m §2.5), or null. Burning (M2o §4.2)
+// is not a filter (too slow with many burning enemies): drawBurning lays a warm glow and flames over it.
 function enemyTintFilter(e) {
   const slowed = isSlowed(e);
   const corroded = isCorroded(e);
@@ -364,6 +376,7 @@ function enemyTintFilter(e) {
 
 function drawTurretOfType(ctx, t, upgrading, anim) {
   if (t.type === 'toader') drawToader(ctx, t, upgrading, toaderMouthOpen(t, anim), anim);
+  else if (t.type === 'cinderjaw') drawCinderjaw(ctx, t, upgrading, anim); // M2o §4.1
   else drawTurret(ctx, t, upgrading, anim);
 }
 

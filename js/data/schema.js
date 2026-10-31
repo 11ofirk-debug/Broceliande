@@ -71,10 +71,11 @@ export const TABS = {
     columns: {
       turret: { type: 'id', required: true }, name: { type: 'text', required: true }, level: { type: 'int', required: true },
       attack: { type: 'id', required: true }, damage: { type: 'number', required: true }, fireInterval: { type: 'number', required: true },
-      range: { type: 'number', required: true }, time: { type: 'number', required: true }, projectileSpeed: { type: 'number', required: true },
+      range: { type: 'number', required: true }, time: { type: 'number', required: true }, projectileSpeed: { type: 'number' },
       muzzleHeight: { type: 'number', required: true }, cloudRadius: { type: 'number' }, cloudDuration: { type: 'number' },
       cloudTick: { type: 'number' }, cloudTickDamage: { type: 'number' },
       levelName: { type: 'text' }, targets: { type: 'int' }, corrodeMult: { type: 'number' }, corrodeLinger: { type: 'number' }, // M2m §2
+      coneAngle: { type: 'number' }, burnDuration: { type: 'number' }, burnTick: { type: 'number' }, burnTickDamage: { type: 'number' }, spreadRadius: { type: 'number' }, // M2o §3
     },
     pattern: [/^cost_[a-z][a-zA-Z0-9]*$/, COST],
   },

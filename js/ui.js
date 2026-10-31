@@ -124,6 +124,7 @@ function druidMeleeLine(game) {
 // Turret figures for this encounter (M1f §7): active clouds, and damage dealt by turret type
 // and, for each type, by impacts vs clouds. Damage counts only HP actually removed.
 function turretDebugLines(game) {
+  const n2 = (v) => (Number.isInteger(v) ? v : v.toFixed(2));
   const s = game.damageStats;
   const lines = [`Clouds active: ${game.clouds.length}   Turrets: ${TURRET_TYPE_KEYS.map((t) => `${turretType(t).name} ${game.turrets.filter((x) => x.type === t).length}`).join(', ')}`];
   // Damage keys carry the level that dealt it, e.g. "toader:cloud:2" (M1h §4).
@@ -133,8 +134,10 @@ function turretDebugLines(game) {
   for (const type of TURRET_TYPE_KEYS) {
     const impact = sum(type, 'impact');
     const cloud = sum(type, 'cloud');
-    const split = turretType(type).attack === 'cloud' ? `  (impacts ${impact}, clouds ${cloud})` : '';
-    lines.push(`  damage ${turretType(type).name.padEnd(16)} ${impact + cloud}${split}`);
+    const burn = sum(type, 'burn'); // M2o §5: Cinderjaw burns
+    const split = turretType(type).attack === 'cloud' ? `  (impacts ${impact}, clouds ${cloud})`
+      : turretType(type).attack === 'cone' ? `  (hits ${impact}, burns ${n2(burn)}, Wildfire spreads ${game.traitStats?.wildfireSpreads ?? 0})` : '';
+    lines.push(`  damage ${turretType(type).name.padEnd(16)} ${n2(impact + cloud + burn)}${split}`);
     if (turretType(type).attack === 'cloud') {
       // Toader by level (M1h §4): impact + cloud damage from shots fired at each level.
       const byLevel = Array.from({ length: maxLevel(type) }, (_, i) => i + 1)
@@ -821,14 +824,18 @@ function placeByNode(popup, x, y, halfWidth) {
 function upgradeDetail(type, level) {
   const from = levelStats(type, level - 1);
   const to = levelStats(type, level);
+  const cone = from.cone && to.cone // M2o §3.1
+    ? `Cone ${from.cone.angle} → ${to.cone.angle}°, burn every ${from.cone.burn.tickInterval} → ${to.cone.burn.tickInterval} s\n`
+    : '';
   const cloud = from.cloud && to.cloud
     ? `Cloud ${from.cloud.radius} → ${to.cloud.radius} px, ${from.cloud.duration} → ${to.cloud.duration} s, `
       + `tick every ${from.cloud.tickInterval} → ${to.cloud.tickInterval} s\n`
     : '';
-  return `${from.cloud ? 'Impact' : 'Damage'} ${from.damage} → ${to.damage}\n`
+  return `${from.cloud ? 'Impact' : from.cone ? 'Hit' : 'Damage'} ${from.damage} → ${to.damage}\n`
     + `Every ${from.fireInterval} → ${to.fireInterval} s\n`
     + `Range ${Math.round(levelRange(type, level - 1))} → ${Math.round(levelRange(type, level))}\n`
     + cloud
+    + cone
     + specialLines(to).map((line) => `${line}\n`).join('')
     + `Takes ${to.time} s — turret stops firing`;
 }
@@ -845,6 +852,8 @@ function specialLines(stats) {
   if (stats.targets > 1) lines.push(`Twin shot: ${stats.targets} targets per volley`);
   const corrode = stats.cloud?.corrode;
   if (corrode) lines.push(`Corrosion: +${Math.round((corrode.mult - 1) * 100)}% damage taken inside and ${corrode.linger} s after`);
+  const spread = stats.cone?.burn.spreadRadius;
+  if (spread) lines.push(`Wildfire: a burning enemy that dies sets those within ${spread} px burning`); // M2o §2.3
   return lines;
 }
 
@@ -852,11 +861,22 @@ function specialLines(stats) {
 function turretSummary(type) {
   const t = turretType(type);
   const l1 = t.levels[0];
+  if (t.attack === 'cone') { // M2o §2
+    return `Fire cone (${l1.cone.angle}°): ${l1.damage} to every enemy in it, flyers too, then burning ${l1.cone.burn.tickDamage} every ${l1.cone.burn.tickInterval} s for ${l1.cone.burn.duration} s\n`
+      + `Every ${l1.fireInterval} s · range ${Math.round(levelRange(type, 1))}`;
+  }
   if (t.attack === 'cloud') {
     return `Poison cloud: ${l1.damage} on impact, then ${l1.cloud.tickDamage} every ${l1.cloud.tickInterval} s to all inside\n`
       + `Every ${l1.fireInterval} s · range ${Math.round(levelRange(type, 1))}`;
   }
   return `${l1.damage} damage every ${l1.fireInterval} s · range ${Math.round(levelRange(type, 1))}`;
+}
+
+// M2o §2.4: a short-range turret (the Cinderjaw) may not reach any lane from a slot: if no point of
+// any lane's centreline is within its level 1 range, its card warns (building is still allowed).
+function laneWarning(game, slotIndex, type) {
+  const slot = game.slots[slotIndex];
+  return game.lanes.some((lane) => lane.path.distanceTo(slot) <= levelRange(type, 1)) ? '' : 'Reaches no lane';
 }
 
 // Build menu (§9.2, M1f §5.2): one card per turret type. In step mode it also needs the steps
@@ -870,7 +890,7 @@ function buildOptions(game, menu) {
     const disabled = stepMode
       ? !affordable || !enoughSteps || game.action.state !== ActionState.IDLE
       : !canStartBuild(game, menu.index, type);
-    const reason = !affordable ? 'Not enough resources' : !enoughSteps ? 'Not enough steps' : '';
+    const reason = !affordable ? 'Not enough resources' : !enoughSteps ? 'Not enough steps' : laneWarning(game, menu.index, type);
     return {
       title: turretType(type).name, portrait: type, cost: buildCost(type), costText: null,
       detail: turretSummary(type), action: 'Build', disabled, reason, turretType: type,
@@ -904,7 +924,7 @@ function doubleBuildOptions(game, menu) {
     return {
       title: turretType(type).name, portrait: type, cost: job.cost, costText: null,
       detail: `${turretSummary(type)}\nBuild time ${job.time} s`, action: 'Build',
-      disabled: !affordable, reason: affordable ? '' : 'Not enough resources', turretType: type,
+      disabled: !affordable, reason: affordable ? laneWarning(game, menu.index, type) : 'Not enough resources', turretType: type,
     };
   });
 }
@@ -913,6 +933,10 @@ function doubleBuildOptions(game, menu) {
 function turretStats(turret) {
   const s = levelStats(turret.type, turret.level);
   const range = Math.round(levelRange(turret.type, turret.level));
+  if (s.cone) {
+    return [`Hit ${s.damage} every ${s.fireInterval} s · range ${range} · cone ${s.cone.angle}°`,
+      `Burn ${s.cone.burn.tickDamage} every ${s.cone.burn.tickInterval} s for ${s.cone.burn.duration} s`, ...specialLines(s)].join('\n');
+  }
   if (s.cloud) {
     return [`Impact ${s.damage} every ${s.fireInterval} s · range ${range}`,
       `Cloud ${s.cloud.radius} px, ${s.cloud.duration} s, ${s.cloud.tickDamage} every ${s.cloud.tickInterval} s`, ...specialLines(s)].join('\n');

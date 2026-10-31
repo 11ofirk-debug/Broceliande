@@ -1,7 +1,9 @@
 // Timed enemy statuses (M2k §3.4). Each status lives on enemy.statuses until its `until` (combat
-// time) passes. Applying one again refreshes it rather than stacking. Two so far:
+// time) passes. Applying one again refreshes it rather than stacking. Three so far:
 //   slowed:   { until, mult } — the enemy moves at mult × its speed (see enemySpeed in enemy.js)
 //   corroded: { until, mult } — it takes mult × damage from every source, before armor (M2m §2.4)
+//   burning:  { until, nextTick, tickDamage, tickInterval, spreadRadius, level, sourceTurretId } —
+//             tickDamage every tickInterval s (burnSystem.js), M2o §2.2; spreadRadius > 0: Wildfire
 
 import { enemyType } from '../entities/enemy.js';
 
@@ -30,6 +32,27 @@ export function isCorroded(enemy) {
 // Damage taken multiplier from its statuses: Corroded's mult, else 1.
 export function corrodeMult(enemy) {
   return enemy.statuses.corroded?.mult ?? 1;
+}
+
+// Sets an enemy burning (M2o §2.2) with `burn` ({ duration, tickInterval, tickDamage, spreadRadius })
+// from a turret (id and level). Its first tick comes one tickInterval after it catches fire. Burned
+// again while burning: the duration restarts (no stacking), and it keeps whichever burn is stronger
+// (more damage per second), its next tick no later than the stronger burn's interval from now.
+export function applyBurn(game, enemy, burn, turretId, level) {
+  const now = game.combatTime;
+  const fresh = { until: now + burn.duration, nextTick: now + burn.tickInterval, tickDamage: burn.tickDamage, tickInterval: burn.tickInterval, spreadRadius: burn.spreadRadius, level, sourceTurretId: turretId, duration: burn.duration };
+  const old = enemy.statuses.burning;
+  if (!old) {
+    enemy.statuses.burning = fresh;
+    return;
+  }
+  const stronger = fresh.tickDamage / fresh.tickInterval > old.tickDamage / old.tickInterval;
+  const kept = stronger ? { ...fresh, nextTick: Math.min(old.nextTick, fresh.nextTick) } : { ...old, until: fresh.until };
+  enemy.statuses.burning = kept;
+}
+
+export function isBurning(enemy) {
+  return !!enemy.statuses.burning;
 }
 
 // Removes statuses whose time is up.

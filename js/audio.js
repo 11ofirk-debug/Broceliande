@@ -74,7 +74,7 @@ export function toggleMute() {
 // ---------------------------------------------------------------------------
 // Events → sounds
 // ---------------------------------------------------------------------------
-const TURRET_FIRE_SOUND = { sprinkler: 'sprinklerFire', toader: 'toaderFire' };
+const TURRET_FIRE_SOUND = { sprinkler: 'sprinklerFire', toader: 'toaderFire', cinderjaw: 'cinderjawFires' };
 const ENEMY_ATTACK_SOUND = { wolf: 'wolfBite', bear: 'bearAttack', ogre: 'ogreBlow', stirge: 'stirgeBite' };
 const ENEMY_DEATH_SOUND = { wolf: 'wolfDie', bear: 'bearDie', ogre: 'ogreDies', stirge: 'stirgeDies' };
 // M2c §2.9: a mini-boss's arrival, footsteps and wind-up (none for wolves and Bears).
@@ -87,6 +87,8 @@ function subscribe() {
   events.on('cloudBurst', (e) => play('cloudBurst', e));
   // M2n §4.6: the trader scene.
   for (const name of ['traderGreet', 'tradeComplete', 'tradeUndo', 'soldOut']) events.on(name, (e) => play(name, e));
+  // M2o §4.3: burning and Wildfire (the breath is turretFired, above).
+  for (const name of ['burnTick', 'wildfireSpread']) events.on(name, (e) => play(name, e));
   events.on('enemyAttacked', (e) => playEnemy(ENEMY_ATTACK_SOUND, e));
   events.on('druidSwing', (e) => play('druidWhoosh', e));
   events.on('druidImpact', (e) => play('druidThud', e));
@@ -616,6 +618,25 @@ const RECIPES = {
   upgradeDone(t, out, p) {
     bell(t, out, 660 * p, 0, 0.25, 0.7);
     return bell(t, out, 990 * p, 0.11, 0.35, 0.8);
+  },
+
+  // Cinderjaw breathes (M2o §4.3): a short roaring whoosh, noise swelling and falling with a low rumble.
+  cinderjawFires(t, out, p) {
+    noise(t, out, { freq: 900 * p, to: 2200 * p, q: 0.7, dur: 0.45, attack: 0.06, gain: 0.9 });
+    noise(t, out, { filter: 'lowpass', freq: 300 * p, dur: 0.4, attack: 0.04, gain: 0.6 });
+    return tone(t, out, { type: 'sawtooth', freq: 70 * p, to: 50 * p, dur: 0.35, attack: 0.05, gain: 0.12 });
+  },
+
+  // A burn tick: a very quiet crackle, a couple of tiny high clicks.
+  burnTick(t, out, p) {
+    noise(t, out, { filter: 'highpass', freq: 3500 * p, dur: 0.03, gain: 0.6 });
+    return noise(t, out, { filter: 'highpass', freq: 4200 * p, dur: 0.025, gain: 0.4, delay: 0.05 });
+  },
+
+  // Wildfire catches (M2o §2.3): a soft whump.
+  wildfireSpread(t, out, p) {
+    noise(t, out, { filter: 'lowpass', freq: 700 * p, to: 200 * p, dur: 0.35, attack: 0.02, gain: 0.9 });
+    return tone(t, out, { freq: 110 * p, to: 60 * p, dur: 0.3, attack: 0.01, gain: 0.5 });
   },
 
   // Trader (M2n §4.6): a coin clink, two bright metallic taps.

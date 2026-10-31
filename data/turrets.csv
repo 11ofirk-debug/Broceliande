@@ -1,11 +1,16 @@
-turret,name,level,attack,damage,fireInterval,range,cost_pits,cost_reeds,cost_feathers,cost_boughs,cost_shells,time,projectileSpeed,muzzleHeight,cloudRadius,cloudDuration,cloudTick,cloudTickDamage,levelName,targets,corrodeMult,corrodeLinger
-sprinkler,Pebble Sprinkler,1,projectile,3,0.75,220,2,1,0,,,2.3,600,40,,,,,,,,
-sprinkler,Pebble Sprinkler,2,projectile,5,0.6,264,2,0,1,,,2.5,600,40,,,,,,,,
-sprinkler,Pebble Sprinkler,3,projectile,7,0.5,297,6,0,2,,,4,600,40,,,,,,,,
-sprinkler,Pebble Sprinkler,4,projectile,9,0.45,319,8,0,3,,,5,600,40,,,,,Hailstone,,,
-sprinkler,Pebble Sprinkler,5,projectile,11,0.4,341,10,0,3,1,,6,600,40,,,,,Stormspinner,2,,
-toader,Poison Toader,1,cloud,3,3.5,260,0,2,0,,,2.5,450,20,70,4.2,0.8,1,,,,
-toader,Poison Toader,2,cloud,4,3,285,3,1,0,,,3,450,20,80,5,0.65,1,,,,
-toader,Poison Toader,3,cloud,5,2.6,310,5,1,1,,,4,450,20,90,5.6,0.5,1,,,,
-toader,Poison Toader,4,cloud,6,2.3,330,6,2,1,,,5,450,20,100,6,0.45,1,Bog Belcher,,,
-toader,Poison Toader,5,cloud,7,2,350,8,2,2,1,,6,450,20,110,6.5,0.4,1,Rotmaw,,1.25,2
+turret,name,level,attack,damage,fireInterval,range,cost_pits,cost_reeds,cost_feathers,cost_boughs,cost_shells,time,projectileSpeed,muzzleHeight,cloudRadius,cloudDuration,cloudTick,cloudTickDamage,levelName,targets,corrodeMult,corrodeLinger,coneAngle,burnDuration,burnTick,burnTickDamage,spreadRadius
+sprinkler,Pebble Sprinkler,1,projectile,3,0.75,220,2,1,0,,,2.3,600,40,,,,,,,,,,,,,
+sprinkler,Pebble Sprinkler,2,projectile,5,0.6,264,2,0,1,,,2.5,600,40,,,,,,,,,,,,,
+sprinkler,Pebble Sprinkler,3,projectile,7,0.5,297,6,0,2,,,4,600,40,,,,,,,,,,,,,
+sprinkler,Pebble Sprinkler,4,projectile,9,0.45,319,8,0,3,,,5,600,40,,,,,Hailstone,,,,,,,,
+sprinkler,Pebble Sprinkler,5,projectile,11,0.4,341,10,0,3,1,,6,600,40,,,,,Stormspinner,2,,,,,,,
+toader,Poison Toader,1,cloud,3,3.5,260,0,2,0,,,2.5,450,20,70,4.2,0.8,1,,,,,,,,,
+toader,Poison Toader,2,cloud,4,3,285,3,1,0,,,3,450,20,80,5,0.65,1,,,,,,,,,
+toader,Poison Toader,3,cloud,5,2.6,310,5,1,1,,,4,450,20,90,5.6,0.5,1,,,,,,,,,
+toader,Poison Toader,4,cloud,6,2.3,330,6,2,1,,,5,450,20,100,6,0.45,1,Bog Belcher,,,,,,,,
+toader,Poison Toader,5,cloud,7,2,350,8,2,2,1,,6,450,20,110,6.5,0.4,1,Rotmaw,,1.25,2,,,,,
+cinderjaw,Cinderjaw,1,cone,2,4,160,2,0,1,1,,2.5,,30,,,,,,,,,50,8.5,1.2,1,
+cinderjaw,Cinderjaw,2,cone,3,3.7,170,4,0,1,0,,3,,30,,,,,,,,,55,8.5,1,1,
+cinderjaw,Cinderjaw,3,cone,4,3.4,180,6,0,2,0,,4,,30,,,,,,,,,60,8.5,0.85,1,
+cinderjaw,Cinderjaw,4,cone,5,3.1,190,8,0,2,1,,5,,30,,,,,Searing Maw,,,,65,8.5,0.75,1,
+cinderjaw,Cinderjaw,5,cone,6,2.8,200,10,0,2,1,,6,,30,,,,,Inferno Jaw,,,,70,8.5,0.65,1,60
