@@ -73,3 +73,13 @@ export function turretFireInterval(turret) {
 export function turretMuzzle(turret) {
   return { x: turret.x, y: turret.y + C.TURRET_BASE_OFFSET - C.TURRET_TYPES[turret.type].muzzleHeight };
 }
+
+// Pebbles per volley (M2m §2.3, Twin shot): 2 at the Stormspinner, else 1.
+export function turretTargets(turret) {
+  return levelStats(turret.type, turret.level).targets;
+}
+
+// The level's name (M2m §2.1), e.g. 'Hailstone', or null for an unnamed level.
+export function levelName(type, level) {
+  return levelStats(type, level).name;
+}

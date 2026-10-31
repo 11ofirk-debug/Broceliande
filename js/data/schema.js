@@ -72,6 +72,7 @@ export const TABS = {
       range: { type: 'number', required: true }, time: { type: 'number', required: true }, projectileSpeed: { type: 'number', required: true },
       muzzleHeight: { type: 'number', required: true }, cloudRadius: { type: 'number' }, cloudDuration: { type: 'number' },
       cloudTick: { type: 'number' }, cloudTickDamage: { type: 'number' },
+      levelName: { type: 'text' }, targets: { type: 'int' }, corrodeMult: { type: 'number' }, corrodeLinger: { type: 'number' }, // M2m §2
     },
     pattern: [/^cost_[a-z][a-zA-Z0-9]*$/, COST],
   },

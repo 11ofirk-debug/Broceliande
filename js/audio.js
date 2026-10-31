@@ -114,7 +114,10 @@ function subscribe() {
   events.on('doubleAppears', (e) => play('doubleAppears', e));
   events.on('doubleCraftHit', (e) => play('doubleCraftHit', e));
   events.on('doubleCancelled', (e) => play('doubleCancelled', e));
-  events.on('upgradeCompleted', (e) => play('upgradeDone', e));
+  events.on('upgradeCompleted', (e) => {
+    play('upgradeDone', e);
+    if (e.level >= 5) play('upgradeFlourish', e); // M2m §2.6: maxing a turret earns a flourish
+  });
   events.on('summonPlaced', (e) => play(e.kind === 'slowWisp' ? 'wispSummoned' : 'summon', e));
   events.on('wispBursts', (e) => play('wispBursts', e)); // M2k §3.5
 }
@@ -611,6 +614,12 @@ const RECIPES = {
   upgradeDone(t, out, p) {
     bell(t, out, 660 * p, 0, 0.25, 0.7);
     return bell(t, out, 990 * p, 0.11, 0.35, 0.8);
+  },
+
+  // Level 5 reached (M2m §2.6): a quick rising sparkle of bells after the upgrade chime.
+  upgradeFlourish(t, out, p) {
+    [1320, 1660, 1980, 2640].forEach((f, i) => bell(t, out, f * p, 0.28 + i * 0.06, 0.3, 0.45));
+    return 0.28 + 3 * 0.06 + 0.3;
   },
 
   // Short rising shimmer, pitched by summon (Vulture lower, Squirrel higher).

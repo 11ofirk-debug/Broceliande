@@ -13,7 +13,6 @@ export const SIM_STEP = 1 / 60;          // seconds, fixed timestep
 export const MAX_FRAME_DT = 0.05;        // real seconds; larger frame gaps (tab switch) are clamped
 export const MAX_STEPS_PER_FRAME = 12;   // hard cap on sim steps per animation frame (covers ×4 speed)
 export const SIM_SPEEDS = [1, 2, 4];     // game speeds for the player in Combat (M2k §1: HUD buttons, keys 1 / 2 / 4)
-export const GAME_SPEED_KEY = 'broceliande.gameSpeed'; // localStorage key for the chosen game speed (M2k §1.2)
 
 // ---------------------------------------------------------------------------
 // M1b addendum §9 — step-budget Prep (docs/M1B_STEPS_ADDENDUM.md)
@@ -85,6 +84,7 @@ export const SHOWCASE_PAIR_GAP = 70;        // px between one normal / Grim pair
 export const CLOUD_GROW_TIME = 0.3;       // s, a cloud grows from pellet size to full radius (visual only)
 export const CLOUD_FADE_TIME = 0.6;       // s, it fades out over its last moments (visual only)
 export const TURRET_TURN_SPEED = 9;       // TUNING — rad/s, how fast a turret visibly turns toward its target (visual; firing does not wait for it)
+export const TWIN_SHOT_SPREAD = 5;        // px either side of the muzzle the Stormspinner's two pebbles leave from (M2m §2.5, visual)
 
 // ---------------------------------------------------------------------------
 // 17.5 Vulture
@@ -171,6 +171,8 @@ export const WISP_SPIRAL_RADIUS = 6;          // TUNING — px, the lazy spiral 
 export const WISP_SPIRAL_RATE = 3;            // rad/s of that wobble
 export const WISP_BURST_TIME = 0.8;           // s the burst takes to fade out
 export const SLOW_TINT_FILTER = 'grayscale(0.55) sepia(0.25) hue-rotate(175deg) brightness(1.25)'; // TUNING — pale silver-blue tint on a slowed enemy (canvas filter)
+export const CORRODE_TINT_FILTER = 'sepia(0.55) hue-rotate(30deg) saturate(1.6) brightness(1.08)'; // TUNING — faint yellow-green tint on a Corroded enemy (M2m §2.5)
+export const SLOW_CORRODE_TINT_FILTER = 'grayscale(0.5) sepia(0.4) hue-rotate(110deg) saturate(1.3) brightness(1.2)'; // TUNING — teal mix while both slowed and Corroded
 export const SLOW_SPIRAL_SIZE = 7;            // px, radius of the spiral floating above a slowed enemy's head
 export const SLOW_SPIRAL_TURN_RATE = 1.2;     // rad/s it turns
 export const SOUND_WISP_FREQ = 620;           // TUNING — Hz, the Wisp's airy whistle
@@ -1218,8 +1220,9 @@ export let FEATURE_TYPES;
 // flying, flyHeight, burstStagger, dropSpacing, keepSide, sideWander, boss, stepSoundInterval }
 export let ENEMY_TYPES;
 // turrets: id → { name, attack: 'projectile' | 'cloud', range (level 1), projectileSpeed,
-// muzzleHeight, levels: [{ damage, fireInterval, range, cost, time, cloud? }] }. Level 1's cost /
-// time are the build; later levels' the upgrade to that level.
+// muzzleHeight, levels: [{ damage, fireInterval, range, cost, time, name (or null), targets (M2m §2.3:
+// pebbles per volley), cloud?: { radius, duration, tickInterval, tickDamage, corrode?: { mult, linger } } }] }.
+// Level 1's cost / time are the build; later levels' the upgrade to that level.
 export let TURRET_TYPES;
 export let TURRET_RANGE; // the Pebble Sprinkler's level-1 range: lane coverage for layouts (M1c §4.1)
 // summons: id → its row; and the values systems read by name
@@ -1299,8 +1302,9 @@ export function applyData(t) {
   TURRET_TYPES = {};
   for (const r of t.turrets) {
     const type = (TURRET_TYPES[r.turret] ??= { name: r.name, attack: r.attack, range: r.range, projectileSpeed: r.projectileSpeed, muzzleHeight: r.muzzleHeight, levels: [] });
-    const level = { damage: r.damage, fireInterval: r.fireInterval, range: r.range, cost: cost(r), time: r.time };
+    const level = { damage: r.damage, fireInterval: r.fireInterval, range: r.range, cost: cost(r), time: r.time, name: r.levelName ?? null, targets: r.targets ?? 1 };
     if (r.attack === 'cloud') level.cloud = { radius: r.cloudRadius, duration: r.cloudDuration, tickInterval: r.cloudTick, tickDamage: r.cloudTickDamage };
+    if (r.corrodeMult !== undefined) level.cloud.corrode = { mult: r.corrodeMult, linger: r.corrodeLinger }; // M2m §2.4: Corrosion
     type.levels.push(level);
   }
   TURRET_RANGE = TURRET_TYPES.sprinkler.range;

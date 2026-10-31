@@ -55,6 +55,10 @@ const COLORS = {
   pebble: '#b8b2a4',
   upgradeBand: '#e8c547',
   level3Band: '#8fd8ff',
+  level4Band: '#d9dee6',           // M2m §2.5: Hailstone's silver ring …
+  level5Band: '#ffd23f',           // … and Stormspinner's gold
+  spinnerVane: '#c9ced6',
+  spinnerShimmer: 'rgba(255, 236, 160, 0.4)',
   rangeFill: 'rgba(255, 245, 200, 0.08)',
   rangeEdge: 'rgba(255, 245, 200, 0.7)',
   nextRangeEdge: 'rgba(255, 245, 200, 0.4)',
@@ -92,6 +96,15 @@ const COLORS = {
   cloudEdge: 'rgba(120, 180, 100, 0.2)',
   cloudSwirl: 'rgba(210, 180, 240, 0.45)',
   cloudRing: 'rgba(190, 150, 230, 0.75)',
+  // Rotmaw (level 5 Toader) clouds, M2m §2.5: sickly yellow-green, so Corroding zones read apart.
+  corrodeCloudCore: 'rgba(190, 200, 60, 0.55)',
+  corrodeCloudMid: 'rgba(150, 190, 50, 0.42)',
+  corrodeCloudEdge: 'rgba(170, 200, 70, 0.2)',
+  corrodeCloudSwirl: 'rgba(235, 240, 150, 0.5)',
+  corrodeCloudRing: 'rgba(215, 225, 90, 0.8)',
+  toaderGlowEye: '#7dff5a',
+  toaderBubble: 'rgba(190, 235, 150, 0.8)',
+  corrodeDrip: '#c8d84a',
   squirrel: '#8b5530',
   squirrelHit: '#c09070',
   squirrelBelly: '#e6cfa6',
@@ -1099,23 +1112,27 @@ export function drawFeature(ctx, feature, hovered) {
 // arm that points along turret.angle (§10.1). Stands on its slot pad, with its pebble cup
 // hub at the muzzle (turretMuzzle). upgrading: drawn faded (it is not firing).
 // Level 2: gold ring and bands (§11.2). Level 3 (M1e §4.4): a double ring and bands in sky
-// blue, and slightly longer arms with a bigger cup.
-export function drawTurret(ctx, turret, upgrading) {
+// blue, and slightly longer arms with a bigger cup. Level 4, Hailstone (M2m §2.5): a third ring
+// in silver and a vaned spinner on the hub. Level 5, Stormspinner: the third ring and the bands
+// in gold, the spinner fastest with a faint shimmer trail. anim: animation time, s (the spinner).
+const SPRINKLER_SPIN_RATE = { 4: 7, 5: 13 }; // rad/s of the hub spinner, by level (visual only)
+
+export function drawTurret(ctx, turret, upgrading, anim = 0) {
   const { x, y } = slotBase(turret);
   const top = y - C.TURRET_TYPES[turret.type ?? 'sprinkler'].muzzleHeight;
-  const band = turret.level >= 3 ? COLORS.level3Band : COLORS.upgradeBand;
+  const band = turret.level >= 5 ? COLORS.level5Band : turret.level >= 3 ? COLORS.level3Band : COLORS.upgradeBand;
   const armLength = turret.level >= 3 ? 29 : 27;
   const cupRadius = turret.level >= 3 ? 7 : 6.5;
   ctx.save();
   if (turret.level >= 2) {
-    ctx.strokeStyle = band;
     ctx.lineWidth = 3.5;
-    const rings = turret.level >= 3 ? [C.TURRET_SLOT_RADIUS - 2, C.TURRET_SLOT_RADIUS + 3] : [C.TURRET_SLOT_RADIUS - 2];
-    for (const r of rings) {
+    const third = turret.level >= 5 ? COLORS.level5Band : COLORS.level4Band;
+    levelRingRadii(turret.level).forEach((r, i) => {
+      ctx.strokeStyle = i === 2 ? third : turret.level === 2 ? band : COLORS.level3Band;
       ctx.beginPath();
       ctx.ellipse(x, y, r, r * 0.7, 0, 0, Math.PI * 2);
       ctx.stroke();
-    }
+    });
   }
   if (upgrading) ctx.globalAlpha = 0.5;
   drawShadow(ctx, x, y, 20, 7);
@@ -1175,6 +1192,43 @@ export function drawTurret(ctx, turret, upgrading) {
     ctx.arc(x, top, 5, 0, Math.PI * 2);
     ctx.fill();
   }
+  if (turret.level >= 4) drawSpinner(ctx, x, top, turret.level, upgrading ? 0 : anim);
+  ctx.restore();
+}
+
+// Level rings round a turret's pad: one at level 2, two at 3, three from level 4 (M2m §2.5).
+// The outermost stays inside LOCATION_RADIUS.
+function levelRingRadii(level) {
+  return [C.TURRET_SLOT_RADIUS - 2, C.TURRET_SLOT_RADIUS + 3, C.TURRET_SLOT_RADIUS + 8].slice(0, Math.min(3, level - 1));
+}
+
+// The Hailstone / Stormspinner hub spinner (M2m §2.5): three small vanes turning over the hub,
+// seen from slightly above; at level 5 faster, with a faint gold shimmer trailing each vane.
+function drawSpinner(ctx, x, top, level, anim) {
+  const a0 = anim * SPRINKLER_SPIN_RATE[Math.min(level, 5)];
+  const vane = 10;
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    const a = a0 + (i * 2 * Math.PI) / 3;
+    if (level >= 5) {
+      ctx.strokeStyle = COLORS.spinnerShimmer;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(x, top - 3, vane, vane * 0.4, 0, a - 1.1, a);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = COLORS.spinnerVane;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x, top - 3);
+    ctx.lineTo(x + Math.cos(a) * vane, top - 3 + Math.sin(a) * vane * 0.4);
+    ctx.stroke();
+  }
+  ctx.fillStyle = level >= 5 ? COLORS.level5Band : COLORS.level4Band;
+  ctx.beginPath();
+  ctx.arc(x, top - 3, 2.5, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -1191,14 +1245,15 @@ export function toaderMouthOpen(turret, t) {
 
 // Levels (M1h §2.4), like the Sprinkler's: level 2 a single ring round the pad, level 3 a double
 // ring, a slightly larger toad and a third pipe. The rings are purple with a green inner line.
-const TOADER_L3_SCALE = 1.1;
+// Level 4, Bog Belcher (M2m §2.5): a third ring, larger still, a fourth pipe and bubbles at the
+// mouth. Level 5, Rotmaw: glowing green eyes and slow drips from the mouth. anim: animation time, s.
+const TOADER_SCALE = { 3: 1.1, 4: 1.18, 5: 1.2 };
 
-export function drawToader(ctx, turret, upgrading, mouthOpen = 0) {
+export function drawToader(ctx, turret, upgrading, mouthOpen = 0, anim = 0) {
   const { x, y } = slotBase(turret);
   ctx.save();
   if (turret.level >= 2) {
-    const rings = turret.level >= 3 ? [C.TURRET_SLOT_RADIUS - 2, C.TURRET_SLOT_RADIUS + 3] : [C.TURRET_SLOT_RADIUS - 2];
-    for (const r of rings) {
+    for (const r of levelRingRadii(turret.level)) {
       for (const [width, color] of [[3.5, COLORS.toaderLevelRing], [1.5, COLORS.toaderLevelRingInner]]) {
         ctx.strokeStyle = color;
         ctx.lineWidth = width;
@@ -1211,11 +1266,13 @@ export function drawToader(ctx, turret, upgrading, mouthOpen = 0) {
   if (upgrading) ctx.globalAlpha = 0.5;
   drawShadow(ctx, x, y, 24, 8);
   ctx.translate(x, y);
-  if (turret.level >= 3) ctx.scale(TOADER_L3_SCALE, TOADER_L3_SCALE);
+  const scale = TOADER_SCALE[Math.min(turret.level, 5)] ?? 1;
+  ctx.scale(scale, scale);
 
-  // Pipes on its back, behind the body (a third, central one at level 3).
+  // Pipes on its back, behind the body (a third, central one at level 3; a fourth at level 4).
   const pipes = [[-12, -20, -19, -34], [11, -22, 16, -33]];
   if (turret.level >= 3) pipes.push([0, -24, -1, -39]);
+  if (turret.level >= 4) pipes.push([18, -15, 26, -27]);
   ctx.strokeStyle = COLORS.toaderPipe;
   ctx.lineCap = 'round';
   ctx.lineWidth = 5;
@@ -1253,10 +1310,16 @@ export function drawToader(ctx, turret, upgrading, mouthOpen = 0) {
     ctx.beginPath();
     ctx.arc(ex, -26, 6, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = COLORS.toaderEye;
+    ctx.save();
+    if (turret.level >= 5) { // Rotmaw: glowing green eyes
+      ctx.shadowColor = COLORS.toaderGlowEye;
+      ctx.shadowBlur = 8;
+    }
+    ctx.fillStyle = turret.level >= 5 ? COLORS.toaderGlowEye : COLORS.toaderEye;
     ctx.beginPath();
     ctx.arc(ex, -26.5, 3.5, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
     ctx.fillStyle = '#1a1410';
     ctx.beginPath();
     ctx.ellipse(ex, -26.5, 1.2, 2.6, 0, 0, Math.PI * 2);
@@ -1275,6 +1338,41 @@ export function drawToader(ctx, turret, upgrading, mouthOpen = 0) {
     ctx.moveTo(-15, -12);
     ctx.quadraticCurveTo(0, -7, 15, -12);
     ctx.stroke();
+  }
+  if (turret.level >= 4) drawMouthBubbles(ctx, upgrading ? 0 : anim);
+  if (turret.level >= 5) drawMouthDrips(ctx, upgrading ? 0 : anim);
+  ctx.restore();
+}
+
+// Bog Belcher (M2m §2.5): small bubbles swelling and rising at the mouth corners, in the toad's
+// local frame. Each bubble loops on its own period.
+function drawMouthBubbles(ctx, anim) {
+  for (const [bx, period, offset] of [[-13, 1.3, 0], [12, 1.7, 0.6], [-4, 2.1, 1.1]]) {
+    const k = ((anim + offset) % period) / period; // 0 … 1 through one bubble's life
+    ctx.save();
+    ctx.globalAlpha *= 1 - k;
+    ctx.strokeStyle = COLORS.toaderBubble;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(bx + Math.sin(k * 6) * 1.5, -10 - k * 9, 1 + k * 2.2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// Rotmaw (M2m §2.5): slow sickly drips swelling under the mouth, then falling to the pad.
+function drawMouthDrips(ctx, anim) {
+  ctx.save();
+  const baseAlpha = ctx.globalAlpha; // faded while upgrading
+  ctx.fillStyle = COLORS.corrodeDrip;
+  for (const [dx, period, offset] of [[-6, 2.4, 0], [7, 2.9, 1.3]]) {
+    const k = ((anim + offset) % period) / period;
+    const swell = Math.min(1, k / 0.7);              // the drop grows under the lip …
+    const fall = Math.max(0, (k - 0.7) / 0.3);       // … then falls
+    ctx.globalAlpha = baseAlpha * 0.9 * (1 - fall);
+    ctx.beginPath();
+    ctx.ellipse(dx, -8 + fall * 9, 1 + swell, 1.3 + swell * 1.3, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.restore();
 }
@@ -1296,7 +1394,11 @@ export function drawPellet(ctx, p) {
 // Poison cloud (M1f §6.5): grows from pellet size to its full radius over CLOUD_GROW_TIME,
 // swirls slowly, and fades out over its last CLOUD_FADE_TIME. Its outer ring is drawn at the
 // damage radius, so the visible edge matches what it hits. radius: full damage radius.
+// A Rotmaw cloud (one that Corrodes, M2m §2.5) is tinted sickly yellow-green.
 export function drawCloud(ctx, cloud, radius, duration) {
+  const k = cloud.spec?.corrode
+    ? { core: COLORS.corrodeCloudCore, mid: COLORS.corrodeCloudMid, edge: COLORS.corrodeCloudEdge, swirl: COLORS.corrodeCloudSwirl, ring: COLORS.corrodeCloudRing }
+    : { core: COLORS.cloudCore, mid: COLORS.cloudMid, edge: COLORS.cloudEdge, swirl: COLORS.cloudSwirl, ring: COLORS.cloudRing };
   const grow = Math.min(1, cloud.age / C.CLOUD_GROW_TIME);
   const r = 5 + (radius - 5) * grow;
   const fade = Math.min(1, Math.max(0, (duration - cloud.age) / C.CLOUD_FADE_TIME));
@@ -1304,15 +1406,15 @@ export function drawCloud(ctx, cloud, radius, duration) {
   ctx.save();
   ctx.globalAlpha = fade;
   const g = ctx.createRadialGradient(cloud.x, cloud.y, 0, cloud.x, cloud.y, r);
-  g.addColorStop(0, COLORS.cloudCore);
-  g.addColorStop(0.7, COLORS.cloudMid);
-  g.addColorStop(1, COLORS.cloudEdge);
+  g.addColorStop(0, k.core);
+  g.addColorStop(0.7, k.mid);
+  g.addColorStop(1, k.edge);
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(cloud.x, cloud.y, r, 0, Math.PI * 2);
   ctx.fill();
   // Slow swirl: two arcs turning inside.
-  ctx.strokeStyle = COLORS.cloudSwirl;
+  ctx.strokeStyle = k.swirl;
   ctx.lineWidth = 2.5;
   ctx.lineCap = 'round';
   for (let i = 0; i < 2; i++) {
@@ -1322,7 +1424,7 @@ export function drawCloud(ctx, cloud, radius, duration) {
     ctx.stroke();
   }
   // Edge ring at the damage radius.
-  ctx.strokeStyle = COLORS.cloudRing;
+  ctx.strokeStyle = k.ring;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(cloud.x, cloud.y, r, 0, Math.PI * 2);
@@ -1763,4 +1865,21 @@ export function drawVultureGhost(ctx, p, t) {
 // Where an enemy's HP bar sits (its top), so marks above the head clear it (M2k §3.5).
 export function enemyBarY(enemy) {
   return enemy.y - enemy.radius * HP_BAR[C.ENEMY_TYPES[enemy.type].baseType].lift;
+}
+
+// Corroded (M2m §2.5): small yellow-green drips falling from the enemy's body while the status
+// lasts, staggered by its id. Drawn over the enemy; its tint is a canvas filter (renderer.js).
+export function drawCorrodeDrips(ctx, x, y, radius, anim, seed) {
+  ctx.save();
+  ctx.fillStyle = COLORS.corrodeDrip;
+  for (let i = 0; i < 3; i++) {
+    const period = 0.9 + 0.2 * i;
+    const k = ((anim + seed * 0.37 + i * 0.31) % period) / period; // 0 … 1 through one drip's fall
+    const dx = (i - 1) * radius * 0.45;
+    ctx.globalAlpha = 0.85 * (1 - k);
+    ctx.beginPath();
+    ctx.ellipse(x + dx, y + k * radius * 0.9, 1.4, 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }

@@ -5,16 +5,18 @@
 // simply not updated); they are cleared when the encounter ends or restarts.
 // A cloud copies the stats of the level its pellet was fired at (M1h §2.3), so upgrading the
 // Toader changes only the clouds created after it.
+// A level 5 (Rotmaw) cloud also Corrodes the enemies inside it (M2m §2.4); flyers stay clear as above.
 
 import * as C from '../config.js';
 import { cloudStats } from '../entities/turret.js';
 import { damageEnemy } from './combatSystem.js';
+import { applyCorrode } from './statusSystem.js';
 import { events } from '../events.js';
 
 const TICK_EPSILON = 1e-9; // s, so 0.8 s of 1/60 s steps ticks on time
 
 export function createCloud(game, x, y, source, level) {
-  const spec = { ...cloudStats(source, level) }; // { radius, duration, tickInterval, tickDamage }
+  const spec = { ...cloudStats(source, level) }; // { radius, duration, tickInterval, tickDamage, corrode? }
   game.clouds.push({ id: game.nextEntityId++, x, y, source, level, spec, age: 0, ticks: 0 });
   events.emit('cloudBurst', { x, y });
 }
@@ -33,6 +35,9 @@ export function updateClouds(game, dt) {
   for (const cloud of game.clouds) {
     const spec = cloud.spec;
     cloud.age += dt;
+    // M2m §2.4: a Rotmaw cloud corrodes everything inside it, every step, so the linger counts
+    // from the moment an enemy leaves (or the cloud ends).
+    if (spec.corrode) for (const enemy of game.enemies) if (overlaps(cloud, enemy)) applyCorrode(game, enemy, spec.corrode.mult, spec.corrode.linger);
     while (cloud.age >= (cloud.ticks + 1) * spec.tickInterval - TICK_EPSILON && (cloud.ticks + 1) * spec.tickInterval <= spec.duration) {
       cloud.ticks++;
       for (const enemy of game.enemies.filter((e) => overlaps(cloud, e))) {

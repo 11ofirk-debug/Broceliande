@@ -83,7 +83,7 @@ export function validateTables(t, problems) {
     if ((m.splashRatio === undefined) !== (m.splashRadius === undefined)) err('enemies', r, 'splashRatio', 'splashRatio and splashRadius must both be set or both blank');
   }
 
-  // turrets: levels 1, 2, 3… per turret; cloud attacks need their cloud values.
+  // turrets: levels 1, 2, 3… per turret; cloud attacks need their cloud values; corrosion (M2m §2.4) is a cloud's.
   const turretLevels = {};
   for (const r of t.turrets) {
     resourceColumns('turrets', r, 'cost_', '');
@@ -92,6 +92,9 @@ export function validateTables(t, problems) {
     if (r.attack === 'cloud') {
       for (const c of ['cloudRadius', 'cloudDuration', 'cloudTick', 'cloudTickDamage']) if (r[c] === undefined) err('turrets', r, c, 'a cloud turret needs a value');
     }
+    if (r.targets !== undefined && r.targets < 1) err('turrets', r, 'targets', 'targets must be 1 or more');
+    if ((r.corrodeMult === undefined) !== (r.corrodeLinger === undefined)) err('turrets', r, 'corrodeMult', 'corrodeMult and corrodeLinger go together');
+    if (r.corrodeMult !== undefined && r.attack !== 'cloud') err('turrets', r, 'corrodeMult', 'only a cloud turret can corrode');
   }
   for (const [id, rows] of Object.entries(turretLevels)) {
     rows.forEach((r, i) => { if (r.level !== i + 1) err('turrets', r, 'level', `${id}'s levels must be 1, 2, 3… in order`); });

@@ -22,7 +22,7 @@ Then open http://localhost:8000 in Chrome.
 | `E` | Summon a Bough Double (Combat only) — straight into targeting |
 | `R` | Summon a Slow Wisp (Combat only) — straight into placement (shows the burst radius); again to cancel |
 | `Space` | Call next wave (during the countdown or a gap between waves) |
-| `1` / `2` / `4` | Game speed ×1 / ×2 / ×4 (Combat only; also the HUD buttons, remembered between battles) |
+| `1` / `2` / `4` | Game speed ×1 / ×2 / ×4 (Combat only; also the HUD buttons; every battle starts at ×1) |
 | `V` | Mute / unmute sound |
 | `Esc` / right-click | Close menu, otherwise cancel the current action or placement |
 

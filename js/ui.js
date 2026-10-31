@@ -19,7 +19,7 @@ import { isDoubleTargeting, isDoubleTarget, doubleOnSlot, doubleJob } from './sy
 import { DoubleState } from './entities/boughDouble.js';
 import { AttackState } from './entities/enemy.js';
 import { turretOnSlot } from './systems/buildSystem.js';
-import { buildCost, levelStats, levelRange, nextLevelStats, maxLevel, turretType, TURRET_TYPE_KEYS } from './entities/turret.js';
+import { buildCost, levelStats, levelRange, levelName, nextLevelStats, maxLevel, turretType, TURRET_TYPE_KEYS } from './entities/turret.js';
 import { isStepMode, stepCost, canVisit, anyVisitable, routePreview, calibrationFigures, affordableTurretTypes } from './systems/stepSystem.js';
 import { enemyTotals, waveCounts } from './game.js';
 import { isMuted, soundStats, audioStatus } from './audio.js';
@@ -74,7 +74,8 @@ function traitDebugLine(game) {
   const s = game.traitStats;
   if (!s) return 'Grim traits: —';
   const n = (v) => (Number.isInteger(v) ? v : v.toFixed(2));
-  return `Grim traits: armor blocked ${n(s.armorBlocked)}  splash ${n(s.splashDamage)}  lifesteal healed ${n(s.lifestealHealed)}`;
+  return `Grim traits: armor blocked ${n(s.armorBlocked)}  splash ${n(s.splashDamage)}  lifesteal healed ${n(s.lifestealHealed)}\n`
+    + `Level 5:     Twin shot 2nd pebbles ${n(s.twinShotDamage)}  Corrosion extra ${n(s.corrosionExtra)}`; // M2m §3
 }
 
 // Waves (M2i §7): the wave and its sub-state, this wave's spawned / alive / left, and the countdown.
@@ -703,7 +704,7 @@ function combatTooltip(game, hover) {
     const job = doubleJob(game, hover.index);
     const lines = upgradeDetail(job.turretType, job.toLevel).split('\n').map((text) => ['', text]); // gains and time
     if (!canAfford(game.resources, job.cost)) lines.push(['tip-warn', 'Not enough resources']);
-    return { title: `Upgrade to Level ${job.toLevel}`, cost: job.cost, lines, anchor };
+    return { title: `Upgrade to ${levelLabel(job.turretType, job.toLevel)}`, cost: job.cost, lines, anchor };
   }
   if (hover.kind === 'slot' && !d) {
     return { title: 'Turret slot', lines: [['tip-muted', 'Summon a Bough Double from the Druid to build here.']], anchor };
@@ -789,7 +790,23 @@ function upgradeDetail(type, level) {
     + `Every ${from.fireInterval} → ${to.fireInterval} s\n`
     + `Range ${Math.round(levelRange(type, level - 1))} → ${Math.round(levelRange(type, level))}\n`
     + cloud
+    + specialLines(to).map((line) => `${line}\n`).join('')
     + `Takes ${to.time} s — turret stops firing`;
+}
+
+// "Level 4 — Hailstone", or "Level 2" for an unnamed level (M2m §2.1). word: 'Level' or 'level'.
+function levelLabel(type, level, word = 'Level') {
+  const name = levelName(type, level);
+  return name ? `${word} ${level} — ${name}` : `${word} ${level}`;
+}
+
+// A level's special (M2m §2.3–2.4), as lines: Twin shot, Corrosion; none for most levels.
+function specialLines(stats) {
+  const lines = [];
+  if (stats.targets > 1) lines.push(`Twin shot: ${stats.targets} targets per volley`);
+  const corrode = stats.cloud?.corrode;
+  if (corrode) lines.push(`Corrosion: +${Math.round((corrode.mult - 1) * 100)}% damage taken inside and ${corrode.linger} s after`);
+  return lines;
 }
 
 // What a turret type does, for its build card (M1f §5.2).
@@ -858,10 +875,10 @@ function turretStats(turret) {
   const s = levelStats(turret.type, turret.level);
   const range = Math.round(levelRange(turret.type, turret.level));
   if (s.cloud) {
-    return `Impact ${s.damage} every ${s.fireInterval} s · range ${range}\n`
-      + `Cloud ${s.cloud.radius} px, ${s.cloud.duration} s, ${s.cloud.tickDamage} every ${s.cloud.tickInterval} s`;
+    return [`Impact ${s.damage} every ${s.fireInterval} s · range ${range}`,
+      `Cloud ${s.cloud.radius} px, ${s.cloud.duration} s, ${s.cloud.tickDamage} every ${s.cloud.tickInterval} s`, ...specialLines(s)].join('\n');
   }
-  return `Damage ${s.damage} every ${s.fireInterval} s · range ${range}`;
+  return [`Damage ${s.damage} every ${s.fireInterval} s · range ${range}`, ...specialLines(s)].join('\n');
 }
 
 // Turret menu in Combat (M1i §2.4, §2.6): type, level and stats, with no build or upgrade button
@@ -871,7 +888,7 @@ function turretMenuOptions(game, menu) {
   const options = [];
   const d = doubleOnSlot(game, menu.index);
   if (d) {
-    const what = d.job === 'build' ? `building ${turretType(d.turretType).name}` : `upgrading to level ${d.toLevel}`;
+    const what = d.job === 'build' ? `building ${turretType(d.turretType).name}` : `upgrading to ${levelLabel(d.turretType, d.toLevel, 'level')}`;
     const left = d.state === DoubleState.WISP ? 'arriving' : `${Math.max(0, d.duration - d.elapsed).toFixed(1)} s left`;
     options.push({
       title: `Bough Double: ${what}`, portrait: 'double', cost: null, costText: `Refund: ${formatCost(d.paid)}`,
@@ -881,7 +898,7 @@ function turretMenuOptions(game, menu) {
   const turret = turretOnSlot(game, menu.index);
   if (turret) {
     options.push({
-      title: `${turretType(turret.type).name} · level ${turret.level}`, portrait: turret.type, cost: null,
+      title: `${turretType(turret.type).name} · ${levelLabel(turret.type, turret.level, 'level')}`, portrait: turret.type, cost: null,
       // "No upgrades available" stays for future single-level types (M1h §2.3).
       costText: maxLevel(turret.type) === 1 ? 'No upgrades available'
         : turret.level >= maxLevel(turret.type) ? 'Max level' : `Upgrade with a Bough Double (level ${turret.level + 1})`,

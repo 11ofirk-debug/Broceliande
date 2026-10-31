@@ -4,10 +4,11 @@
 
 import * as C from '../config.js';
 import { EnemyState, AttackState, enemyType, remainingDistance } from '../entities/enemy.js';
-import { turretType, turretRange, turretDamage, turretFireInterval, turretMuzzle } from '../entities/turret.js';
+import { turretType, turretRange, turretDamage, turretFireInterval, turretMuzzle, turretTargets } from '../entities/turret.js';
 import { createProjectile } from '../entities/projectile.js';
 import { dropLoot } from './dropSystem.js';
 import { createCloud, isInsideCloud } from './cloudSystem.js';
+import { corrodeMult } from './statusSystem.js';
 import { isBeingUpgraded } from './doubleSystem.js';
 import { events } from '../events.js';
 
@@ -17,24 +18,18 @@ const TIMER_EPSILON = 1e-9; // s, so timers built from 1/60 s steps fire on time
 // Turrets (§10.2)
 // ---------------------------------------------------------------------------
 
-// The in-range enemy with the least remaining lane distance to the Druid (enemies already
-// at the Druid count as 0), whatever its type (M1e §3.4). Ties go to the nearer one.
-function selectTarget(game, turret) {
+// The in-range enemies by priority, best first: least remaining lane distance to the Druid
+// (enemies already at the Druid count as 0), whatever its type (M1e §3.4). Ties go to the nearer
+// one. The Sprinkler aims at the first; Twin shot (M2m §2.3) at the first two.
+function selectTargets(game, turret, count) {
   const range = turretRange(turret);
-  let best = null;
-  let bestRemaining = Infinity;
-  let bestDist = Infinity;
+  const inRange = [];
   for (const enemy of game.enemies) {
     const dist = Math.hypot(enemy.x - turret.x, enemy.y - turret.y);
-    if (dist > range) continue;
-    const remaining = remainingDistance(enemy);
-    if (remaining < bestRemaining || (remaining === bestRemaining && dist < bestDist)) {
-      best = enemy;
-      bestRemaining = remaining;
-      bestDist = dist;
-    }
+    if (dist <= range) inRange.push({ enemy, dist, remaining: remainingDistance(enemy) });
   }
-  return best;
+  inRange.sort((a, b) => a.remaining - b.remaining || a.dist - b.dist);
+  return inRange.slice(0, count).map((c) => c.enemy);
 }
 
 function turnToward(turret, target, dt) {
@@ -55,7 +50,8 @@ export function updateTurrets(game, dt) {
       continue;
     }
     const cloud = turretType(turret.type).attack === 'cloud';
-    const target = cloud ? selectCloudTarget(game, turret) : selectTarget(game, turret);
+    const targets = cloud ? [selectCloudTarget(game, turret)].filter(Boolean) : selectTargets(game, turret, turretTargets(turret));
+    const target = targets[0];
     turret.targetId = target ? target.id : null;
     if (!target) {
       turret.cooldown = Math.max(0, turret.cooldown); // stays ready while there is no target
@@ -64,8 +60,14 @@ export function updateTurrets(game, dt) {
 
     turnToward(turret, target, dt);
     if (turret.cooldown > 0) continue;
-    game.projectiles.push(createProjectile(game.nextEntityId++, turretMuzzle(turret), target.id, turretDamage(turret),
-      cloud ? 'pellet' : 'pebble', turret.type, turret.level));
+    // Twin shot (M2m §2.3): one pebble per target, leaving side by side; one sound per volley.
+    const muzzle = turretMuzzle(turret);
+    targets.forEach((t, i) => {
+      const from = targets.length > 1 ? { x: muzzle.x + (i ? 1 : -1) * C.TWIN_SHOT_SPREAD, y: muzzle.y } : muzzle;
+      const p = createProjectile(game.nextEntityId++, from, t.id, turretDamage(turret), cloud ? 'pellet' : 'pebble', turret.type, turret.level);
+      p.twin = i > 0; // a second shot, for the debug panel (M2m §3)
+      game.projectiles.push(p);
+    });
     events.emit('turretFired', { type: turret.type, x: turret.x, y: turret.y });
     turret.lastFireTime = game.combatTime;
     turret.cooldown += turretFireInterval(turret); // carry the remainder so the rate is exact
@@ -119,7 +121,8 @@ export function updateProjectiles(game, dt) {
         if (target) damageEnemy(game, target, p.damage, `${p.source}:impact:${p.level}`);
         createCloud(game, p.lastX, p.lastY, p.source, p.level);
       } else {
-        damageEnemy(game, target, p.damage, `${p.source}:impact:${p.level}`);
+        const taken = damageEnemy(game, target, p.damage, `${p.source}:impact:${p.level}`);
+        if (p.twin) game.traitStats.twinShotDamage += taken; // M2m §3
       }
       continue;
     }
@@ -136,18 +139,25 @@ export function updateProjectiles(game, dt) {
 // 'squirrel', for the debug panel's damage figures (M1f §7, M1h §4). Only damage actually taken
 // is counted (no overkill). Every damage source goes through here, so armor (M2l §1.3, the Grim
 // Bear's Thick hide) applies to all of them: each hit loses `armor`, but never below 1 (a hit of 1
-// or less stays as it is). A reduced hit throws a small grey spark.
+// or less stays as it is). A reduced hit throws a small grey spark. A Corroded enemy (M2m §2.4)
+// takes its mult more from every hit, before armor. Returns the damage actually taken.
 export function damageEnemy(game, enemy, damage, source = null) {
   const armor = enemyType(enemy).armor ?? 0;
-  const dealt = armor > 0 ? Math.min(damage, Math.max(1, damage - armor)) : damage;
-  if (dealt < damage) {
-    game.traitStats.armorBlocked += damage - dealt;
+  const afterArmor = (d) => (armor > 0 ? Math.min(d, Math.max(1, d - armor)) : d);
+  const plain = afterArmor(damage);
+  const dealt = afterArmor(damage * corrodeMult(enemy));
+  if (plain < damage) {
+    game.traitStats.armorBlocked += damage - plain;
     game.armorSparks.push({ x: enemy.x, y: enemy.y - enemyType(enemy).hitHeight * 0.6, age: 0 });
   }
-  if (source) recordDamage(game, source, Math.min(dealt, Math.max(0, enemy.hp)));
+  const left = Math.max(0, enemy.hp);
+  const taken = Math.min(dealt, left);
+  game.traitStats.corrosionExtra += taken - Math.min(plain, left);
+  if (source) recordDamage(game, source, taken);
   enemy.hp -= dealt;
   enemy.lastHitTime = game.combatTime;
   if (enemy.hp <= 0) killEnemy(game, enemy);
+  return taken;
 }
 
 // After one of its bites or blows lands on anything (M2l §1.3, the Grim Stirge's Bloodsucker):

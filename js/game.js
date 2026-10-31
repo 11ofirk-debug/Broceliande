@@ -201,7 +201,7 @@ export function startEncounter(game, { newSeed = false, levelId = null, resource
   game.dustRings = [];          // M2c §2.5: { x, y, age, radius } at each Ogre blow
   game.armorSparks = [];        // M2l §2.2: { x, y, age } where armor reduced a hit (visual only)
   game.healSparkles = [];       // M2l §2.2: { enemyId, age } when a bite healed its biter (visual only)
-  game.traitStats = { armorBlocked: 0, splashDamage: 0, lifestealHealed: 0 }; // M2l §4: this battle's figures
+  game.traitStats = { armorBlocked: 0, splashDamage: 0, lifestealHealed: 0, twinShotDamage: 0, corrosionExtra: 0 }; // M2l §4, M2m §3: this battle's figures
   game.shake = null;            // M2c §2.5: { age } of the screen shake after a blow (drawing only)
   game.nextEntityId = 1;
   game.enemies = [];

@@ -37,3 +37,4 @@ ogreDies,0.9,1,1,1,TRUE
 shellChime,0.45,1,0.05,4,TRUE
 wispSummoned,0.5,1,0.1,2,TRUE
 wispBursts,0.6,1,0.1,2,TRUE
+upgradeFlourish,0.45,1,0.1,1,TRUE

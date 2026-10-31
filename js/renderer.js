@@ -5,7 +5,7 @@ import { GameState, ActionState } from './states.js';
 import { drawDebugOverlay } from './debug/debugOverlay.js';
 import { drawFloor, drawCorridors, drawFlats, drawDecor, drawStream, drawAshFlecks, drawLaneGlow } from './render/environment.js';
 import {
-  drawTurretSlot, drawDruid, drawFeature, drawEnemyHpBar, enemyBarY, drawArmorSpark, drawHealSparkle, drawDruidHpBar, drawDustRing, drawLanePulse,
+  drawTurretSlot, drawDruid, drawFeature, drawEnemyHpBar, enemyBarY, drawArmorSpark, drawHealSparkle, drawCorrodeDrips, drawDruidHpBar, drawDustRing, drawLanePulse,
   drawTurret, drawToader, toaderMouthOpen, drawPellet, drawCloud, drawRange, drawProgressBar, drawFloatingText, drawPebble,
   drawVulture, drawVultureStatus, drawVultureGhost, featureBase, slotBase, drawDrop,
   drawSquirrel, drawSquirrelStatus, drawSquirrelGhost, drawSwipe, drawSpark, drawNextRange, DRUID_REST_POSE,
@@ -21,7 +21,7 @@ import { animationTime } from './game.js';
 import { drawMap } from './render/map.js';
 import { drawSlotFloater } from './render/items.js';
 import { drawWisp, drawWispTarget, drawWispGhost, drawWispBurst, drawSlowSpiral } from './render/wisp.js';
-import { isSlowed } from './systems/statusSystem.js';
+import { isSlowed, isCorroded } from './systems/statusSystem.js';
 import { drawEnemyLook } from './render/enemyLook.js'; // an enemy's look, Grims included (M2l §2.1)
 import { drawShowcase } from './debug/showcase.js';
 
@@ -99,15 +99,16 @@ export function createRenderer(canvas) {
     const anim = animationTime(game);
     const recent = (time) => anim - time < HIT_FLASH_TIME;
     const hurt = recent(game.druidLastHitTime);
-    // An enemy, with a pale silver-blue tint while slowed (M2k §3.5).
+    // An enemy, with a pale silver-blue tint while slowed (M2k §3.5), a faint yellow-green one while
+    // Corroded (M2m §2.5), a teal mix of the two while both.
     const drawEnemy = (e) => {
-      const slowed = isSlowed(e);
-      if (slowed) {
+      const filter = enemyTintFilter(e);
+      if (filter) {
         ctx.save();
-        ctx.filter = C.SLOW_TINT_FILTER;
+        ctx.filter = filter;
       }
       drawEnemyLook(ctx, knockedBack(e, anim), strikeFlash(e, anim) ? 'strike' : recent(e.lastHitTime), recent(e.lastBiteTime), anim);
-      if (slowed) ctx.restore();
+      if (filter) ctx.restore();
     };
     // Slow Wisps' target points while they travel (M2k §3.3): on the ground, under everything upright.
     for (const w of game.wisps) drawWispTarget(ctx, w);
@@ -146,6 +147,10 @@ export function createRenderer(canvas) {
     for (const s of game.swipes) drawSwipe(ctx, s, s.age / C.DRUID_SWIPE_TIME);
     for (const s of game.sparks) drawSpark(ctx, s, s.age / C.STRIKE_SPARK_TIME);
     // Grim trait feedback (M2l §2.2): armor sparks; lifesteal sparkles on the biter, wherever it is now.
+    // Corroded (M2m §2.5): drips falling from the body while it lasts.
+    for (const e of game.enemies) {
+      if (isCorroded(e)) drawCorrodeDrips(ctx, e.x, e.y - (C.ENEMY_TYPES[e.type].flyHeight ?? 0) - C.ENEMY_TYPES[e.type].hitHeight * 0.5, e.radius, anim, e.id);
+    }
     for (const s of game.armorSparks) drawArmorSpark(ctx, s, s.age / C.ARMOR_SPARK_TIME);
     for (const s of game.healSparkles) {
       const e = game.enemies.find((x) => x.id === s.enemyId);
@@ -340,9 +345,18 @@ function drawTargeting(ctx, game, view) {
 }
 
 // Turret drawing per type (M1f §5): the Sprinkler, or the Toader with its mouth animation.
+// The canvas filter tinting an enemy by its statuses (M2k §3.5, M2m §2.5), or null.
+function enemyTintFilter(e) {
+  const slowed = isSlowed(e);
+  const corroded = isCorroded(e);
+  if (slowed && corroded) return C.SLOW_CORRODE_TINT_FILTER;
+  if (slowed) return C.SLOW_TINT_FILTER;
+  return corroded ? C.CORRODE_TINT_FILTER : null;
+}
+
 function drawTurretOfType(ctx, t, upgrading, anim) {
-  if (t.type === 'toader') drawToader(ctx, t, upgrading, toaderMouthOpen(t, anim));
-  else drawTurret(ctx, t, upgrading);
+  if (t.type === 'toader') drawToader(ctx, t, upgrading, toaderMouthOpen(t, anim), anim);
+  else drawTurret(ctx, t, upgrading, anim);
 }
 
 // Progress bar above the object the Druid is working on (§16.3), raised above the

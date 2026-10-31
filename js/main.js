@@ -18,7 +18,7 @@ import { createEquipmentPanel } from './equipmentPanel.js';
 import { validateItems } from './stats.js';
 import { createRng } from './rng.js';
 import { events } from './events.js';
-import { chosenSpeed, setChosenSpeed } from './gameSpeed.js';
+import { chosenSpeed, setChosenSpeed, resetChosenSpeed } from './gameSpeed.js';
 import { buildShowcase } from './debug/showcase.js';
 
 const stage = document.getElementById('stage');
@@ -61,6 +61,7 @@ const interaction = createInteraction(game, view);
 
 // UI state to clear whenever an encounter (re)starts or the map opens.
 function afterRestart() {
+  resetChosenSpeed(); // M2m §1: a (re)started encounter is back at ×1
   view.clickMarker = null;
   view.mapHover = null;
   interaction.closeMenu();
@@ -224,6 +225,7 @@ function frame(now) {
   lastTime = now;
   if (realDt > 0) view.fps = view.fps * 0.9 + (1 / realDt) * 0.1;
 
+  if (game.state !== GameState.COMBAT) resetChosenSpeed(); // every battle's Combat starts at ×1 (M2m §1)
   clock.speed = game.state === GameState.COMBAT ? chosenSpeed() : 1; // M2k §1.2
   if (!clock.paused) accumulator += realDt * clock.speed;
 
