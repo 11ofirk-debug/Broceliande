@@ -1165,6 +1165,7 @@ export const MAP_SINGLE_NODE_SPREAD = 60; // px, a single-node row (start, boss)
 export const MAP_ROAD_REACH = 220;        // px; a road's weight falls as exp(−horizontal distance / this): short roads are likelier
 export const MAP_EXTRA_ROAD_CHANCE = 0.25; // TUNING — chance per extra non-crossing road candidate (× its distance weight)
 export const MAP_MAX_ATTEMPTS = 200;      // whole maps tried until one passes every check; else the best one, with a warning
+export const MAP_BOSS_MAX_ROADS_IN = 4;    // roads the boss node may take in: the one exception to 1–3 (M2n), so the row under it can hold a Trader
 export const MAP_ROAD_BEND = 26;          // px, the most a road's curve bows sideways (seeded per road)
 export const MAP_ROAD_CLEARANCE = 12;     // px a road keeps from other nodes' circles and labels
 

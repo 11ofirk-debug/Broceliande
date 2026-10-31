@@ -12,26 +12,41 @@ import * as C from './config.js';
 import { createRng } from './rng.js';
 
 // The whole-map checks (§2.3), plus roads clear of other nodes and labels (§2.4) and every node's
-// roads within 1–3 each way (§2.2; a row with a Trader can need more than the sweep allows).
+// roads within limits each way (§2.2; a row with a Trader can need more than the sweep allows).
 const CHECKS = ['reachable', 'fellAvoidable', 'variety', 'choice', 'roadsClear', 'degrees'];
 
-// The map for a seed: up to MAP_MAX_ATTEMPTS whole maps from one RNG stream, the first passing
-// every check, or else the one failing the fewest (with a warning).
+// Most roads a node may have coming in: 3 (§2.2), but the last row's (the boss) up to
+// MAP_BOSS_MAX_ROADS_IN (M2n), so the row under it can hold a Trader beside its three levels.
+const maxIn = (rowIndex, rowCount) => (rowIndex === rowCount - 1 ? C.MAP_BOSS_MAX_ROADS_IN : 3);
+const MAX_OUT = 3;
+
+// The map for a seed. Each Trader's row is picked first, with equal chance among its band's
+// eligible rows (M2n §2.1); then up to MAP_MAX_ATTEMPTS whole maps (order, positions, roads) are
+// tried around that choice, all from one RNG stream, the first passing every check winning. Only
+// if none passes does a Trader move to another row of its band (each tried in turn, MAP_MAX_ATTEMPTS
+// more each). If nothing passes at all: the attempt failing the fewest checks, with a warning.
 export function generateMap(seed) {
   const rng = createRng(seed >>> 0);
   const failCounts = Object.fromEntries(CHECKS.map((c) => [c, 0]));
+  const bands = traderBands(levelRows());
+  const chosen = bands.map((band) => band[rng.int(0, band.length - 1)]);
+  const tries = [chosen, ...bands.flatMap((band, k) => band.filter((r) => r !== chosen[k]).map((r) => chosen.map((c, i) => (i === k ? r : c))))];
   let best = null;
   let attempts = 0;
-  while (attempts < C.MAP_MAX_ATTEMPTS) {
-    attempts++;
-    const map = attempt(rng);
-    const failed = CHECKS.filter((c) => !CHECK_FNS[c](map));
-    for (const c of failed) failCounts[c]++;
-    if (!best || failed.length < best.failed.length) best = { map, failed };
-    if (!failed.length) break;
+  for (const traderRows of tries) {
+    for (let n = 0; n < C.MAP_MAX_ATTEMPTS; n++) {
+      attempts++;
+      const map = attempt(rng, traderRows);
+      const failed = CHECKS.filter((c) => !CHECK_FNS[c](map));
+      for (const c of failed) failCounts[c]++;
+      if (!best || failed.length < best.failed.length) best = { map, failed };
+      if (!failed.length) break;
+    }
+    if (!best.failed.length) break;
   }
-  if (best.failed.length) console.warn(`Map: no attempt passed every check in ${C.MAP_MAX_ATTEMPTS}; using one that fails ${best.failed.join(', ')}`);
-  return { ...best.map, attempts, failed: best.failed, failCounts };
+  if (best.failed.length) console.warn(`Map: no attempt passed every check; using one that fails ${best.failed.join(', ')}`);
+  const movedTrader = best.map.traderRows.some((r, k) => r !== chosen[k]);
+  return { ...best.map, attempts, failed: best.failed, failCounts, movedTrader };
 }
 
 // The seed a run's map uses (§3): from the run seed, or MAP_FIXED_SEED when MAP_RANDOMISE is off.
@@ -39,53 +54,58 @@ export function mapSeedFor(runSeed) {
   return C.MAP_RANDOMISE ? (runSeed ^ 0x5bd1e995) >>> 0 : C.MAP_FIXED_SEED;
 }
 
-// The map's rows, bottom to top: [[node, …], …], each node a fresh copy with its row, plus the
-// run's Trader nodes (M2n §2.1) in rows picked with the rng.
-function rowsOf(rng) {
+// The level nodes' rows, bottom to top: [[node, …], …], each node a fresh copy with its row.
+function levelRows() {
   const byRow = new Map();
   for (const n of C.MAP_NODES) {
     const row = C.LEVELS[n.levelId].row;
     if (!byRow.has(row)) byRow.set(row, []);
     byRow.get(row).push({ id: n.id, levelId: n.levelId, name: n.name, type: n.type, row, pos: null, next: [] });
   }
-  const rows = [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r));
-  traderRows(rng, rows).forEach((index, k) => {
+  return [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r));
+}
+
+// The rows with the run's Trader nodes added (M2n §2.1): trader k+1 in rows[traderRows[k]].
+function rowsWithTraders(traderRows) {
+  const rows = levelRows();
+  traderRows.forEach((index, k) => {
     rows[index].push({ id: `trader${k + 1}`, levelId: null, name: C.NODE_TYPES.trader.label, type: 'trader', row: rows[index][0].row, pos: null, next: [] });
   });
   return rows;
 }
 
-// M2n §2.1: TRADERS_PER_RUN Trader rows (as indexes into rows), never the first or last row, at
-// most one per row: the rows between are split into that many bands, bottom to top (with 2 and 8
-// rows: rows 2–4 and 5–7), and each Trader goes in a random row of its band. A row only qualifies
-// if each neighbouring row can still take its roads within 3 per node (so not the row under a
-// single boss node when it already has 3 nodes).
-function traderRows(rng, rows) {
+// M2n §2.1: each Trader's eligible rows (indexes into rows), never the first or last row, one
+// Trader per band: the rows between are split into TRADERS_PER_RUN bands, bottom to top (with 2
+// and 8 rows: rows 2–4 and 5–7). A row is eligible only if it can work at all: with a Trader
+// added, the row below can still give each of its nodes a road up (at most MAX_OUT each) and the
+// row above can take a road from each (at most maxIn each). A band with no eligible row gets no
+// Trader (with a warning).
+function traderBands(rows) {
   const inner = rows.map((_, i) => i).slice(1, -1);
   const n = Math.min(C.TRADERS_PER_RUN, inner.length);
-  const fits = (i) => [i - 1, i + 1].every((j) => rows[i].length + 1 <= 3 * rows[j].length);
-  const picked = [];
+  const fits = (i) => rows[i].length + 1 <= MAX_OUT * rows[i - 1].length && rows[i].length + 1 <= maxIn(i + 1, rows.length) * rows[i + 1].length;
+  const bands = [];
   for (let k = 0; k < n; k++) {
     const band = inner.slice(Math.floor((k * inner.length) / n), Math.floor(((k + 1) * inner.length) / n)).filter(fits);
-    if (band.length) picked.push(band[rng.int(0, band.length - 1)]);
+    if (band.length) bands.push(band);
     else console.warn(`Map: no row in Trader band ${k + 1} can take a Trader`);
   }
-  return picked;
+  return bands;
 }
 
-function attempt(rng) {
-  const rows = rowsOf(rng);
+function attempt(rng, traderRows) {
+  const rows = rowsWithTraders(traderRows);
   rows.forEach((row, i) => {
     shuffle(rng, row);                // §2.1: order within the row
     placeRow(rng, row, i);            // x positions, the row's height with a little jitter
     row.sort((a, b) => a.pos.x - b.pos.x);
   });
   const roads = [];
-  for (let i = 0; i + 1 < rows.length; i++) roads.push(...connectRows(rng, rows[i], rows[i + 1]));
+  for (let i = 0; i + 1 < rows.length; i++) roads.push(...connectRows(rng, rows[i], rows[i + 1], maxIn(i + 1, rows.length)));
   const nodes = rows.flat();
   const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
   for (const r of roads) byId[r.from].next.push(r.to);
-  const map = { nodes, roads, rows };
+  const map = { nodes, roads, rows, traderRows };
   for (const r of roads) r.bend = roadBend(rng, map, byId[r.from], byId[r.to]);
   return map;
 }
@@ -117,8 +137,9 @@ const reach = (a, b) => Math.exp(-Math.abs(a.pos.x - b.pos.x) / C.MAP_ROAD_REACH
 // §2.2: roads from a lower row up to the next, both sorted left to right. A sweep links the
 // current pair and moves the lower pointer, the upper one or both (weighted toward the shorter
 // next road, and never giving a node a 4th road while another move is possible), so every node gets
-// a road and none cross; then a few extra roads that cross none and keep every degree within 3.
-function connectRows(rng, lower, upper) {
+// a road and none cross; then a few extra roads that cross none and keep every degree within its
+// limit (MAX_OUT up; capIn in: 3, or more into the boss).
+function connectRows(rng, lower, upper, capIn) {
   const links = []; // [i, j]: lower[i] → upper[j]
   let i = 0;
   let j = 0;
@@ -129,7 +150,7 @@ function connectRows(rng, lower, upper) {
     if (j < upper.length - 1) moves.push([i, j + 1]);
     if (i < lower.length - 1 && j < upper.length - 1) moves.push([i + 1, j + 1]);
     // Moving one pointer alone adds a road to the node the other stays on.
-    const roomy = moves.filter(([a, b]) => (a === i ? outCount(links, i) < 3 : true) && (b === j ? inCount(links, j) < 3 : true));
+    const roomy = moves.filter(([a, b]) => (a === i ? outCount(links, i) < MAX_OUT : true) && (b === j ? inCount(links, j) < capIn : true));
     [i, j] = pickWeighted(rng, roomy.length ? roomy : moves, ([a, b]) => reach(lower[a], upper[b]));
     links.push([i, j]);
   }
@@ -138,7 +159,7 @@ function connectRows(rng, lower, upper) {
       if (links.some(([p, q]) => p === a && q === b)) continue;
       if (rng.next() >= C.MAP_EXTRA_ROAD_CHANCE * reach(lower[a], upper[b])) continue;
       const crosses = links.some(([p, q]) => (p < a && q > b) || (p > a && q < b));
-      const full = outCount(links, a) >= 3 || inCount(links, b) >= 3;
+      const full = outCount(links, a) >= MAX_OUT || inCount(links, b) >= capIn;
       if (!crosses && !full) links.push([a, b]);
     }
   }
@@ -279,11 +300,12 @@ const CHECK_FNS = {
   roadsClear(map) {
     return map.roads.every((r) => r.bend !== null);
   },
-  // §2.2: 1–3 roads up from every node but the last row's, 1–3 in to every node but the first row's.
+  // §2.2: 1–3 roads up from every node but the last row's, 1–3 in to every node but the first row's
+  // (up to MAP_BOSS_MAX_ROADS_IN into the last row's).
   degrees(map) {
     const deg = nodeDegrees(map);
     const last = map.rows.length - 1;
-    return map.rows.every((row, r) => row.every((n) => (r === last || (deg[n.id].out >= 1 && deg[n.id].out <= 3)) && (r === 0 || (deg[n.id].in >= 1 && deg[n.id].in <= 3))));
+    return map.rows.every((row, r) => row.every((n) => (r === last || (deg[n.id].out >= 1 && deg[n.id].out <= MAX_OUT)) && (r === 0 || (deg[n.id].in >= 1 && deg[n.id].in <= maxIn(r, map.rows.length)))));
   },
 };
 

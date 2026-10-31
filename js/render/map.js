@@ -261,10 +261,11 @@ export function drawMap(ctx, run, hoverId, t, debug) {
     const head = [
       `Map: ${map.attempts}/${C.MAP_MAX_ATTEMPTS} attempts  paths ${pathTotal(map)}${map.failed.length ? `  FAILS: ${map.failed.join(', ')}` : ''}${C.MAP_RANDOMISE ? '' : `  FIXED (seed ${C.MAP_FIXED_SEED})`}  (L = new map)`,
       `Failed most: ${counts.length ? counts.map(([c, n]) => `${c} ${n}`).join(', ') : 'none'}`,
+      `Traders in rows: ${map.traderRows.map((i) => map.rows[i][0].row).join(', ') || 'none'}${map.movedTrader ? ' (moved: its first row never passed)' : ''}`,
     ];
     head.forEach((line, i) => ctx.fillText(line, C.EQUIP_PANEL_WIDTH + 24, C.HUD_STRIP_HEIGHT + 16 + i * 20));
     map.nodes.forEach((n, i) => {
-      ctx.fillText(`${n.id} (${n.levelId ?? n.type}) → [${n.next.join(', ')}]  ${nodeState(run, n.id)}`, C.EQUIP_PANEL_WIDTH + 24, C.HUD_STRIP_HEIGHT + 60 + i * 20);
+      ctx.fillText(`${n.id} (${n.levelId ?? n.type}) → [${n.next.join(', ')}]  ${nodeState(run, n.id)}`, C.EQUIP_PANEL_WIDTH + 24, C.HUD_STRIP_HEIGHT + 80 + i * 20);
       ctx.fillText(`${n.id}  in ${deg[n.id].in} / out ${deg[n.id].out}`, n.pos.x - C.MAP_NODE_RADIUS, n.pos.y - C.MAP_NODE_RADIUS - 22);
     });
     ctx.restore();
