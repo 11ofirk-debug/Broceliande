@@ -2,10 +2,10 @@ key,value,notes
 hp,86,
 radius,28,TUNING
 meleeRadius,52,TUNING
-meleeSlots,6,TUNING — max simultaneous biters
-meleeDamage,1,M1e §2: Druid strikes the weakest attacker in his melee slots
+meleeSlots,6,TUNING - max simultaneous biters
+meleeDamage,1,M1e sec. 2: Druid strikes the weakest attacker in his melee slots
 meleeInterval,1.6,"s between strike impacts, counted only while he is idle in Combat"
 strikeWindupTime,0.12,"s, staff rotates back away from the target"
 strikeSwingTime,0.1,"s, staff swings through while the Druid lunges"
 regenAmount,0,HP regained every DRUID_REGEN_INTERVAL in Combat (Sap Pendant)
-regenInterval,4,TUNING — s
+regenInterval,4,TUNING - s

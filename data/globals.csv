@@ -1,77 +1,77 @@
 key,value,notes
 # Timing,,
 PREP_DURATION,28,s (build and upgrade times: TURRET_TYPES levels)
-END_DELAY,1.5,s of ENDING between the last kill / Druid death and the result overlay (M1e §1)
+END_DELAY,1.5,s of ENDING between the last kill / Druid death and the result overlay (M1e sec. 1)
 # Step-mode Prep,,
-STEP_PX,25,TUNING — px of straight-line travel per step
-TRAVEL_TWEEN_TIME,0.35,"TUNING — s, Druid's travel animation to a marker"
+STEP_PX,25,TUNING - px of straight-line travel per step
+TRAVEL_TWEEN_TIME,0.35,"TUNING - s, Druid's travel animation to a marker"
 # Enemy movement,,
-ENEMY_WANDER_SPEED,10,"TUNING — px/s, slow lateral drift toward a wander target"
-ENEMY_WANDER_INTERVAL,"1.5, 4","TUNING — s between picking new wander targets [min, max]"
-ENEMY_SIDESTEP_SPEED,55,"TUNING — px/s, lateral speed when stepping round an enemy ahead"
-ENEMY_SLOT_CLAIM_DISTANCE,70,TUNING — px before the lane end where an enemy claims melee slots (waits here if none free; keep outside DRUID_APPROACH_RADIUS + 2×wolf radius)
-DRUID_APPROACH_RADIUS,86,"TUNING — px, ring wolves walk round to reach a far melee slot (clears biters at DRUID_MELEE_RADIUS); larger enemies use it + their extra radius"
-ENEMY_DIRECT_APPROACH_ANGLE,0.6,TUNING — rad; slots closer than this in angle are walked to directly
-STUCK_TIME,0.6,TUNING — s an enemy held up by a slower walking enemy waits before passing through it (M2d §3.4)
-STUCK_DECAY_RATE,0.25,"TUNING — a free step runs the stuck timer down at this × real time, so creeping behind a blocker still adds up"
-SIDE_KEEP_MARGIN,4,px a keepSide enemy stays from its corridor edge (M2d §3.3)
+ENEMY_WANDER_SPEED,10,"TUNING - px/s, slow lateral drift toward a wander target"
+ENEMY_WANDER_INTERVAL,"1.5, 4","TUNING - s between picking new wander targets [min, max]"
+ENEMY_SIDESTEP_SPEED,55,"TUNING - px/s, lateral speed when stepping round an enemy ahead"
+ENEMY_SLOT_CLAIM_DISTANCE,70,TUNING - px before the lane end where an enemy claims melee slots (waits here if none free; keep outside DRUID_APPROACH_RADIUS + 2 x wolf radius)
+DRUID_APPROACH_RADIUS,86,"TUNING - px, ring wolves walk round to reach a far melee slot (clears biters at DRUID_MELEE_RADIUS); larger enemies use it + their extra radius"
+ENEMY_DIRECT_APPROACH_ANGLE,0.6,TUNING - rad; slots closer than this in angle are walked to directly
+STUCK_TIME,0.6,TUNING - s an enemy held up by a slower walking enemy waits before passing through it (M2d sec. 3.4)
+STUCK_DECAY_RATE,0.25,"TUNING - a free step runs the stuck timer down at this x real time, so creeping behind a blocker still adds up"
+SIDE_KEEP_MARGIN,4,px a keepSide enemy stays from its corridor edge (M2d sec. 3.3)
 # Flyers (Stirges),,
-STIRGE_DRUID_RING,40,"TUNING — px, ring over the Druid it hovers on to bite (no melee slots)"
-STIRGE_WANDER_SPEED,34,TUNING — px/s lateral flutter (a wolf's wander is ENEMY_WANDER_SPEED)
-STIRGE_WANDER_INTERVAL,"0.3, 0.9",TUNING — s between new flutter targets
-STIRGE_SEPARATION,16,TUNING — px Stirges ease apart below (they may overlap a little)
-STIRGE_SEPARATION_SPEED,40,TUNING — px/s of that easing
+STIRGE_DRUID_RING,40,"TUNING - px, ring over the Druid it hovers on to bite (no melee slots)"
+STIRGE_WANDER_SPEED,34,TUNING - px/s lateral flutter (a wolf's wander is ENEMY_WANDER_SPEED)
+STIRGE_WANDER_INTERVAL,"0.3, 0.9",TUNING - s between new flutter targets
+STIRGE_SEPARATION,16,TUNING - px Stirges ease apart below (they may overlap a little)
+STIRGE_SEPARATION_SPEED,40,TUNING - px/s of that easing
 CLOUDS_HIT_FLYERS,FALSE,true: Toaders target flyers and their clouds damage them
 # Waves,,
-BURST_STAGGER,0.6,TUNING — s between enemies in one burst
-FIRST_WAVE_DELAY,3,TUNING — s of countdown before wave 1 (M2i §3.1)
-WAVE_GAP_AFTER_LAST_SPAWN,10,TUNING — s after a wave's last spawn when its gap starts even with enemies alive (not after the last wave)
+BURST_STAGGER,0.6,TUNING - s between enemies in one burst
+FIRST_WAVE_DELAY,3,TUNING - s of countdown before wave 1 (M2i sec. 3.1)
+WAVE_GAP_AFTER_LAST_SPAWN,10,TUNING - s after a wave's last spawn when its gap starts even with enemies alive (not after the last wave)
 # Layout generation,,
-CORRIDOR_WIDTH,110,TUNING — px; the default for levels without their own corridorWidth (M2b §2)
-RANDOMISE_LAYOUT,TRUE,"false = the same zone-based layout every run, from FIXED_LAYOUT_SEED (M1j §4.2)"
+CORRIDOR_WIDTH,110,TUNING - px; the default for levels without their own corridorWidth (M2b sec. 2)
+RANDOMISE_LAYOUT,TRUE,"false = the same zone-based layout every run, from FIXED_LAYOUT_SEED (M1j sec. 4.2)"
 FIXED_LAYOUT_SEED,1001,---------------------------------------------------------------------------
-LOCATION_RADIUS,45,"TUNING — px, footprint of every candidate; all feature/turret visuals fit inside; also the click area"
-LOCATION_JITTER,25,"TUNING — px, max random offset of a chosen location"
-LOCATION_GAP,20,"TUNING — px, extra spacing between candidates"
-LANE_MIN_TURRET_SLOTS,3,TUNING — turret slots that must cover each lane
-FEATURE_ROUTE_MIN_FACTOR,0.75,TUNING — greedy all-feature route ≥ this × the level's stepBudget
-FEATURE_ROUTE_MAX_FACTOR,1.1,TUNING — … and ≤ this × the level's stepBudget
-MAX_LAYOUT_ATTEMPTS,200,"Feature type mix (M1j §5): one type per resource spot, shuffled across them each run. Its"
+LOCATION_RADIUS,45,"TUNING - px, footprint of every candidate; all feature/turret visuals fit inside; also the click area"
+LOCATION_JITTER,25,"TUNING - px, max random offset of a chosen location"
+LOCATION_GAP,20,"TUNING - px, extra spacing between candidates"
+LANE_MIN_TURRET_SLOTS,3,TUNING - turret slots that must cover each lane
+FEATURE_ROUTE_MIN_FACTOR,0.75,TUNING - greedy all-feature route >= this x the level's stepBudget
+FEATURE_ROUTE_MAX_FACTOR,1.1,TUNING - ... and <= this x the level's stepBudget
+MAX_LAYOUT_ATTEMPTS,200,layouts tried per encounter until one passes the fairness checks; if none passes the best one is used (with a warning)
 # Zone quotas,,
 ZONE_NEAR_TURRET,2,turret slots per near zone (levels may override single zones in code)
 ZONE_NEAR_FEATURE,1,resource spots per near zone
 ZONE_FAR_TURRET,2,turret slots per far zone
 ZONE_FAR_FEATURE,2,resource spots per far zone
 # Drops,,
-DROP_SPACING,16,TUNING — px between items dropped by one wolf
-DROP_POP_HEIGHT,70,TUNING — px the arc rises above the straight line from death point to resting spot
-DROP_POP_TIME,0.35,TUNING — s in the air; Squirrels can only target an item once it has landed
-DROP_POP_STAGGER,0.2,TUNING — s between the launches of one enemy's items
+DROP_SPACING,16,TUNING - px between items dropped by one wolf
+DROP_POP_HEIGHT,70,TUNING - px the arc rises above the straight line from death point to resting spot
+DROP_POP_TIME,0.35,TUNING - s in the air; Squirrels can only target an item once it has landed
+DROP_POP_STAGGER,0.2,TUNING - s between the launches of one enemy's items
 DROP_SINGLE_OFFSET,"6, 12","px along the lane a lone item lands from the death point, so it still arcs"
 # Resource floaters,,
-FLOATER_RISE_PX,45,"TUNING — px risen over FLOATER_TIME, easing out"
-FLOATER_TIME,1,TUNING — s; fades during the last 40%
-FLOATER_STAGGER,0.12,"TUNING — s between floaters of one gain, in resource order"
-FLOATER_STACK_PX,30,TUNING — px each further floater of one gain starts higher (no overlap)
+FLOATER_RISE_PX,45,"TUNING - px risen over FLOATER_TIME, easing out"
+FLOATER_TIME,1,TUNING - s; fades during the last 40%
+FLOATER_STAGGER,0.12,"TUNING - s between floaters of one gain, in resource order"
+FLOATER_STACK_PX,30,TUNING - px each further floater of one gain starts higher (no overlap)
 # Victory field sweep,,
-SWEEP_FLIGHT_TIME,0.5,TUNING — s per item
-SWEEP_STAGGER,0.04,"TUNING — s between launches, nearest the HUD first; shortened if needed"
+SWEEP_FLIGHT_TIME,0.5,TUNING - s per item
+SWEEP_STAGGER,0.04,"TUNING - s between launches, nearest the HUD first; shortened if needed"
 SWEEP_END_MARGIN,0.1,s before the Victory overlay by which the last item must land
 SWEEP_END_SCALE,0.65,"item size on arrival, relative to its size on the ground"
 SWEEP_PULSE_TIME,0.3,s a HUD counter pulses after an item lands on it
 # Run and equipment bases,,
-CARRY_DRUID_HP,FALSE,TUNING — true: the Druid starts the next encounter with the HP he won with (M2a §3)
+CARRY_DRUID_HP,FALSE,TUNING - true: the Druid starts the next encounter with the HP he won with (M2a sec. 3)
 ITEMS_PER_BATTLE,1,0 turns hidden items off
-WORK_SPEED,1,build / upgrade speed multiplier: job time ÷ this (Wright's Belt)
+WORK_SPEED,1,build / upgrade speed multiplier: job time / this (Wright's Belt)
 SEARCH_MAIN_BONUS,0,extra units of a spot's mainResource per search (Forager's Belt)
 BOUGH_REFUND_CHANCE,0,chance a Bough Double's Bough is refunded when its job starts (Mossheart Ferrule)
 # Sound,,
-MASTER_VOLUME,0.5,TUNING — 0..1
-SOUND_PITCH_JITTER,0.05,TUNING — each play is pitched up or down by up to this fraction
+MASTER_VOLUME,0.5,TUNING - 0..1
+SOUND_PITCH_JITTER,0.05,TUNING - each play is pitched up or down by up to this fraction
 # Trader,,
-TRADERS_PER_RUN,2,TUNING — Trader nodes added to the map each run (M2n §2.1)
-TRADE_PRICE_VARIATION,0.3,TUNING — each resource's price multiplier at a trader is rolled in 1 ± this
-TRADE_MARGIN,0.1,TUNING — traders sell at value × (1 + this) and buy at value × (1 − this)
-TRADE_MAX_RATIO_TERM,5,TUNING — largest term in a shown trade ratio a → b
-TRADE_TAG_CHEAP,0.85,TUNING — multiplier at or below this: cheap (goods) / sells poorly (pack)
-TRADE_TAG_PRICEY,1.15,TUNING — multiplier at or above this: pricey (goods) / sells well (pack)
+TRADERS_PER_RUN,2,TUNING - Trader nodes added to the map each run (M2n sec. 2.1)
+TRADE_PRICE_VARIATION,0.3,TUNING - each resource's price multiplier at a trader is rolled in 1 +/- this
+TRADE_MARGIN,0.1,TUNING - traders sell at value x (1 + this) and buy at value x (1 - this)
+TRADE_MAX_RATIO_TERM,5,TUNING - largest term in a shown trade ratio a -> b
+TRADE_TAG_CHEAP,0.85,TUNING - multiplier at or below this: cheap (goods) / sells poorly (pack)
+TRADE_TAG_PRICEY,1.15,TUNING - multiplier at or above this: pricey (goods) / sells well (pack)
