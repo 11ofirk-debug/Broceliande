@@ -205,6 +205,37 @@ export const SOUND_STATS_WINDOW = 5;      // s, debug panel: sounds played / ski
 export const SOUND_MUTE_KEY = 'broceliande.muted'; // localStorage key for the mute state
 
 // ---------------------------------------------------------------------------
+// Place scenes (M2n §1): full-screen scenes of non-combat map nodes, the Trader's first. A scene
+// template: a background in the place's palette (PLACE_PALETTE) with decoration, a character on
+// the left (the Druid) and one on the right (the host), and the interaction area between them.
+// Stage px; feet positions. Drawing and layout only.
+// ---------------------------------------------------------------------------
+export const PLACE_SCENE = {
+  horizonY: 430,                          // the clearing's back edge: forest above, open ground below
+  clearing: { x: 960, y: 760, rx: 1000, ry: 330 }, // the open ground ellipse
+  druid: { x: 400, y: 640, scale: 2.4 },  // left character (zone kept clear for a sprite later)
+  host: { x: 1520, y: 600, scale: 2.4 },  // right character
+  decorSeed: 4242,                        // the background trees and bushes (visual only)
+  backTrees: 16,                          // trees along the clearing's back edge
+  sideBushes: 10,                         // bushes along its sides
+};
+export const TRADER_SCENE = {
+  cart: { x: 1700, y: 520 },              // behind the trader
+  campfire: { x: 690, y: 470 },           // at the back of the clearing, behind and right of the Druid
+  blanket: { x: 1490, y: 790, rx: 360, ry: 92 }, // the goods lie on it (DOM over it, traderScreen.js)
+  scale: { x: 960, y: 560 },              // balance scale, centre
+};
+export const TRADER_FADE_TIME = 0.35;     // s, the fade into and out of the trader scene (M2n §1)
+export const TRADER_SCALE_TIP_TIME = 0.7; // s the scale tips toward the trader after a trade (visual)
+export const TRADER_LOOKS = [             // per-trader colour variation (cloak, hood lining, pack)
+  { cloak: '#5b3a5e', lining: '#8a5a8e', pack: '#7a5a34' },
+  { cloak: '#3d5a3a', lining: '#6d8a5a', pack: '#80613a' },
+  { cloak: '#6a3a2a', lining: '#a0603e', pack: '#6c5232' },
+  { cloak: '#2f4a5e', lining: '#5a7a90', pack: '#7d5c3a' },
+  { cloak: '#5e5230', lining: '#8f8048', pack: '#6a4a2c' },
+];
+
+// ---------------------------------------------------------------------------
 // 17.9 Debug
 // ---------------------------------------------------------------------------
 export const DEBUG_SEED = null;          // null = new random seed each restart; integer = fixed seed
@@ -1190,6 +1221,10 @@ export const EQUIP_CLEARING_RAGGED = 0.2;
 // Code-side lists the data must match: the resources the game draws (icons, HUD) and its summons.
 export const RESOURCE_IDS = ['pits', 'reeds', 'feathers', 'boughs', 'shells'];
 export const SUMMON_KINDS = ['vulture', 'squirrel', 'double', 'slowWisp'];
+// Palettes of non-combat places (M2n §1): rows of the palettes tab that aren't levels.
+export const PLACE_PALETTES = ['trader'];
+// The traders tab's kinds (M2n §4.5): the name pool and the lines for each moment.
+export const TRADER_LINE_KINDS = ['name', 'greet', 'trade', 'soldout', 'leave'];
 
 // globals tab
 export let PREP_DURATION, END_DELAY, STEP_PX, TRAVEL_TWEEN_TIME;
@@ -1206,6 +1241,7 @@ export let FLOATER_RISE_PX, FLOATER_TIME, FLOATER_STAGGER, FLOATER_STACK_PX;
 export let SWEEP_FLIGHT_TIME, SWEEP_STAGGER, SWEEP_END_MARGIN, SWEEP_END_SCALE, SWEEP_PULSE_TIME;
 export let CARRY_DRUID_HP, ITEMS_PER_BATTLE, WORK_SPEED, SEARCH_MAIN_BONUS, BOUGH_REFUND_CHANCE;
 export let MASTER_VOLUME, SOUND_PITCH_JITTER;
+export let TRADERS_PER_RUN, TRADE_PRICE_VARIATION, TRADE_MARGIN, TRADE_MAX_RATIO_TERM, TRADE_TAG_CHEAP, TRADE_TAG_PRICEY;
 
 // druid tab
 export let DRUID_HP, DRUID_RADIUS, DRUID_MELEE_RADIUS, DRUID_MELEE_SLOTS, DRUID_MELEE_DAMAGE, DRUID_MELEE_INTERVAL,
@@ -1242,6 +1278,12 @@ export let STATS;
 export let LEVELS;
 // sounds: id → { volume, pitch, minGap, maxVoices, enabled }
 export let SOUNDS;
+// trade (M2n §3.1): resource → { baseValue, stockMin, stockMax }
+export let TRADE;
+// traders (M2n §4.5): kind → [text, …] (TRADER_LINE_KINDS)
+export let TRADER_TEXT;
+// palettes of non-combat places (PLACE_PALETTES): id → palette, like a level's
+export let PLACE_PALETTE;
 
 // Builds every value above from the loaded tabs (rows as from js/data/loader.js, already checked by
 // js/data/validate.js). Leaves out blank cells so the code's defaults apply, and keeps row order.
@@ -1269,6 +1311,7 @@ export function applyData(t) {
     SWEEP_FLIGHT_TIME, SWEEP_STAGGER, SWEEP_END_MARGIN, SWEEP_END_SCALE, SWEEP_PULSE_TIME,
     CARRY_DRUID_HP, ITEMS_PER_BATTLE, WORK_SPEED, SEARCH_MAIN_BONUS, BOUGH_REFUND_CHANCE,
     MASTER_VOLUME, SOUND_PITCH_JITTER,
+    TRADERS_PER_RUN, TRADE_PRICE_VARIATION, TRADE_MARGIN, TRADE_MAX_RATIO_TERM, TRADE_TAG_CHEAP, TRADE_TAG_PRICEY,
   } = keyed(t.globals));
 
   ({
@@ -1355,6 +1398,10 @@ export function applyData(t) {
   }
 
   SOUNDS = byId(t.sounds, (r) => ({ volume: r.volume, pitch: r.pitch, minGap: r.minGap, maxVoices: r.maxVoices, enabled: r.enabled }));
+
+  TRADE = byId(t.trade, (r) => ({ baseValue: r.baseValue, stockMin: r.stockMin, stockMax: r.stockMax }), 'resource');
+  TRADER_TEXT = Object.fromEntries(TRADER_LINE_KINDS.map((kind) => [kind, t.traders.filter((r) => r.kind === kind).map((r) => r.text)]));
+  PLACE_PALETTE = Object.fromEntries(PLACE_PALETTES.map((id) => [id, unflatten(t.palettes.find((p) => p.level === id) ?? {}, ['level', '_row'])]));
 }
 
 // A palette row's flattened columns ("treeDark_canopy_0") back into nested objects and arrays.

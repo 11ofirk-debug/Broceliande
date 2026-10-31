@@ -4,16 +4,19 @@
 
 import * as C from './config.js';
 import { emptyResources } from './resources.js';
-import { makeRandomSeed } from './rng.js';
+import { makeRandomSeed, createRng } from './rng.js';
+import { rollTrader } from './trade.js';
 
-// run: { seed, currentNodeId, completedNodeIds, inventory, druidHp, items, equipped, seenItems }
+// run: { seed, currentNodeId, completedNodeIds, inventory, druidHp, items, equipped, seenItems, traders }
 // currentNodeId: the node last entered (null before the first). inventory: resources carried
 // between encounters. druidHp: used for the next encounter only with CARRY_DRUID_HP. Equipment
 // (M2e §5): items owned this run (ITEMS keys), the one equipped in each slot (or null), and the
-// owned items the player has looked at (badges and New marks).
+// owned items the player has looked at (badges and New marks). traders (M2n §5): each Trader node's
+// rolled trader (name, multipliers, stock), by node id, rolled with the run.
 export function createRun() {
+  const seed = C.DEBUG_SEED ?? makeRandomSeed(); // DEBUG_SEED reproduces the whole run
   return {
-    seed: C.DEBUG_SEED ?? makeRandomSeed(), // DEBUG_SEED reproduces the whole run
+    seed,
     currentNodeId: null,
     completedNodeIds: [],
     inventory: emptyResources(),
@@ -21,7 +24,18 @@ export function createRun() {
     items: [],
     equipped: Object.fromEntries(Object.keys(C.SLOT_TYPES).map((slot) => [slot, null])),
     seenItems: [],
+    traders: rollRunTraders(seed),
   };
+}
+
+// M2n §5: a trader for every Trader node on the map, seeded from the run seed, no name used twice.
+function rollRunTraders(seed) {
+  const rng = createRng((seed ^ 0x7a3d1) >>> 0);
+  const traders = {};
+  for (const node of C.MAP_NODES.filter((n) => n.type === 'trader')) {
+    traders[node.id] = rollTrader(rng, Object.values(traders).map((t) => t.name));
+  }
+  return traders;
 }
 
 export function mapNode(id) {

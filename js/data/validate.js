@@ -3,7 +3,7 @@
 // per-level start-up checks (candidates, corridors, zones, Ogre widths…) run later, on the applied
 // data, as before.
 
-import { RESOURCE_IDS, SUMMON_KINDS, SLOT_TYPES, NODE_TYPES, LEVEL_GEOMETRY } from '../config.js';
+import { RESOURCE_IDS, SUMMON_KINDS, SLOT_TYPES, NODE_TYPES, LEVEL_GEOMETRY, PLACE_PALETTES, TRADER_LINE_KINDS } from '../config.js';
 import { GLOBAL_TYPES, DRUID_KEYS } from './schema.js';
 import { STAT_KEYS } from '../stats.js';
 
@@ -181,7 +181,24 @@ export function validateTables(t, problems) {
 
   // palettes
   const palettes = ids('palettes', 'level');
-  for (const r of t.palettes) known('palettes', r, 'level', levels, 'level');
+  // Rows are levels, or non-combat places (M2n §1: the trader scene).
+  for (const r of t.palettes) known('palettes', r, 'level', new Set([...levels, ...PLACE_PALETTES]), 'level or place');
+  for (const id of PLACE_PALETTES) if (!palettes.has(id)) err('palettes', '', 'level', `missing the "${id}" palette`);
+
+  // trade (M2n §3.1): one row per resource, stock ranges in order, positive values.
+  ids('trade', 'resource');
+  for (const r of t.trade) {
+    known('trade', r, 'resource', resources, 'resource');
+    if (r.baseValue <= 0) err('trade', r, 'baseValue', 'baseValue must be above 0');
+    if (r.stockMin < 0 || r.stockMax < r.stockMin) err('trade', r, 'stockMax', 'need 0 ≤ stockMin ≤ stockMax');
+  }
+  for (const id of RESOURCE_IDS) if (!t.trade.some((r) => r.resource === id)) err('trade', '', 'resource', `missing resource ${id}`);
+
+  // traders (M2n §4.5): known kinds; enough names for every Trader in a run, and a line of each kind.
+  for (const r of t.traders) if (!TRADER_LINE_KINDS.includes(r.kind)) err('traders', r, 'kind', `kind must be one of ${TRADER_LINE_KINDS.join(', ')}`);
+  for (const kind of TRADER_LINE_KINDS) if (!t.traders.some((r) => r.kind === kind)) err('traders', '', 'kind', `no ${kind} rows`);
+  const traderCount = t.globals.find((r) => r.key === 'TRADERS_PER_RUN')?.value ?? 0;
+  if (t.traders.filter((r) => r.kind === 'name').length < traderCount) err('traders', '', 'kind', `fewer names than TRADERS_PER_RUN (${traderCount})`);
 
   ids('sounds');
 

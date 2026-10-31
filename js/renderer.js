@@ -19,6 +19,7 @@ import { isStepMode, routePreview } from './systems/stepSystem.js';
 import { drawFootsteps, drawTrail } from './render/footsteps.js';
 import { animationTime } from './game.js';
 import { drawMap } from './render/map.js';
+import { drawTraderScene } from './render/trader.js';
 import { drawSlotFloater } from './render/items.js';
 import { drawWisp, drawWispTarget, drawWispGhost, drawWispBurst, drawSlowSpiral } from './render/wisp.js';
 import { isSlowed, isCorroded } from './systems/statusSystem.js';
@@ -52,6 +53,13 @@ export function createRenderer(canvas) {
     if (game.state === GameState.MAP) {
       // The level map (M2a §4) instead of an encounter scene.
       drawMap(ctx, game.run, view.mapHover, performance.now() / 1000, view.debug);
+      ctx.fillStyle = COLORS.hudBackdrop;
+      ctx.fillRect(0, 0, C.STAGE_WIDTH, C.HUD_STRIP_HEIGHT);
+      return;
+    }
+    if (game.state === GameState.TRADER) {
+      // M2n §4.2: the trader's scene; its text and controls are HTML (traderScreen.js).
+      drawTraderScene(ctx, game.visit, game.visit.time);
       ctx.fillStyle = COLORS.hudBackdrop;
       ctx.fillRect(0, 0, C.STAGE_WIDTH, C.HUD_STRIP_HEIGHT);
       return;

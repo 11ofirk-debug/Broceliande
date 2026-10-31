@@ -1,0 +1,22 @@
+kind,text
+name,Old Marrow
+name,Hettie Thistlewick
+name,Brother Ash
+name,Mag Fennick
+name,Tom Nine-Toes
+name,Sorrel the Pedlar
+greet,"Mind the mud, friend. Mind the prices too."
+greet,"A druid! Sit, sit. Everything's for sale but the fire."
+greet,"Come closer, the lantern doesn't bite. I might."
+greet,"Fair trades only. Fair to me, mostly."
+trade,"{resource}? I've a use for those."
+trade,"Pleasure doing business. Mostly mine."
+trade,"Done and dusted. Well, done."
+trade,"{resource}, lovely. My cousin eats them."
+soldout,"No more {resource}, I'm afraid. Not even for you."
+soldout,"Cleaned out of {resource}. Try asking nicely next time."
+soldout,"{resource}? Gone. The last went to a badger."
+leave,"Safe roads. Or at least interesting ones."
+leave,"Come back when your pack's heavier."
+leave,"Off you go. Watch for wolves, they don't haggle."
+leave,"May the forest owe you a favour."

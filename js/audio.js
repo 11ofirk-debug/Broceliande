@@ -85,6 +85,8 @@ const ENEMY_WINDUP_SOUND = { ogre: 'ogreWindup' };
 function subscribe() {
   events.on('turretFired', (e) => play(TURRET_FIRE_SOUND[e.type], e));
   events.on('cloudBurst', (e) => play('cloudBurst', e));
+  // M2n §4.6: the trader scene.
+  for (const name of ['traderGreet', 'tradeComplete', 'tradeUndo', 'soldOut']) events.on(name, (e) => play(name, e));
   events.on('enemyAttacked', (e) => playEnemy(ENEMY_ATTACK_SOUND, e));
   events.on('druidSwing', (e) => play('druidWhoosh', e));
   events.on('druidImpact', (e) => play('druidThud', e));
@@ -614,6 +616,30 @@ const RECIPES = {
   upgradeDone(t, out, p) {
     bell(t, out, 660 * p, 0, 0.25, 0.7);
     return bell(t, out, 990 * p, 0.11, 0.35, 0.8);
+  },
+
+  // Trader (M2n §4.6): a coin clink, two bright metallic taps.
+  tradeComplete(t, out, p) {
+    bell(t, out, 2400 * p, 0, 0.18, 0.5);
+    return bell(t, out, 3150 * p, 0.07, 0.25, 0.45);
+  },
+
+  // Undo: the clink reversed and softer, the higher tap first, falling.
+  tradeUndo(t, out, p) {
+    bell(t, out, 3150 * p, 0, 0.14, 0.3);
+    return bell(t, out, 2100 * p, 0.08, 0.2, 0.28);
+  },
+
+  // Arriving at the cart: the small bell hanging on it, rung twice.
+  traderGreet(t, out, p) {
+    bell(t, out, 1180 * p, 0, 0.6, 0.45);
+    return bell(t, out, 1180 * p, 0.22, 0.7, 0.35);
+  },
+
+  // Sold out: a dull wooden thunk.
+  soldOut(t, out, p) {
+    noise(t, out, { filter: 'lowpass', freq: 500 * p, dur: 0.1, gain: 0.7 });
+    return tone(t, out, { freq: 140 * p, to: 90 * p, dur: 0.18, gain: 0.9, attack: 0.003 });
   },
 
   // Level 5 reached (M2m §2.6): a quick rising sparkle of bells after the upgrade chime.

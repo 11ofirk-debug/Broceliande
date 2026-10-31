@@ -20,6 +20,8 @@ import { createRng } from './rng.js';
 import { events } from './events.js';
 import { chosenSpeed, setChosenSpeed, resetChosenSpeed } from './gameSpeed.js';
 import { buildShowcase } from './debug/showcase.js';
+import { createTraderScreen } from './traderScreen.js';
+import { openDebugTrader, selectResource, stepBundles, maxOutBundles, doTrade, undoVisitTrade, leaveVisit } from './visit.js';
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('game-canvas');
@@ -121,6 +123,16 @@ const equipPanel = createEquipmentPanel({
   onSlotViewed: (slot) => markSlotSeen(game.run, slot),
 });
 
+// The trader scene's controls (M2n §4).
+const traderScreen = createTraderScreen({
+  onSelect: (side, resource) => selectResource(game, side, resource),
+  onStep: (delta) => stepBundles(game, delta),
+  onMax: () => maxOutBundles(game),
+  onTrade: () => doTrade(game),
+  onUndo: () => undoVisitTrade(game),
+  onLeave: () => leaveVisit(game),
+});
+
 const input = createInput(stage, canvas, () => scale, {
   onPointerDown(world, button) {
     if (button === 0) {
@@ -145,20 +157,20 @@ const input = createInput(stage, canvas, () => scale, {
         break;
       case 'r': // M2k §4: R the Slow Wisp shortcut; Shift+R (debug) this encounter again
         if (!e.shiftKey) summonShortcut(key);
-        else if (game.state !== GameState.MAP) { restartEncounter(game); afterRestart(); }
+        else if (inEncounter()) { restartEncounter(game); afterRestart(); }
         break;
       case 'w': // Shift+W (debug): win the battle now (Combat only); W alone is the Squirrel shortcut
         if (e.shiftKey) winNow(game); else summonShortcut(key);
         break;
       case 'q': case 'e': summonShortcut(key); break; // summon shortcuts (Combat only)
-      case 'l': if (game.state !== GameState.MAP) restart({ newSeed: true }); break; // M1c §6.1: restart with a new layout
+      case 'l': if (inEncounter()) restart({ newSeed: true }); break; // M1c §6.1: restart with a new layout
       case 'm': // M1b §2: switch timed / steps Prep, then restart this encounter
         togglePrepMode(game);
-        if (game.state !== GameState.MAP) { restartEncounter(game); afterRestart(); }
+        if (inEncounter()) { restartEncounter(game); afterRestart(); }
         break;
       case 'u': undoLastMove(game); break;              // M1b §8: undo last step-mode move
       case 'c': // debug Shift+C: each normal enemy beside its Grim, standing still mid-stage; again to remove
-        if (e.shiftKey && game.state !== GameState.MAP) view.showcase = view.showcase ? null : buildShowcase();
+        if (e.shiftKey && inEncounter()) view.showcase = view.showcase ? null : buildShowcase();
         break;
       case 'k': killAllEnemies(game); break; // extra debug key (not in §18.1): kill all living enemies
       // M1e §6, M2c §4, M2h §6: B / O / S spawn a Bear / an Ogre / a flock of Stirges at a random lane
@@ -166,9 +178,10 @@ const input = createInput(stage, canvas, () => scale, {
       case 'b': spawnDebugBear(game, e.shiftKey ? 'grimBear' : 'bear'); break;
       case 'o': spawnDebugOgre(game, e.shiftKey ? 'grimOgre' : 'ogre'); break; // (an error if the corridors are too narrow)
       case 's': spawnDebugStirges(game, e.shiftKey ? 'grimStirge' : 'stirge'); break;
-      case '[': switchLevel(-1); break;                 // M2a §8: previous / next level in LEVELS,
-      case ']': switchLevel(1); break;                  //   starting its Prep with the current resources
+      case '[': if (game.state !== GameState.TRADER) switchLevel(-1); break; // M2a §8: previous / next level in LEVELS,
+      case ']': if (game.state !== GameState.TRADER) switchLevel(1); break;  //   starting its Prep with the current resources
       case 'g': if (e.shiftKey) spawnDebugGrimWolves(game); else grantResources(game); break; // Shift+G (M2l §4): 4 Grim Wolves
+      case 't': if (e.shiftKey) openDebugTrader(game); break; // M2n §6: Shift+T on the map opens a trader scene
       case 'v': toggleMute(); break;                    // M1g §3.6: mute / unmute sound
       case 'x': toggleDropMult(game); break;            // M1d §3: enemy drop chances ×1 / ×DEBUG_DROP_MULT
       case 'i': // M2e §6: on the map, add a random unowned item; in battle, reveal the hidden item's spot (debug overlay)
@@ -193,6 +206,12 @@ window.broceliande = {
   equip: (itemId) => { addItem(game.run, itemId); return equipItem(game.run, itemId); },
   unequip: (slot) => unequipSlot(game.run, slot),
 };
+
+// In an encounter (Prep to Victory / Defeat), not on the map or in a place scene (M2n §4): the
+// debug keys that restart or switch the encounter only work there.
+function inEncounter() {
+  return game.state !== GameState.MAP && game.state !== GameState.TRADER;
+}
 
 // M2k §1.1: the HUD speed buttons and keys 1 / 2 / 4 choose the game speed, in Combat only.
 function setSpeed(speed) {
@@ -239,7 +258,11 @@ function frame(now) {
 
   // Hover is re-picked every frame so it stays correct when objects change under a still cursor.
   view.pointer = input.mouse.inside ? { x: input.mouse.x, y: input.mouse.y } : null;
-  if (game.state === GameState.MAP) {
+  if (game.state === GameState.TRADER) {
+    view.hover = null; // M2n §4: the scene's controls are HTML
+    view.mapHover = null;
+    canvas.style.cursor = 'default';
+  } else if (game.state === GameState.MAP) {
     // Map (M2a §4.3): the available node under the pointer, with a soft tick on entering one.
     view.hover = null;
     const mapHover = input.mouse.inside ? availableNodeAt(game.run, input.mouse) : null;
@@ -260,6 +283,7 @@ function frame(now) {
   renderer.render(game, view);
   ui.update(game, clock, view);
   equipPanel.update(game);
+  traderScreen.update(game);
   requestAnimationFrame(frame);
 }
 

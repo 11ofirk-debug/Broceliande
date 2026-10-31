@@ -28,6 +28,7 @@ import { updateDruidMelee } from './systems/druidMeleeSystem.js';
 import { updateClouds } from './systems/cloudSystem.js';
 import { updateDoubles } from './systems/doubleSystem.js';
 import { startSweep, updateSweep, finishSweep } from './systems/sweepSystem.js';
+import { updateVisit, enterTrader, isTraderNode } from './visit.js';
 
 export { GameState };
 
@@ -35,7 +36,8 @@ export { GameState };
 // debug R key can restart mid-encounter; a new run (→ MAP) from any state (Start again, Shift+R).
 const TRANSITIONS = {
   [GameState.START]: [GameState.MAP, GameState.PREP], // PREP: a direct start without the map (tests, debug)
-  [GameState.MAP]: [GameState.PREP, GameState.MAP],
+  [GameState.MAP]: [GameState.PREP, GameState.MAP, GameState.TRADER],
+  [GameState.TRADER]: [GameState.MAP], // M2n §4.1
   [GameState.PREP]: [GameState.COMBAT, GameState.PREP, GameState.MAP],
   [GameState.COMBAT]: [GameState.ENDING, GameState.PREP, GameState.MAP],
   [GameState.ENDING]: [GameState.VICTORY, GameState.DEFEAT, GameState.PREP, GameState.MAP],
@@ -92,6 +94,7 @@ export function createGame(levelId) {
     sparks: [],           // Druid strike impact sparks { x, y, age } (visual only)
     druidStrike: null,    // strike in progress (M1f §4): { elapsed, targetId, dirX, dirY, fromReady, impactAt }
     resources: emptyResources(),
+    visit: null,       // M2n §4: the Trader visit in progress (visit.js), in the TRADER state only
     layout: null,      // this run's layout (M1c §3): slots, features, candidate roles, fairness stats
     slots: [],         // this run's turret slot positions { x, y, candidate, lanes }
     features: [],
@@ -127,7 +130,7 @@ export function createGame(levelId) {
   };
 }
 
-function setState(game, next) {
+export function setState(game, next) {
   if (!TRANSITIONS[game.state].includes(next)) {
     console.error(`Invalid game state transition ${game.state} → ${next}`);
     return false;
@@ -282,6 +285,7 @@ export function newRun(game) {
 // derived seed and (with CARRY_DRUID_HP) the carried HP. Returns false for any other node.
 export function enterNode(game, nodeId) {
   if (game.state !== GameState.MAP || nodeState(game.run, nodeId) !== 'available') return false;
+  if (isTraderNode(nodeId)) return enterTrader(game, nodeId); // M2n §4.1: a Trader's scene, not an encounter
   const node = mapNode(nodeId);
   game.run.currentNodeId = nodeId;
   game.encounterStart = {
@@ -427,15 +431,18 @@ export function grantResources(game) {
   const grant = Object.fromEntries(RESOURCE_KEYS.map((k) => [k, n])); // every resource, Boughs too (M1i §1.3)
   add(game.resources, grant);
   game.doubleStats.boughsGained += n;
-  // On the map, the grant goes to the carried inventory the next encounter starts with (M2a §3).
-  if (game.state === GameState.MAP) add(game.run.inventory, grant);
-  // M2d §1.3: the same floaters as any gain, above the Druid (not on the map).
+  // On the map and at a Trader (M2n §5), the grant goes to the carried inventory the next encounter starts with (M2a §3).
+  if (game.state === GameState.MAP || game.state === GameState.TRADER) add(game.run.inventory, grant);
+  // M2d §1.3: the same floaters as any gain, above the Druid (not on the map or at a Trader).
   else addResourceFloaters(game, grant, game.druidPos.x, game.druidPos.y - C.DRUID_RADIUS * 2.2);
 }
 
 // One fixed simulation step. VICTORY / DEFEAT / START: simulation is stopped.
 export function updateGame(game, dt) {
   switch (game.state) {
+    case GameState.TRADER:
+      updateVisit(game, dt); // M2n §4: the scene's clock and leaving
+      break;
     case GameState.PREP:
       // Step mode has no countdown: Prep ends only via Start Battle (M1b §5.6).
       if (!isStepMode(game)) game.prepRemaining -= dt;

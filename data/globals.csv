@@ -68,3 +68,10 @@ BOUGH_REFUND_CHANCE,0,chance a Bough Double's Bough is refunded when its job sta
 # Sound,,
 MASTER_VOLUME,0.5,TUNING — 0..1
 SOUND_PITCH_JITTER,0.05,TUNING — each play is pitched up or down by up to this fraction
+# Trader,,
+TRADERS_PER_RUN,2,TUNING — Trader nodes added to the map each run (M2n §2.1)
+TRADE_PRICE_VARIATION,0.3,TUNING — each resource's price multiplier at a trader is rolled in 1 ± this
+TRADE_MARGIN,0.1,TUNING — traders sell at value × (1 + this) and buy at value × (1 − this)
+TRADE_MAX_RATIO_TERM,5,TUNING — largest term in a shown trade ratio a → b
+TRADE_TAG_CHEAP,0.85,TUNING — multiplier at or below this: cheap (goods) / sells poorly (pack)
+TRADE_TAG_PRICEY,1.15,TUNING — multiplier at or above this: pricey (goods) / sells well (pack)

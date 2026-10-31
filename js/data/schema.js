@@ -27,6 +27,8 @@ export const GLOBAL_TYPES = {
   SWEEP_FLIGHT_TIME: 'number', SWEEP_STAGGER: 'number', SWEEP_END_MARGIN: 'number', SWEEP_END_SCALE: 'number', SWEEP_PULSE_TIME: 'number',
   CARRY_DRUID_HP: 'bool', ITEMS_PER_BATTLE: 'int', WORK_SPEED: 'number', SEARCH_MAIN_BONUS: 'number', BOUGH_REFUND_CHANCE: 'number',
   MASTER_VOLUME: 'number', SOUND_PITCH_JITTER: 'number',
+  TRADERS_PER_RUN: 'int', TRADE_PRICE_VARIATION: 'number', TRADE_MARGIN: 'number', TRADE_MAX_RATIO_TERM: 'int',
+  TRADE_TAG_CHEAP: 'number', TRADE_TAG_PRICEY: 'number',
 };
 
 // Druid stats: key → type. Every key must have a row.
@@ -108,6 +110,10 @@ export const TABS = {
   // Any other column is a palette colour; nested colours are flattened with '_' (treeDark_canopy_0).
   palettes: { columns: { level: { type: 'id', required: true } }, pattern: [/^[a-z][a-zA-Z0-9]*(_[a-zA-Z0-9]+)*$/, { type: 'text' }] },
   sounds: { columns: { id: { type: 'id', required: true }, volume: { type: 'number', required: true }, pitch: { type: 'number', required: true }, minGap: { type: 'number', required: true }, maxVoices: { type: 'int', required: true }, enabled: { type: 'bool', required: true } } },
+  // M2n §3.1: each resource's trade value and a trader's stock range.
+  trade: { columns: { resource: { type: 'id', required: true }, baseValue: { type: 'number', required: true }, stockMin: { type: 'int', required: true }, stockMax: { type: 'int', required: true } } },
+  // M2n §4.5: trader names (kind = name) and their lines (greet, trade, soldout, leave), with an optional {resource}.
+  traders: { columns: { kind: { type: 'id', required: true }, text: { type: 'text', required: true } } },
 };
 
 // Exported from code for the sheet's lane dropdown (M2j §3.2); never loaded by the game.

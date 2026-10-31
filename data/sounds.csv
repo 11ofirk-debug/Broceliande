@@ -38,3 +38,7 @@ shellChime,0.45,1,0.05,4,TRUE
 wispSummoned,0.5,1,0.1,2,TRUE
 wispBursts,0.6,1,0.1,2,TRUE
 upgradeFlourish,0.45,1,0.1,1,TRUE
+tradeComplete,0.5,1,0.05,3,TRUE
+tradeUndo,0.45,1,0.05,3,TRUE
+traderGreet,0.5,1,0.3,1,TRUE
+soldOut,0.5,1,0.15,2,TRUE

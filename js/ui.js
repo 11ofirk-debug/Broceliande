@@ -27,6 +27,7 @@ import { chosenSpeed } from './gameSpeed.js';
 import { isRunComplete, mapNode, nodeRadius } from './run.js';
 import { resolveStats, changedStats, statLabel } from './stats.js';
 import { drawSlotIcon } from './render/items.js';
+import { tradeValue, exactCost, tradeRatio } from './trade.js';
 
 const RESOURCE_LABELS = Object.fromEntries(Object.entries(C.RESOURCES).map(([k, r]) => [k, r.name])); // full names (data/resources.csv)
 // "Pits 3  Reeds 0  Feathers 2  Boughs 1": every resource, in display order (debug panel).
@@ -395,7 +396,7 @@ export function createUI(callbacks) {
 // The current Wilds' name, bottom-left (M2a §6): during Prep and Combat, and still through
 // ENDING and under the Victory / Defeat overlay.
 function updateLevelName(el, game) {
-  const shown = game.state !== GameState.START && game.state !== GameState.MAP;
+  const shown = game.state !== GameState.START && game.state !== GameState.MAP && game.state !== GameState.TRADER; // not in a place scene (M2n §4.2)
   el.levelName.hidden = !shown;
   if (shown) setText(el.levelName, game.scene.level.name);
 }
@@ -637,7 +638,7 @@ function updateHud(el, game) {
 function updateStepBar(el, game, view) {
   const shown = game.state === GameState.PREP && isStepMode(game);
   el.steps.hidden = !shown;
-  el.timer.hidden = shown || game.state === GameState.MAP; // no clock on the map (M2a §4)
+  el.timer.hidden = shown || game.state === GameState.MAP || game.state === GameState.TRADER; // no clock on the map (M2a §4) or at a Trader
   if (!shown) return;
 
   const preview = routePreview(game, view.hover);
@@ -1102,11 +1103,30 @@ function updateSpeedButtons(el, game) {
   }
 }
 
+// The trader scene (M2n §6): each resource's multiplier, value and stock, and the selected pair's
+// exact cost against the chosen ratio.
+function traderDebugLines(v) {
+  if (!v) return [];
+  const lines = [`Trader: ${v.trader.name}${v.nodeId ? ` (node ${v.nodeId})` : ' (debug Shift+T)'}   trades this visit: ${v.trades.length}`];
+  for (const k of RESOURCE_KEYS) {
+    lines.push(`  ${k.padEnd(9)} ×${v.trader.mult[k].toFixed(2)}  value ${tradeValue(v.trader, k).toFixed(2).padStart(5)}  stock ${v.trader.stock[k]}`);
+  }
+  if (v.give && v.get) {
+    const { a, b } = tradeRatio(v.trader, v.give, v.get);
+    lines.push(`  ${v.give} per ${v.get}: exact ${exactCost(v.trader, v.give, v.get).toFixed(3)}  ratio ${a}:${b} = ${(a / b).toFixed(3)}`);
+  }
+  return lines;
+}
+
 function updateDebugPanel(el, game, clock, view, layoutLines, scene) {
   el.debugPanel.hidden = !view.debug;
   if (!view.debug) return;
   if (game.state === GameState.MAP) {
     setText(el.debugPanel, [`State:  ${game.state}`, ...runLines(game), `Level:  ${game.levelId} (last scene)`].join('\n'));
+    return;
+  }
+  if (game.state === GameState.TRADER) {
+    setText(el.debugPanel, [`State:  ${game.state}`, ...runLines(game), ...traderDebugLines(game.visit)].join('\n'));
     return;
   }
   const speed = clock.paused ? `PAUSED (×${clock.speed})` : `×${clock.speed}`;

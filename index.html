@@ -120,6 +120,31 @@
         <div id="equip-tip" hidden></div>
       </div>
 
+      <!-- Trader scene (M2n §4.2): the text and controls over the canvas art, built by
+           js/traderScreen.js; only shown in the TRADER state. -->
+      <div id="trader-screen" hidden>
+        <div id="trader-title"></div>
+        <div id="trader-speech"></div>
+        <div id="trader-pack" class="trade-shelf"><div class="trade-shelf-title">Your pack</div><div class="trade-items"></div></div>
+        <div id="trader-goods" class="trade-shelf"><div class="trade-shelf-title">His goods</div><div class="trade-items"></div></div>
+        <div id="trade-centre">
+          <div id="trade-ratio"></div>
+          <div id="trade-qty">
+            <button id="btn-trade-less" type="button">−</button>
+            <span id="trade-get"></span>
+            <button id="btn-trade-more" type="button">+</button>
+            <button id="btn-trade-max" type="button">Max</button>
+          </div>
+          <div id="trade-preview"></div>
+          <button id="btn-trade" type="button">Trade</button>
+          <div id="trade-reason"></div>
+        </div>
+        <button id="btn-trade-undo" type="button">Undo last trade</button>
+        <button id="btn-trade-leave" type="button">Back to the road</button>
+      </div>
+      <!-- M2n §1: the fade into and out of a place scene; never blocks clicks. -->
+      <div id="scene-fade"></div>
+
       <div id="tooltip" hidden></div>
 
       <!-- Contextual menu: one .menu-option per choice, built by js/ui.js. -->

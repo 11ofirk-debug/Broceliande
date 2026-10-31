@@ -49,6 +49,7 @@ Then open http://localhost:8000 in Chrome.
 | `G` | Grant +10 of each resource |
 | `Shift+G` | Spawn 4 Grim Wolves at a random lane (Combat only) |
 | `Shift+C` | Show each normal enemy beside its Grim, standing still in a row mid-screen, to compare their looks; press again to remove |
+| `Shift+T` | On the map: open a Wandering Trader scene with freshly rolled prices and stock (no map progress) |
 | `X` | Toggle enemy drop chances between ×1 and ×`DEBUG_DROP_MULT` (×10) — see `docs/M1D_DROPS_SQUIRREL_ADDENDUM.md` |
 
 Balancing data (stats, costs, levels, waves, candidates, palettes, sounds…) lives in `data/*.csv`, one file per tab of the Google Sheet, loaded at start-up; data problems show in the page. Code-side settings (lane geometry, decoration, UI and drawing sizes, debug) live in `js/config.js`. See `docs/M2J_DATA_SHEET_ADDENDUM.md`.
