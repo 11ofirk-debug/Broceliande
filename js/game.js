@@ -285,8 +285,8 @@ export function newRun(game) {
 // derived seed and (with CARRY_DRUID_HP) the carried HP. Returns false for any other node.
 export function enterNode(game, nodeId) {
   if (game.state !== GameState.MAP || nodeState(game.run, nodeId) !== 'available') return false;
-  if (isTraderNode(nodeId)) return enterTrader(game, nodeId); // M2n §4.1: a Trader's scene, not an encounter
-  const node = mapNode(nodeId);
+  if (isTraderNode(game.run, nodeId)) return enterTrader(game, nodeId); // M2n §4.1: a Trader's scene, not an encounter
+  const node = mapNode(game.run, nodeId);
   game.run.currentNodeId = nodeId;
   game.encounterStart = {
     levelId: node.levelId,

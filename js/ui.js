@@ -720,9 +720,9 @@ function combatTooltip(game, hover) {
 // Map node tooltip (M2a §4.3), e.g. "Gallows Copse — A restless swarm." / "Wolves 44 · Bears 3".
 // Fell Wilds (M2c §1.3): "Forgotten Barrow — Fell Wilds", the description, the counts without the
 // mini-bosses, then "Mini-boss: Ogre". Everything from the level data.
-function mapTooltip(nodeId) {
+function mapTooltip(run, nodeId) {
   if (!nodeId) return null;
-  const node = mapNode(nodeId);
+  const node = mapNode(run, nodeId);
   const level = C.LEVELS[node.levelId];
   const anchor = { x: node.pos.x, y: node.pos.y, halfWidth: nodeRadius(node) * C.MAP_HOVER_SCALE };
   // M2i §4.3: "3 waves · Wolves 42 · Stirges 4 · Bears 3" (types in display order, from the waves).
@@ -748,7 +748,7 @@ function mapTooltip(nodeId) {
 }
 
 function updateTooltip(el, game, view, prevKey) {
-  const content = game.state === GameState.MAP ? mapTooltip(view.mapHover) : tooltipContent(game, view.hover);
+  const content = game.state === GameState.MAP ? mapTooltip(game.run, view.mapHover) : tooltipContent(game, view.hover);
   const key = content ? JSON.stringify(content) + (content.cost ? costRowsKey(content.cost, game.resources) : '') : null;
   if (key === prevKey) return key;
 
@@ -1050,7 +1050,7 @@ function updateEndOverlay(el, game) {
   el.endCarry.hidden = !goesOn;
   el.endMessage.hidden = !(won && !goesOn);
   // M2f §2: winning the Boss node closes the run with its own line.
-  if (!el.endMessage.hidden) setText(el.endMessage, C.NODE_TYPES[mapNode(game.run.currentNodeId)?.type]?.finalLine ?? RUN_COMPLETE_LINE);
+  if (!el.endMessage.hidden) setText(el.endMessage, C.NODE_TYPES[mapNode(game.run, game.run.currentNodeId)?.type]?.finalLine ?? RUN_COMPLETE_LINE);
   if (goesOn) {
     const inv = game.run.inventory;
     const key = JSON.stringify(inv);

@@ -1,11 +1,12 @@
-// The level map (M2a §4), drawn from MAP_NODES and the run: a calm, dark forest background with
-// faint tree clusters, winding dashed roads for every `next` link, and the nodes in their state
+// The level map (M2a §4), drawn from the run's generated map (M2g): a calm, dark forest background
+// with faint tree clusters, gently curved dashed roads for every `next` link, and the nodes in their state
 // (available, completed, locked, bypassed), with names, the hovered node, the Druid token and,
 // in debug, node IDs and links. Visual only: reads the run, never changes it.
 
 import * as C from '../config.js';
 import { createRng } from '../rng.js';
 import { mapNode, nodeState, nodeRadius } from '../run.js';
+import { roadCurve, curvePoint, nodeDegrees, pathTotal } from '../mapGen.js';
 import { drawWolfHead, drawDruid, DRUID_REST_POSE } from './entities.js';
 
 const COLORS = {
@@ -27,42 +28,35 @@ const COLORS = {
   debug: 'rgba(120, 220, 255, 0.95)',
 };
 
-// Faint tree clusters, scattered once with MAP_DECOR_SEED and kept clear of the nodes and their names.
-let clusters = null;
-function mapClusters() {
-  if (clusters) return clusters;
+// Faint tree clusters, scattered with MAP_DECOR_SEED and kept clear of the nodes and their names;
+// once per map, since the nodes move with each run's map (M2g).
+const clustersByMap = new WeakMap();
+function mapClusters(map) {
+  if (clustersByMap.has(map)) return clustersByMap.get(map);
   const rng = createRng(C.MAP_DECOR_SEED);
-  clusters = [];
+  const clusters = [];
   for (let i = 0; i < 150; i++) { // over the whole screen, minus the clearing
     const x = rng.range(0, C.STAGE_WIDTH);
     const y = rng.range(C.HUD_STRIP_HEIGHT, C.STAGE_HEIGHT);
     const blobs = Array.from({ length: rng.int(3, 7) }, () => ({ dx: rng.range(-34, 34), dy: rng.range(-18, 18), r: rng.range(10, 24) }));
-    const clear = C.MAP_NODES.every((n) => Math.hypot(n.pos.x - x, n.pos.y + 20 - y) > C.MAP_NODE_RADIUS + 80);
+    const clear = map.nodes.every((n) => Math.hypot(n.pos.x - x, n.pos.y + 20 - y) > C.MAP_NODE_RADIUS + 80);
     // M2e (revised): a natural clearing round the equipment, its edge ragged rather than a line.
     const e = C.EQUIP_CLEARING;
     const inClearing = Math.hypot((x - e.x) / e.rx, (y - e.y) / e.ry) < 1 + rng.range(-C.EQUIP_CLEARING_RAGGED, C.EQUIP_CLEARING_RAGGED);
     if (clear && !inClearing) clusters.push({ x, y, blobs });
   }
+  clustersByMap.set(map, clusters);
   return clusters;
 }
 
-// A road from node a up to node b: a gently winding line, the same every frame, starting and
-// ending just outside the two circles. It bows towards the side a lies on (relative to b), so two
-// roads into one node curve in from either side rather than overlapping (M2b §1.1).
-function roadPoints(a, b) {
-  const dx = b.pos.x - a.pos.x;
-  const dy = b.pos.y - a.pos.y;
-  const len = Math.hypot(dx, dy);
-  const nx = -dy / len;
-  const ny = dx / len;
-  const sign = Math.sign(nx * (a.pos.x - b.pos.x)) || 1;
-  const gapA = (nodeRadius(a) + 10) / len; // each end just outside its own circle (a Boss node is larger)
-  const gapB = (nodeRadius(b) + 10) / len;
+// A road from node a up to node b (M2g §2.4): its quadratic curve, bowing `bend` px sideways,
+// starting and ending just outside the two circles.
+function roadPoints(a, b, bend) {
+  const curve = roadCurve(a, b, bend);
   const pts = [];
   for (let i = 0; i <= 40; i++) {
-    const t = gapA + (1 - gapA - gapB) * (i / 40);
-    const sway = (Math.sin(t * Math.PI) * 1.0 + Math.sin(t * Math.PI * 3) * 0.35) * C.MAP_ROAD_WIGGLE * sign;
-    pts.push({ x: a.pos.x + dx * t + nx * sway, y: a.pos.y + dy * t + ny * sway });
+    const p = curvePoint(curve, i / 40);
+    if (Math.hypot(p.x - a.pos.x, p.y - a.pos.y) > nodeRadius(a) + 10 && Math.hypot(p.x - b.pos.x, p.y - b.pos.y) > nodeRadius(b) + 10) pts.push(p);
   }
   return pts;
 }
@@ -154,7 +148,7 @@ function labelLines(ctx, name) {
 // the smaller map leaves no room below it).
 function drawDruidToken(ctx, run) {
   const won = run.completedNodeIds;
-  const node = won.length ? mapNode(won[won.length - 1]) : mapNode(C.MAP_START_NODE);
+  const node = mapNode(run, won.length ? won[won.length - 1] : C.MAP_START_NODE);
   const at = won.length
     ? { x: node.pos.x + nodeRadius(node) + 34, y: node.pos.y + 6 }    // beside it
     : { x: node.pos.x - C.MAP_NODE_RADIUS - 34, y: node.pos.y + 6 };   // beside the start node, on its left
@@ -173,7 +167,8 @@ export function drawMap(ctx, run, hoverId, t, debug) {
   g.addColorStop(1, COLORS.ground);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, C.STAGE_WIDTH, C.STAGE_HEIGHT);
-  for (const c of mapClusters()) {
+  const map = run.map;
+  for (const c of mapClusters(map)) {
     for (const [fill, k] of [[COLORS.cluster, 1], [COLORS.clusterLight, 0.45]]) {
       ctx.fillStyle = fill;
       for (const b of c.blobs) {
@@ -187,20 +182,19 @@ export function drawMap(ctx, run, hoverId, t, debug) {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.setLineDash([16, 12]);
-  for (const node of C.MAP_NODES) {
-    for (const nextId of node.next) {
-      const next = mapNode(nextId);
-      const style = roadStyle(run, node, next);
-      ctx.strokeStyle = style.color;
-      ctx.lineWidth = style.width;
-      ctx.beginPath();
-      roadPoints(node, next).forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.stroke();
-    }
+  for (const road of map.roads) {
+    const node = mapNode(run, road.from);
+    const next = mapNode(run, road.to);
+    const style = roadStyle(run, node, next);
+    ctx.strokeStyle = style.color;
+    ctx.lineWidth = style.width;
+    ctx.beginPath();
+    roadPoints(node, next, road.bend ?? 0).forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.stroke();
   }
   ctx.restore();
 
-  for (const node of C.MAP_NODES) drawNode(ctx, node, nodeState(run, node.id), node.id === hoverId, t);
+  for (const node of map.nodes) drawNode(ctx, node, nodeState(run, node.id), node.id === hoverId, t);
   drawDruidToken(ctx, run);
 
   if (debug) {
@@ -208,9 +202,17 @@ export function drawMap(ctx, run, hoverId, t, debug) {
     ctx.font = '15px monospace';
     ctx.fillStyle = COLORS.debug;
     ctx.textBaseline = 'top';
-    C.MAP_NODES.forEach((n, i) => {
-      ctx.fillText(`${n.id} (${n.levelId}) → [${n.next.join(', ')}]  ${nodeState(run, n.id)}`, C.EQUIP_PANEL_WIDTH + 24, C.HUD_STRIP_HEIGHT + 16 + i * 20);
-      ctx.fillText(n.id, n.pos.x - C.MAP_NODE_RADIUS, n.pos.y - C.MAP_NODE_RADIUS - 22);
+    // M2g §4: each node's in / out degree, the attempts used and the check that failed most.
+    const deg = nodeDegrees(map);
+    const counts = Object.entries(map.failCounts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+    const head = [
+      `Map: ${map.attempts}/${C.MAP_MAX_ATTEMPTS} attempts  paths ${pathTotal(map)}${map.failed.length ? `  FAILS: ${map.failed.join(', ')}` : ''}${C.MAP_RANDOMISE ? '' : `  FIXED (seed ${C.MAP_FIXED_SEED})`}  (L = new map)`,
+      `Failed most: ${counts.length ? counts.map(([c, n]) => `${c} ${n}`).join(', ') : 'none'}`,
+    ];
+    head.forEach((line, i) => ctx.fillText(line, C.EQUIP_PANEL_WIDTH + 24, C.HUD_STRIP_HEIGHT + 16 + i * 20));
+    map.nodes.forEach((n, i) => {
+      ctx.fillText(`${n.id} (${n.levelId}) → [${n.next.join(', ')}]  ${nodeState(run, n.id)}`, C.EQUIP_PANEL_WIDTH + 24, C.HUD_STRIP_HEIGHT + 60 + i * 20);
+      ctx.fillText(`${n.id}  in ${deg[n.id].in} / out ${deg[n.id].out}`, n.pos.x - C.MAP_NODE_RADIUS, n.pos.y - C.MAP_NODE_RADIUS - 22);
     });
     ctx.restore();
   }

@@ -36,7 +36,7 @@ Then open http://localhost:8000 in Chrome.
 | `Shift+N` | Kill all current enemies and skip the rest of this wave's spawns (straight to the gap) |
 | `Shift+R` | Restart this encounter (same node, layout and starting resources) |
 | `Shift+W` | Win the battle now (Combat only) |
-| `L` | Restart with a new seed and layout, even if `DEBUG_SEED` is set — see `docs/M1C_LAYOUT_ADDENDUM.md` |
+| `L` | In battle: restart with a new seed and layout, even if `DEBUG_SEED` is set — see `docs/M1C_LAYOUT_ADDENDUM.md`. On the map: generate a new map (M2g); the run goes on if its current node keeps its row, else a new run starts |
 | `M` | Toggle Prep mode (steps / timed) and restart — see `docs/M1B_STEPS_ADDENDUM.md` |
 | `U` | Undo the last step-mode Prep move (restores steps, position, resources, marker) |
 | `K` | Kill all living enemies (extra, not in the spec; handy for checking Victory) |

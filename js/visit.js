@@ -145,6 +145,6 @@ function syncResources(game) {
   game.resources = { ...game.run.inventory };
 }
 
-export function isTraderNode(nodeId) {
-  return mapNode(nodeId)?.type === 'trader';
+export function isTraderNode(run, nodeId) {
+  return mapNode(run, nodeId)?.type === 'trader';
 }

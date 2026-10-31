@@ -6,8 +6,12 @@ import * as C from './config.js';
 import { emptyResources } from './resources.js';
 import { makeRandomSeed, createRng } from './rng.js';
 import { rollTrader } from './trade.js';
+import { generateMap, mapSeedFor, nodeRadius } from './mapGen.js';
 
-// run: { seed, currentNodeId, completedNodeIds, inventory, druidHp, items, equipped, seenItems, traders }
+export { nodeRadius };
+
+// run: { seed, map, currentNodeId, completedNodeIds, inventory, druidHp, items, equipped, seenItems, traders }
+// map (M2g): this run's generated map (mapGen.js), nodes with positions and `next` roads.
 // currentNodeId: the node last entered (null before the first). inventory: resources carried
 // between encounters. druidHp: used for the next encounter only with CARRY_DRUID_HP. Equipment
 // (M2e §5): items owned this run (ITEMS keys), the one equipped in each slot (or null), and the
@@ -17,6 +21,7 @@ export function createRun() {
   const seed = C.DEBUG_SEED ?? makeRandomSeed(); // DEBUG_SEED reproduces the whole run
   return {
     seed,
+    map: generateMap(mapSeedFor(seed)),
     currentNodeId: null,
     completedNodeIds: [],
     inventory: emptyResources(),
@@ -38,13 +43,14 @@ function rollRunTraders(seed) {
   return traders;
 }
 
-export function mapNode(id) {
-  return C.MAP_NODES.find((n) => n.id === id) ?? null;
+// A node of the run's map (M2g: positions and roads differ per run), or null.
+export function mapNode(run, id) {
+  return run.map.nodes.find((n) => n.id === id) ?? null;
 }
 
 // The last node won, or null at the start of a run.
 function lastCompleted(run) {
-  return run.completedNodeIds.length ? mapNode(run.completedNodeIds[run.completedNodeIds.length - 1]) : null;
+  return run.completedNodeIds.length ? mapNode(run, run.completedNodeIds[run.completedNodeIds.length - 1]) : null;
 }
 
 // Nodes the player may enter now (§4.3): the start node at the beginning of a run, then the
@@ -61,12 +67,12 @@ export function availableNodeIds(run) {
 // Nodes still reachable by following `next` links from the available nodes (not counting them).
 function reachableNodeIds(run) {
   const seen = new Set();
-  const queue = availableNodeIds(run).flatMap((id) => mapNode(id).next);
+  const queue = availableNodeIds(run).flatMap((id) => mapNode(run, id).next);
   while (queue.length) {
     const id = queue.shift();
     if (seen.has(id)) continue;
     seen.add(id);
-    queue.push(...mapNode(id).next);
+    queue.push(...mapNode(run, id).next);
   }
   return seen;
 }
@@ -113,23 +119,29 @@ export function startingDruidHp(run, maxHp) {
 // nodes do not react.
 export function availableNodeAt(run, p) {
   for (const id of availableNodeIds(run)) {
-    const n = mapNode(id);
+    const n = mapNode(run, id);
     if (Math.hypot(p.x - n.pos.x, p.y - n.pos.y) <= nodeRadius(n) * C.MAP_HOVER_SCALE) return id;
   }
   return null;
 }
 
-// Start-up check of MAP_NODES (M2a §4.1, M2c §1.1): unique IDs, a known start node, known levels, types and
-// `next` links.
+// Start-up check of MAP_NODES (M2a §4.1, M2c §1.1, M2g §1): unique IDs, a known start node, known
+// levels and types, every node in a row (its level's), the start node alone in the lowest row and
+// rows numbered without gaps.
 export function validateMap() {
   const ids = C.MAP_NODES.map((n) => n.id);
   if (new Set(ids).size !== ids.length) console.error(`MAP_NODES has duplicate IDs: ${ids.join(', ')}`);
   if (!ids.includes(C.MAP_START_NODE)) console.error(`MAP_START_NODE "${C.MAP_START_NODE}" is not in MAP_NODES`);
   for (const n of C.MAP_NODES) {
     if (!C.LEVELS[n.levelId]) console.error(`Map node ${n.id}: unknown level "${n.levelId}"`);
+    else if (!Number.isInteger(C.LEVELS[n.levelId].row)) console.error(`Map node ${n.id}: its level "${n.levelId}" has no row (levels tab)`);
     if (!C.NODE_TYPES[n.type]) console.error(`Map node ${n.id}: unknown type "${n.type}" (NODE_TYPES)`);
-    for (const next of n.next) if (!ids.includes(next)) console.error(`Map node ${n.id}: unknown next node "${next}"`);
   }
+  const rows = C.MAP_NODES.map((n) => C.LEVELS[n.levelId]?.row).filter(Number.isInteger);
+  const lowest = Math.min(...rows);
+  const start = C.MAP_NODES.find((n) => n.id === C.MAP_START_NODE);
+  if (start && (C.LEVELS[start.levelId]?.row !== lowest || rows.filter((r) => r === lowest).length !== 1)) console.error('MAP_START_NODE must be alone in the lowest row');
+  for (let r = lowest; r <= Math.max(...rows); r++) if (!rows.includes(r)) console.error(`Map: no node in row ${r} (rows must not skip)`);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +182,12 @@ export function markSlotSeen(run, slot) {
   }
 }
 
-// A map node's radius: MAP_NODE_RADIUS, × MAP_BOSS_SCALE for a large node type (M2f §2).
-export function nodeRadius(node) {
-  return C.MAP_NODE_RADIUS * (C.NODE_TYPES[node.type]?.large ? C.MAP_BOSS_SCALE : 1);
+// Debug L on the map (M2g §4): the map again from a new seed. The run's progress stays only if
+// the node last entered still exists in the same row (else false: the caller starts a new run).
+export function regenerateMap(run, seed) {
+  const was = run.currentNodeId ? mapNode(run, run.currentNodeId) : null;
+  run.map = generateMap(seed);
+  if (!was) return true;
+  const now = mapNode(run, was.id);
+  return !!now && now.row === was.row;
 }

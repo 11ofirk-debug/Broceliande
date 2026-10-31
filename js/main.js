@@ -13,10 +13,10 @@ import { ActionState } from './states.js';
 import { undoLastMove } from './systems/actionSystem.js';
 import { toggleDropMult } from './systems/dropSystem.js';
 import { initAudio, toggleMute } from './audio.js';
-import { isRunComplete, mapNode, availableNodeAt, validateMap, addItem, equipItem, unequipSlot, randomUnownedItem, markSlotSeen } from './run.js';
+import { isRunComplete, availableNodeAt, validateMap, regenerateMap, addItem, equipItem, unequipSlot, randomUnownedItem, markSlotSeen } from './run.js';
 import { createEquipmentPanel } from './equipmentPanel.js';
 import { validateItems } from './stats.js';
-import { createRng } from './rng.js';
+import { createRng, makeRandomSeed } from './rng.js';
 import { events } from './events.js';
 import { chosenSpeed, setChosenSpeed, resetChosenSpeed } from './gameSpeed.js';
 import { buildShowcase } from './debug/showcase.js';
@@ -49,10 +49,10 @@ fitStage();
 validateConfig();
 
 validateLevels(); // every level's scene checks (M2a §5.1)
-validateMap();    // MAP_NODES links and levels (M2a §4.1)
+validateMap();    // MAP_NODES levels, types and rows (M2a §4.1, M2g §1)
 validateItems();  // ITEMS slots, stats and ops (M2e §2)
 
-const game = createGame(mapNode(C.MAP_START_NODE).levelId);
+const game = createGame(C.MAP_NODES.find((n) => n.id === C.MAP_START_NODE).levelId);
 // Acts on simulation time only. speed: the speed in effect this frame, the player's chosen speed in
 // Combat and ×1 everywhere else (M2k §1.2); paused: debug P.
 const clock = { speed: 1, paused: false };
@@ -95,7 +95,7 @@ function endButton() {
 function switchLevel(step) {
   const i = LEVEL_IDS.indexOf(game.levelId);
   const levelId = LEVEL_IDS[(i + step + LEVEL_IDS.length) % LEVEL_IDS.length];
-  const node = C.MAP_NODES.find((n) => n.levelId === levelId);
+  const node = game.run.map.nodes.find((n) => n.levelId === levelId);
   if (node) game.run.currentNodeId = node.id;
   game.encounterStart = { levelId, resources: { ...game.resources } };
   restart(game.encounterStart);
@@ -163,7 +163,10 @@ const input = createInput(stage, canvas, () => scale, {
         if (e.shiftKey) winNow(game); else summonShortcut(key);
         break;
       case 'q': case 'e': summonShortcut(key); break; // summon shortcuts (Combat only)
-      case 'l': if (inEncounter()) restart({ newSeed: true }); break; // M1c §6.1: restart with a new layout
+      case 'l': // M1c §6.1: restart with a new layout; on the map (M2g §4), a new map
+        if (inEncounter()) restart({ newSeed: true });
+        else if (game.state === GameState.MAP) debugNewMap();
+        break;
       case 'm': // M1b §2: switch timed / steps Prep, then restart this encounter
         togglePrepMode(game);
         if (inEncounter()) { restartEncounter(game); afterRestart(); }
@@ -222,6 +225,13 @@ function setSpeed(speed) {
 function summonShortcut(key) {
   const kind = Object.keys(C.SUMMON_KEYS).find((k) => C.SUMMON_KEYS[k] === key);
   if (kind) interaction.onSummonKey(kind);
+}
+
+// Debug L on the map (M2g §4): the map from a new seed; the run goes on if its current node is
+// still in the same row, else a new run starts.
+function debugNewMap() {
+  if (!regenerateMap(game.run, makeRandomSeed())) startNewRun();
+  view.mapHover = null;
 }
 
 // Debug key I on the map (M2e §6): a random unowned item joins the run (seeded from the run seed).

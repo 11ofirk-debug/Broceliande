@@ -1096,10 +1096,10 @@ export const LEVEL_GEOMETRY = {
 };
 
 // ---------------------------------------------------------------------------
-// Level map and run (M2a §2–§4). A run is a path through MAP_NODES from MAP_START_NODE; winning a
-// node with no `next` completes it. Node positions are on the 1920×1080 stage: the start near the
-// bottom centre, each next row higher up, slightly off-symmetric (M2b §1.1: Forgotten Barrow
-// centred between the two row-2 nodes). Nothing in the code is tied to these particular nodes.
+// Level map and run (M2a §2–§4). A run is a path through its map from MAP_START_NODE; winning a
+// node with no `next` completes it. Each run's map is generated (M2g, js/mapGen.js): the nodes stay
+// in their rows, at fixed row heights on the 1920×1080 stage, the start at the bottom; their order,
+// x positions and roads vary. Nothing in the code is tied to these particular nodes.
 // ---------------------------------------------------------------------------
 // Node types (M2c §1.1): every type plays the same (an encounter from its levelId); they differ in
 // label (tooltip), icon (a draw function in render/map.js) and whether that icon has red eyes. A
@@ -1115,40 +1115,33 @@ export const NODE_TYPES = {
 // M2e §4.6 (as revised): the map's ground runs across the whole screen; its nodes use the right
 // half (x ≥ EQUIP_PANEL_WIDTH), and it doesn't scroll.
 // Rows are MAP_ROW_SPACING apart from MAP_BOTTOM_ROW_Y up, so MAP_ROW_CAPACITY rows fit below the
-// HUD strip; the 8 rows (M2f) fill it from the bottom, slightly off-symmetric; 2-node rows sit left
-// and right of centre, 3-node rows left, centre and right, so roads never cross.
+// HUD strip; the 8 rows (M2f) fill it from the bottom. Positions within a row are generated (M2g).
 export const MAP_BOTTOM_ROW_Y = 985;      // px, the start row
 export const MAP_ROW_SPACING = 108;       // px between rows (≈ y of row k = MAP_BOTTOM_ROW_Y − k × this)
 export const MAP_ROW_CAPACITY = 9;        // rows the map must be able to hold
 export const MAP_LABEL_FONT_PX = 18;      // node names; a name wider than MAP_LABEL_MAX_WIDTH wraps onto two lines
 export const MAP_LABEL_MAX_WIDTH = 170;   // px
+// M2g §1: the map's nodes. Each sits in its level's row (levels tab, `row`): row 1 the start, the
+// last row the boss. Their order within a row, their positions and the roads between rows are
+// generated per run (js/mapGen.js), so none are listed here.
 export const MAP_NODES = [
-  // Row 1
-  { id: 'tornville',  levelId: 'tornville',  pos: { x: 1440, y: 985 }, next: ['gallows', 'blackthorn'] },
-  // Row 2
-  { id: 'gallows',    levelId: 'gallows',    pos: { x: 1278, y: 879 }, next: ['wychwood', 'barrow'] },
-  { id: 'blackthorn', levelId: 'blackthorn', pos: { x: 1598, y: 873 }, next: ['barrow', 'drowned'] },
-  // Row 3 (M2b §1, §3)
-  { id: 'wychwood',   levelId: 'wychwood',   pos: { x: 1142, y: 771 }, next: ['charcoal'] },
-  { id: 'barrow',      levelId: 'barrow',     pos: { x: 1440, y: 765 }, next: ['charcoal', 'stags'] },
-  { id: 'drowned',    levelId: 'drowned',    pos: { x: 1742, y: 769 }, next: ['stags'] },
-  // Rows 4–8 (M2f §1). levelId: placeholders (existing levels) until their own levels exist.
-  // Row 4
-  { id: 'charcoal',   levelId: 'charcoal', pos: { x: 1288, y: 663 }, next: ['briar', 'causeway'] },
-  { id: 'stags',      levelId: 'stags',  pos: { x: 1594, y: 657 }, next: ['causeway', 'widows'] },
-  // Row 5
-  { id: 'briar',      levelId: 'briar',  pos: { x: 1134, y: 555 }, next: ['mossbound'] },
-  { id: 'causeway',   levelId: 'causeway',  pos: { x: 1444, y: 549 }, next: ['mossbound', 'ashen'] },
-  { id: 'widows',     levelId: 'widows',  pos: { x: 1748, y: 553 }, next: ['ashen'] },
-  // Row 6
-  { id: 'mossbound',  levelId: 'mossbound',  pos: { x: 1284, y: 447 }, next: ['bone', 'weeping'] },
-  { id: 'ashen',       levelId: 'ashen',     pos: { x: 1600, y: 441 }, next: ['weeping', 'bells'] },
-  // Row 7
-  { id: 'bone',       levelId: 'bone',  pos: { x: 1138, y: 339 }, next: ['heartwood'] },
-  { id: 'weeping',    levelId: 'weeping',  pos: { x: 1442, y: 335 }, next: ['heartwood'] },
-  { id: 'bells',      levelId: 'bells',  pos: { x: 1746, y: 339 }, next: ['heartwood'] },
-  // Row 8: the final boss
-  { id: 'heartwood',   levelId: 'heartwood',     pos: { x: 1440, y: 229 }, next: [] },
+  { id: 'tornville',  levelId: 'tornville' },
+  { id: 'gallows',    levelId: 'gallows' },
+  { id: 'blackthorn', levelId: 'blackthorn' },
+  { id: 'wychwood',   levelId: 'wychwood' },
+  { id: 'barrow',     levelId: 'barrow' },
+  { id: 'drowned',    levelId: 'drowned' },
+  { id: 'charcoal',   levelId: 'charcoal' },
+  { id: 'stags',      levelId: 'stags' },
+  { id: 'briar',      levelId: 'briar' },
+  { id: 'causeway',   levelId: 'causeway' },
+  { id: 'widows',     levelId: 'widows' },
+  { id: 'mossbound',  levelId: 'mossbound' },
+  { id: 'ashen',      levelId: 'ashen' },
+  { id: 'bone',       levelId: 'bone' },
+  { id: 'weeping',    levelId: 'weeping' },
+  { id: 'bells',      levelId: 'bells' },
+  { id: 'heartwood',  levelId: 'heartwood' },
 ];
 export const MAP_START_NODE = 'tornville';
 export const MAP_NODE_RADIUS = 30;        // px (M2e §4.6, was 44)
@@ -1156,8 +1149,21 @@ export const MAP_BOSS_SCALE = 1.5;        // M2f §2: a large node (the Boss) is
 export const MAP_BOSS_PULSE_HZ = 0.35;    // its slow, faint red pulse
 export const MAP_HOVER_SCALE = 1.08;      // an available node under the pointer grows this much
 export const MAP_PULSE_HZ = 0.8;          // gentle glow pulse of available nodes
-export const MAP_ROAD_WIGGLE = 14;        // px, sideways sway of a road between two nodes (smaller with the smaller map, M2e)
 export const MAP_DECOR_SEED = 909;        // the map's procedural tree clusters, identical every run
+
+// Generated map (M2g §2–§5): node order and x positions within each row, the roads between
+// adjacent rows (never crossing) and their curves, from the run seed. Rows stay at fixed heights.
+export const MAP_RANDOMISE = true;        // false = every run uses the map from MAP_FIXED_SEED (§3)
+export const MAP_FIXED_SEED = 2024;
+export const MAP_Y_JITTER = 8;            // px, a node's height may differ from its row's by up to this
+export const MAP_MIN_NODE_GAP = 150;      // px between nodes in one row, so their labels don't collide
+export const MAP_X_MARGIN = 110;          // px kept from the map area's edges (EQUIP_PANEL_WIDTH … stage edge), for labels
+export const MAP_SINGLE_NODE_SPREAD = 60; // px, a single-node row (start, boss) sits within this of the map area's centre
+export const MAP_ROAD_REACH = 220;        // px; a road's weight falls as exp(−horizontal distance / this): short roads are likelier
+export const MAP_EXTRA_ROAD_CHANCE = 0.25; // TUNING — chance per extra non-crossing road candidate (× its distance weight)
+export const MAP_MAX_ATTEMPTS = 200;      // whole maps tried until one passes every check; else the best one, with a warning
+export const MAP_ROAD_BEND = 26;          // px, the most a road's curve bows sideways (seeded per road)
+export const MAP_ROAD_CLEARANCE = 12;     // px a road keeps from other nodes' circles and labels
 
 // ---------------------------------------------------------------------------
 // Druid equipment (M2e §1–§2). Six slots: three staff charms, each strengthening one summon,
@@ -1391,7 +1397,7 @@ export function applyData(t) {
     });
     return level;
   });
-  // Map nodes take their name and type from their level.
+  // Map nodes take their name and type from their level (and their row, M2g §1: mapGen.js reads it there).
   for (const node of MAP_NODES) {
     node.name = LEVELS[node.levelId]?.name ?? node.id;
     node.type = LEVELS[node.levelId]?.nodeType;
