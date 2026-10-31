@@ -789,8 +789,31 @@ function updateTooltip(el, game, view, prevKey) {
     el.tooltip.append(row);
   }
   const { x, y, halfWidth } = content.anchor;
-  placeBeside(el.tooltip, x, y, halfWidth);
+  if (game.state === GameState.MAP) placeByNode(el.tooltip, x, y, halfWidth);
+  else placeBeside(el.tooltip, x, y, halfWidth);
   return key;
+}
+
+// A map node's tooltip: for a node in the top quarter of the map, below it (under its name); in the
+// bottom quarter, above it; centred on the node and kept fully on screen. Otherwise beside it, as
+// elsewhere.
+const MAP_TIP_EDGE = 0.25; // fraction of the map's height at the top and bottom where tooltips flip
+
+function placeByNode(popup, x, y, halfWidth) {
+  const w = popup.offsetWidth;
+  const h = popup.offsetHeight;
+  const top = C.HUD_STRIP_HEIGHT + 8;
+  const bottom = C.STAGE_HEIGHT - 8;
+  const edge = (C.STAGE_HEIGHT - C.HUD_STRIP_HEIGHT) * MAP_TIP_EDGE;
+  const below = y < C.HUD_STRIP_HEIGHT + edge;
+  if (!below && y <= C.STAGE_HEIGHT - edge) {
+    placeBeside(popup, x, y, halfWidth);
+    return;
+  }
+  const nameSpace = C.MAP_LABEL_FONT_PX * 2 + 14; // below: clear of the node's name
+  const at = below ? y + halfWidth + nameSpace : y - halfWidth - POPUP_GAP - h;
+  popup.style.left = `${Math.max(8, Math.min(C.STAGE_WIDTH - w - 8, x - w / 2))}px`;
+  popup.style.top = `${Math.max(top, Math.min(bottom - h, at))}px`;
 }
 
 // "Damage 3 → 5 · Every 0.75 → 0.6 s · Range 220 → 264": what the upgrade to `level` buys.

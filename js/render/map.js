@@ -121,7 +121,21 @@ function drawNode(ctx, node, state, hovered, t) {
   ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
   ctx.shadowBlur = 6;
   ctx.fillStyle = COLORS.label;
-  labelLines(ctx, node.name).forEach((line, i) => ctx.fillText(line, x, y + nodeRadius(node) + 8 + i * (C.MAP_LABEL_FONT_PX + 2)));
+  const lines = labelLines(ctx, node.name);
+  const lineY = (i) => y + nodeRadius(node) + 8 + i * (C.MAP_LABEL_FONT_PX + 2);
+  // A soft dark pill behind each line, so roads pass behind the name and it stays readable.
+  const pill = C.MAP_LABEL_PILL;
+  ctx.save();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = pill.color;
+  lines.forEach((line, i) => {
+    const w = ctx.measureText(line).width + pill.padX * 2;
+    ctx.beginPath();
+    ctx.roundRect(x - w / 2, lineY(i) - pill.padY, w, C.MAP_LABEL_FONT_PX + pill.padY * 2 + 1, pill.radius);
+    ctx.fill();
+  });
+  ctx.restore();
+  lines.forEach((line, i) => ctx.fillText(line, x, lineY(i)));
   ctx.restore();
 }
 

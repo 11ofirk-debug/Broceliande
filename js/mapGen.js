@@ -97,7 +97,7 @@ function attempt(rng, traderRows) {
   const rows = rowsWithTraders(traderRows);
   rows.forEach((row, i) => {
     shuffle(rng, row);                // §2.1: order within the row
-    placeRow(rng, row, i);            // x positions, the row's height with a little jitter
+    placeRow(rng, row, i, rows.length, (k) => Math.max(...rows[k].map(nodeRadius))); // x positions, the row's height with a little jitter
     row.sort((a, b) => a.pos.x - b.pos.x);
   });
   const roads = [];
@@ -117,12 +117,24 @@ function shuffle(rng, list) {
   }
 }
 
+// A row's height: the rows evenly spread from the bottom one (its label MAP_BOTTOM_MARGIN above the
+// screen's bottom edge) to the top one (its node, rim included, MAP_TOP_MARGIN below the HUD
+// strip). Those two rows get no jitter, so the margins hold. radius(k): row k's largest node radius.
+const RIM = 3; // px, half the widest node rim (the boss's) outside its radius
+
+function rowY(index, rowCount, radius) {
+  const bottom = C.STAGE_HEIGHT - C.MAP_BOTTOM_MARGIN - C.MAP_LABEL_FONT_PX - 8 - radius(0); // one-line label under the node
+  const top = C.HUD_STRIP_HEIGHT + C.MAP_TOP_MARGIN + RIM + radius(rowCount - 1);
+  return rowCount > 1 ? bottom - (index * (bottom - top)) / (rowCount - 1) : bottom;
+}
+
 // §2.1: nodes anywhere across the map area, at least MAP_MIN_NODE_GAP apart, not centred or evenly
 // spread (n sorted random offsets in the free room, plus the gaps); a single node near the centre.
-function placeRow(rng, row, index) {
+// Its height is the row's (rowY), with a little jitter.
+function placeRow(rng, row, index, rowCount, nodeRadiusOfRow) {
   const left = C.EQUIP_PANEL_WIDTH + C.MAP_X_MARGIN;
   const right = C.STAGE_WIDTH - C.MAP_X_MARGIN;
-  const y = () => C.MAP_BOTTOM_ROW_Y - index * C.MAP_ROW_SPACING + rng.range(-C.MAP_Y_JITTER, C.MAP_Y_JITTER);
+  const y = () => rowY(index, rowCount, nodeRadiusOfRow) + (index === 0 || index === rowCount - 1 ? 0 : rng.range(-C.MAP_Y_JITTER, C.MAP_Y_JITTER));
   if (row.length === 1) {
     row[0].pos = { x: (left + right) / 2 + rng.range(-C.MAP_SINGLE_NODE_SPREAD, C.MAP_SINGLE_NODE_SPREAD), y: y() };
     return;

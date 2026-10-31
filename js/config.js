@@ -1117,11 +1117,12 @@ export const NODE_TYPES = {
 
 // M2e §4.6 (as revised): the map's ground runs across the whole screen; its nodes use the right
 // half (x ≥ EQUIP_PANEL_WIDTH), and it doesn't scroll.
-// Rows are MAP_ROW_SPACING apart from MAP_BOTTOM_ROW_Y up, so MAP_ROW_CAPACITY rows fit below the
-// HUD strip; the 8 rows (M2f) fill it from the bottom. Positions within a row are generated (M2g).
-export const MAP_BOTTOM_ROW_Y = 985;      // px, the start row
-export const MAP_ROW_SPACING = 108;       // px between rows (≈ y of row k = MAP_BOTTOM_ROW_Y − k × this)
-export const MAP_ROW_CAPACITY = 9;        // rows the map must be able to hold
+// The rows are spread evenly over the map's height (mapGen.js rowY): the top row's node, rim
+// included, MAP_TOP_MARGIN below the HUD strip; the bottom row's label MAP_BOTTOM_MARGIN above the
+// screen's bottom edge. Positions within a row are generated (M2g).
+export const MAP_TOP_MARGIN = 35;         // px from the HUD strip's bottom to the top row's node (the boss, with its rim)
+export const MAP_BOTTOM_MARGIN = 25;      // px from the bottom row's label (the start node's) to the screen's bottom edge
+export const MAP_LABEL_PILL = { padX: 7, padY: 2, radius: 8, color: 'rgba(12, 16, 10, 0.6)' }; // the soft backing behind node names
 export const MAP_LABEL_FONT_PX = 18;      // node names; a name wider than MAP_LABEL_MAX_WIDTH wraps onto two lines
 export const MAP_LABEL_MAX_WIDTH = 170;   // px
 // M2g §1: the map's nodes. Each sits in its level's row (levels tab, `row`): row 1 the start, the
