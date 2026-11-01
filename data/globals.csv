@@ -40,7 +40,7 @@ MAX_LAYOUT_ATTEMPTS,200,layouts tried per encounter until one passes the fairnes
 # Zone quotas,,
 ZONE_NEAR_TURRET,2,turret slots per near zone (levels may override single zones in code)
 ZONE_NEAR_FEATURE,1,resource spots per near zone
-ZONE_FAR_TURRET,2,turret slots per far zone
+ZONE_FAR_TURRET,3,turret slots per far zone
 ZONE_FAR_FEATURE,2,resource spots per far zone
 # Drops,,
 DROP_SPACING,16,TUNING - px between items dropped by one wolf

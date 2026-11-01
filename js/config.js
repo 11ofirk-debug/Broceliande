@@ -328,11 +328,12 @@ export const LEVEL_GEOMETRY = {
     sectorNames: ['NW', 'E', 'SW'],       // sector starting at each boundary
     nearRadius: 460,                      // TUNING — px; corridors leave little room close to the Druid, so near reaches this far
     // Kept (route check): with its default 2 resource spots, the cramped far corner fSW puts
-    // features so far out that most layouts fail the route band. Its spots go to nSW and fE.
+    // features so far out that most layouts fail the route band. It holds 3 turret slots (4 candidates, no room for a 5th);
+    // its resource spots go to nSW and fE.
     zoneQuotaOverrides: {
-      fSW: { turret: 2, feature: 0 }, // TUNING
+      fSW: { turret: 3, feature: 0 }, // TUNING
       nSW: { turret: 2, feature: 2 }, // TUNING
-      fE: { turret: 2, feature: 3 }, // TUNING
+      fE: { turret: 3, feature: 3 }, // TUNING
     },
     decorSeed: 12345,
     decorDensity: 1,
@@ -607,11 +608,12 @@ export const LEVEL_GEOMETRY = {
     sectorNames: ['SE', 'W', 'NE'],
     nearRadius: 460,                      // TUNING
     // Kept (route check): with its default 2 resource spots, the cramped far corner fSE puts
-    // features so far out that most layouts fail the route band. Its spots go to nSE and fW.
+    // features so far out that most layouts fail the route band. It holds 3 turret slots;
+    // its resource spots go to nSE and fW.
     zoneQuotaOverrides: {
-      fSE: { turret: 2, feature: 0 }, // TUNING
+      fSE: { turret: 3, feature: 0 }, // TUNING
       nSE: { turret: 2, feature: 2 }, // TUNING
-      fW: { turret: 2, feature: 3 }, // TUNING
+      fW: { turret: 3, feature: 3 }, // TUNING
     },
     decorSeed: 7001,
     decorDensity: 0.9,                    // TUNING
@@ -952,11 +954,12 @@ export const LEVEL_GEOMETRY = {
     sectorNames: ['NW', 'E', 'SW'],
     nearRadius: 460,                      // TUNING
     // Kept (route check): with its default 2 resource spots, the cramped far corner fNW puts
-    // features so far out that most layouts fail the route band. Its spots go to nNW and fE.
+    // features so far out that most layouts fail the route band. It holds 3 turret slots (4 candidates, no room for a 5th);
+    // its resource spots go to nNW and fE.
     zoneQuotaOverrides: {
-      fNW: { turret: 2, feature: 0 }, // TUNING
+      fNW: { turret: 3, feature: 0 }, // TUNING
       nNW: { turret: 2, feature: 2 }, // TUNING
-      fE: { turret: 2, feature: 3 }, // TUNING
+      fE: { turret: 3, feature: 3 }, // TUNING
     },
     decorSeed: 7009,
     decorDensity: 0.95,                   // TUNING
