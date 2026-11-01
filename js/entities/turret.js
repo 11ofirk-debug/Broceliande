@@ -71,7 +71,7 @@ export function turretFireInterval(turret) {
 // World point its shots leave from: the Sprinkler's cup or the Toader's mouth, above a pad
 // that sits TURRET_BASE_OFFSET below the location centre (M1c §2.1).
 export function turretMuzzle(turret) {
-  return { x: turret.x, y: turret.y + C.TURRET_BASE_OFFSET - C.TURRET_TYPES[turret.type].muzzleHeight };
+  return { x: turret.x, y: turret.y + (C.TURRET_BASE_OFFSET - C.TURRET_TYPES[turret.type].muzzleHeight) * C.SPOT_SCALE };
 }
 
 // Pebbles per volley (M2m §2.3, Twin shot): 2 at the Stormspinner, else 1.

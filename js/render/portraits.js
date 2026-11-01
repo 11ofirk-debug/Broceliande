@@ -16,6 +16,18 @@ const PAD = 1;         // px of margin inside the portrait
 // A resting enemy for its portrait (wave preview, M2i §4.2): just what the draw functions read.
 const restingEnemy = (type, x, y) => ({ x, y, type, radius: C.ENEMY_TYPES[type].radius, facing: 1, id: 0, stride: 0, attack: null, lastBlowTime: -Infinity, windupElapsed: 0 });
 
+function designSize(draw) {
+  return (ctx, x, y) => {
+    const s = 1 / C.SPOT_SCALE;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    ctx.translate(-x, -y);
+    draw(ctx, x, y);
+    ctx.restore();
+  };
+}
+
 // How each portrait is drawn: an entity's own draw function, in a neutral resting pose.
 const PORTRAIT_DRAW = {
   vulture: (ctx, x, y) => drawVulture(ctx, { x, y, state: 'LANDED', facing: 1, id: 0 }, 0, false, false),
@@ -24,19 +36,20 @@ const PORTRAIT_DRAW = {
   double: (ctx, x, y) => drawDruid(ctx, x, y, false, 0, DRUID_REST_POSE, { tint: C.DOUBLE_TINT, alpha: C.DOUBLE_ALPHA }),
   // Slow Wisp (M2k §3.2): its orb, as in flight.
   slowWisp: (ctx, x, y) => drawWisp(ctx, { x, y, from: { x, y }, to: { x, y }, age: 0 }),
-  // Turrets on their slot pad, level 1 (M1f §5.2 build menu).
-  sprinkler: (ctx, x, y) => {
+  // Turrets on their slot pad, level 1 (M1f §5.2 build menu), at their design size (the
+  // battlefield scales spot art by SPOT_SCALE; the portrait undoes it).
+  sprinkler: designSize((ctx, x, y) => {
     drawTurretSlot(ctx, { x, y }, false, false);
     drawTurret(ctx, { x, y, level: 1, angle: -0.5 }, false);
-  },
-  toader: (ctx, x, y) => {
+  }),
+  toader: designSize((ctx, x, y) => {
     drawTurretSlot(ctx, { x, y }, false, false);
     drawToader(ctx, { x, y }, false, 0);
-  },
-  cinderjaw: (ctx, x, y) => { // M2o §4.1
+  }),
+  cinderjaw: designSize((ctx, x, y) => { // M2o §4.1
     drawTurretSlot(ctx, { x, y }, false, false);
     drawCinderjaw(ctx, { x, y, level: 1, angle: -0.3, lastFireTime: -Infinity }, false, 1);
-  },
+  }),
 };
 
 // Enemies (M2i §4.2) with their battlefield look, a Grim's outline, cracks and features included

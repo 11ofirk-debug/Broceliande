@@ -30,8 +30,8 @@ WAVE_GAP_AFTER_LAST_SPAWN,10,TUNING - s after a wave's last spawn when its gap s
 CORRIDOR_WIDTH,110,TUNING - px; the default for levels without their own corridorWidth (M2b sec. 2)
 RANDOMISE_LAYOUT,TRUE,"false = the same zone-based layout every run, from FIXED_LAYOUT_SEED (M1j sec. 4.2)"
 FIXED_LAYOUT_SEED,1001,---------------------------------------------------------------------------
-LOCATION_RADIUS,45,"TUNING - px, footprint of every candidate; all feature/turret visuals fit inside; also the click area"
-LOCATION_JITTER,25,"TUNING - px, max random offset of a chosen location"
+LOCATION_RADIUS,38,"TUNING - px, footprint of every candidate; all feature/turret visuals are scaled to fit inside (drawn for 45); also the click area"
+LOCATION_JITTER,20,"TUNING - px, max random offset of a chosen location"
 LOCATION_GAP,20,"TUNING - px, extra spacing between candidates"
 LANE_MIN_TURRET_SLOTS,3,TUNING - turret slots that must cover each lane
 FEATURE_ROUTE_MIN_FACTOR,0.75,TUNING - greedy all-feature route >= this x the level's stepBudget

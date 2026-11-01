@@ -7,7 +7,7 @@ import * as C from './config.js';
 import { createLanePath } from './lanePath.js';
 import { createRng } from './rng.js';
 import { emptyResources } from './resources.js';
-import { zoneIds, geometricZone, zoneQuota, zoneCandidates, quotaTotals } from './zones.js';
+import { zoneIds, geometricZone, zoneQuota, zoneCandidates, quotaTotals, isNearZone } from './zones.js';
 import { corridorWidth, featureMix, levelWaves, waveTotals } from './levelSettings.js';
 import { fitsCorridor } from './entities/enemy.js';
 
@@ -100,6 +100,13 @@ function validateZones(scene) {
     const n = zoneCandidates(level, zone).length;
     if (n < q.turret + q.feature) {
       console.error(`${levelId}: zone ${zone} has ${n} candidates, fewer than its quota of ${q.turret} turret + ${q.feature} feature`);
+    }
+    // A zoneQuotaOverrides entry can lower a zone's quota to what it holds, which hides a far zone
+    // that is short of room: also check far zones against the default far quota.
+    const base = level.zoneQuotas.far;
+    if (!isNearZone(zone) && n < base.turret + base.feature) {
+      console.warn(`${levelId}: far zone ${zone} has ${n} candidates, fewer than the default far quota of `
+        + `${base.turret} turret + ${base.feature} feature${level.zoneQuotaOverrides[zone] ? ' (its quota override hides this)' : ''}`);
     }
   }
   // M1j §5: one feature type per resource spot.

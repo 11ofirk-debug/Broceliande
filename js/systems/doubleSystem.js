@@ -157,7 +157,7 @@ function craftHit(game, d) {
   const n = 2 + (d.swings % 2);
   for (let i = 0; i < n; i++) {
     const a = -Math.PI / 2 + (i - (n - 1) / 2) * 0.7 + (d.swings % 3 - 1) * 0.25;
-    game.chips.push({ x: slot.x, y: slot.y + C.TURRET_BASE_OFFSET - 12, vx: Math.cos(a) * 70, vy: Math.sin(a) * 90, age: 0 });
+    game.chips.push({ x: slot.x, y: slot.y + (C.TURRET_BASE_OFFSET - 12) * C.SPOT_SCALE, vx: Math.cos(a) * 70, vy: Math.sin(a) * 90, age: 0 });
   }
   events.emit('doubleCraftHit', { slotIndex: d.slotIndex });
 }

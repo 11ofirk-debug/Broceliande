@@ -169,20 +169,45 @@ export function drawDrop(ctx, drop, t) {
   ctx.restore();
 }
 
-// Ground point a feature's sprite stands on (also its y-sort key).
+// Ground point a feature's sprite stands on (also its y-sort key), on screen.
 export function featureBase(feature) {
-  return { x: feature.x, y: feature.y + FEATURE_BASE_OFFSET[feature.type] };
+  return { x: feature.x, y: feature.y + FEATURE_BASE_OFFSET[feature.type] * C.SPOT_SCALE };
 }
 
-// Ground point a slot pad and its turret stand on.
+// Ground point a slot pad and its turret stand on, on screen.
 export function slotBase(slot) {
+  return { x: slot.x, y: slot.y + C.TURRET_BASE_OFFSET * C.SPOT_SCALE };
+}
+
+// Spot art (slot pads, turrets, features) is drawn at its design size, for a footprint of
+// SPOT_ART_RADIUS, and scaled round the location centre to the real footprint (SPOT_SCALE).
+// Inside it, artBase / featureArtBase give the unscaled ground point.
+export function spotDrawn(draw) {
+  return (ctx, spot, ...rest) => {
+    const s = C.SPOT_SCALE;
+    ctx.save();
+    ctx.translate(spot.x, spot.y);
+    ctx.scale(s, s);
+    ctx.translate(-spot.x, -spot.y);
+    draw(ctx, spot, ...rest);
+    ctx.restore();
+  };
+}
+
+export function artBase(slot) {
   return { x: slot.x, y: slot.y + C.TURRET_BASE_OFFSET };
 }
 
+function featureArtBase(feature) {
+  return { x: feature.x, y: feature.y + FEATURE_BASE_OFFSET[feature.type] };
+}
+
 // Turret slot: flat stone pad on the ground. Faint during Combat (spec §9.1), brighter when hovered.
-export function drawTurretSlot(ctx, slot, faint, hovered) {
+export const drawTurretSlot = spotDrawn(drawSlotArt);
+
+function drawSlotArt(ctx, slot, faint, hovered) {
   const r = C.TURRET_SLOT_RADIUS;
-  const { x, y } = slotBase(slot);
+  const { x, y } = artBase(slot);
   ctx.save();
   ctx.globalAlpha = faint ? 0.35 : 1;
   ctx.fillStyle = hovered ? COLORS.slotFillHover : COLORS.slotFill;
@@ -1084,8 +1109,10 @@ export function drawLanePulse(ctx, p, progress) {
 
 // Searchable feature, centred on its location (M1c §2.1). A soft glow filling the footprint
 // marks it as interactive; hovered: brighter glow; exhausted: dimmed, no glow (§8.4).
-export function drawFeature(ctx, feature, hovered) {
-  const { x, y } = featureBase(feature);
+export const drawFeature = spotDrawn(drawFeatureArt);
+
+function drawFeatureArt(ctx, feature, hovered) {
+  const { x, y } = featureArtBase(feature);
   const R = C.FEATURE_RADIUS;
   ctx.save();
   if (feature.exhausted) {
@@ -1093,7 +1120,7 @@ export function drawFeature(ctx, feature, hovered) {
   } else {
     ctx.fillStyle = hovered ? COLORS.featureGlowHover : COLORS.featureGlow;
     ctx.beginPath();
-    ctx.arc(feature.x, feature.y, C.LOCATION_RADIUS - 1, 0, Math.PI * 2); // −1: anti-aliased edge stays inside
+    ctx.arc(feature.x, feature.y, C.SPOT_ART_RADIUS - 1, 0, Math.PI * 2); // −1: anti-aliased edge stays inside
     ctx.fill();
   }
 
@@ -1117,8 +1144,10 @@ export function drawFeature(ctx, feature, hovered) {
 // in gold, the spinner fastest with a faint shimmer trail. anim: animation time, s (the spinner).
 const SPRINKLER_SPIN_RATE = { 4: 7, 5: 13 }; // rad/s of the hub spinner, by level (visual only)
 
-export function drawTurret(ctx, turret, upgrading, anim = 0) {
-  const { x, y } = slotBase(turret);
+export const drawTurret = spotDrawn(drawSprinklerArt);
+
+function drawSprinklerArt(ctx, turret, upgrading, anim = 0) {
+  const { x, y } = artBase(turret);
   const top = y - C.TURRET_TYPES[turret.type ?? 'sprinkler'].muzzleHeight;
   const band = turret.level >= 5 ? COLORS.level5Band : turret.level >= 3 ? COLORS.level3Band : COLORS.upgradeBand;
   const armLength = turret.level >= 3 ? 29 : 27;
@@ -1197,7 +1226,7 @@ export function drawTurret(ctx, turret, upgrading, anim = 0) {
 }
 
 // Level rings round a turret's pad: one at level 2, two at 3, three from level 4 (M2m §2.5).
-// The outermost stays inside LOCATION_RADIUS.
+// The outermost stays inside SPOT_ART_RADIUS (scaled with the rest of the spot art).
 export function levelRingRadii(level) {
   return [C.TURRET_SLOT_RADIUS - 2, C.TURRET_SLOT_RADIUS + 3, C.TURRET_SLOT_RADIUS + 8].slice(0, Math.min(3, level - 1));
 }
@@ -1249,8 +1278,10 @@ export function toaderMouthOpen(turret, t) {
 // mouth. Level 5, Rotmaw: glowing green eyes and slow drips from the mouth. anim: animation time, s.
 const TOADER_SCALE = { 3: 1.1, 4: 1.18, 5: 1.2 };
 
-export function drawToader(ctx, turret, upgrading, mouthOpen = 0, anim = 0) {
-  const { x, y } = slotBase(turret);
+export const drawToader = spotDrawn(drawToaderArt);
+
+function drawToaderArt(ctx, turret, upgrading, mouthOpen = 0, anim = 0) {
+  const { x, y } = artBase(turret);
   ctx.save();
   if (turret.level >= 2) {
     for (const r of levelRingRadii(turret.level)) {

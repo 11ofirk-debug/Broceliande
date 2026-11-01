@@ -3,7 +3,7 @@
 
 import * as C from '../config.js';
 import { drawShadow } from './environment.js';
-import { slotBase, levelRingRadii } from './entities.js';
+import { artBase, spotDrawn, levelRingRadii } from './entities.js';
 
 const COLORS = {
   stone: '#6d675c',
@@ -32,8 +32,10 @@ const JAW_OPEN_TIME = 0.4; // s the jaw stays open after a breath (matches the c
 
 // The turret on its slot. upgrading: faded. anim: animation time, s (tongue, smoke, shimmer).
 // The head turns to face turret.angle: it flips left / right and tilts a little up or down.
-export function drawCinderjaw(ctx, turret, upgrading, anim = 0) {
-  const { x, y } = slotBase(turret);
+export const drawCinderjaw = spotDrawn(drawCinderjawArt);
+
+function drawCinderjawArt(ctx, turret, upgrading, anim = 0) {
+  const { x, y } = artBase(turret);
   const level = turret.level ?? 1;
   ctx.save();
   // Level rings round the pad, in ember colours (as the other turrets have theirs).

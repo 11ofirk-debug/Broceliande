@@ -102,14 +102,18 @@ export const LANE_LENGTH_FACTOR = 2.0;    // TUNING — target lane length ÷ st
 export const LANE_LENGTH_TOLERANCE = 0.15; // start-up warning if a lane's length factor is off LANE_LENGTH_FACTOR by more than this fraction
 export const LANE_SAMPLES_PER_SEGMENT = 24; // polyline samples between two waypoints (§12.2)
 
-export const TURRET_SLOT_RADIUS = 30;     // TUNING — px, slot pad size (drawing only; must fit LOCATION_RADIUS)
+// Spot art (slot pads, turrets of every type and level, features) is drawn for a footprint of
+// SPOT_ART_RADIUS and scaled by SPOT_SCALE = LOCATION_RADIUS / SPOT_ART_RADIUS round the location
+// centre, so it keeps its proportions when the footprint changes. The sizes below are design sizes.
+export const SPOT_ART_RADIUS = 45;        // px, the footprint the spot drawings were made for
+export const TURRET_SLOT_RADIUS = 30;     // TUNING — px, slot pad size (drawing only; must fit SPOT_ART_RADIUS)
 export const TURRET_BASE_OFFSET = 18;     // px the slot pad sits below its location centre, so pad + turret fit the footprint (M1c §2.1)
 
 // ---------------------------------------------------------------------------
 // 17.7 Searchable features
 // ---------------------------------------------------------------------------
 
-export const FEATURE_RADIUS = 32;         // TUNING — px, feature sprite scale (drawing only; sprites must fit LOCATION_RADIUS)
+export const FEATURE_RADIUS = 32;         // TUNING — px, feature sprite scale (drawing only; sprites must fit SPOT_ART_RADIUS)
 
 // ---------------------------------------------------------------------------
 // M1c addendum — candidate locations and randomised layout (docs/M1C_LAYOUT_ADDENDUM.md §7)
@@ -1247,6 +1251,7 @@ export let ENEMY_WANDER_SPEED, ENEMY_WANDER_INTERVAL, ENEMY_SIDESTEP_SPEED, ENEM
 export let STIRGE_DRUID_RING, STIRGE_WANDER_SPEED, STIRGE_WANDER_INTERVAL, STIRGE_SEPARATION,
   STIRGE_SEPARATION_SPEED, CLOUDS_HIT_FLYERS;
 export let BURST_STAGGER, FIRST_WAVE_DELAY, WAVE_GAP_AFTER_LAST_SPAWN;
+export let SPOT_SCALE; // LOCATION_RADIUS / SPOT_ART_RADIUS, set in applyData
 export let CORRIDOR_WIDTH, RANDOMISE_LAYOUT, FIXED_LAYOUT_SEED, LOCATION_RADIUS, LOCATION_JITTER, LOCATION_GAP,
   LANE_MIN_TURRET_SLOTS, FEATURE_ROUTE_MIN_FACTOR, FEATURE_ROUTE_MAX_FACTOR, MAX_LAYOUT_ATTEMPTS;
 export let ZONE_NEAR_TURRET, ZONE_NEAR_FEATURE, ZONE_FAR_TURRET, ZONE_FAR_FEATURE;
@@ -1328,6 +1333,7 @@ export function applyData(t) {
     MASTER_VOLUME, SOUND_PITCH_JITTER,
     TRADERS_PER_RUN, TRADE_PRICE_VARIATION, TRADE_MARGIN, TRADE_MAX_RATIO_TERM, TRADE_TAG_CHEAP, TRADE_TAG_PRICEY,
   } = keyed(t.globals));
+  SPOT_SCALE = LOCATION_RADIUS / SPOT_ART_RADIUS;
 
   ({
     hp: DRUID_HP, radius: DRUID_RADIUS, meleeRadius: DRUID_MELEE_RADIUS, meleeSlots: DRUID_MELEE_SLOTS,
