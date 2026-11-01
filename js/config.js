@@ -327,13 +327,12 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [176, 320, 65], // TUNING
     sectorNames: ['NW', 'E', 'SW'],       // sector starting at each boundary
     nearRadius: 460,                      // TUNING — px; corridors leave little room close to the Druid, so near reaches this far
-    // fSW fits only 3 candidates under the M1c spacing rules, and its corner one would sit under
-    // the level-name label (M2a §6), so it has 2: both turret slots. Its resource spot goes to
-    // nSW; fE holds the far zones' other extra one (totals stay 12 turret slots and 9 resource spots).
+    // Kept (route check): with its default 2 resource spots, the cramped far corner fSW puts
+    // features so far out that most layouts fail the route band. Its spots go to nSW and fE.
     zoneQuotaOverrides: {
       fSW: { turret: 2, feature: 0 }, // TUNING
       nSW: { turret: 2, feature: 2 }, // TUNING
-      fE:  { turret: 2, feature: 3 }, // TUNING
+      fE: { turret: 2, feature: 3 }, // TUNING
     },
     decorSeed: 12345,
     decorDensity: 1,
@@ -467,11 +466,7 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [30, 105, 300], // TUNING
     sectorNames: ['S', 'SW', 'E'],
     nearRadius: 460,                      // TUNING
-    // nS fits only 2 candidates (the South lane runs through it), so its resource spot moves to fS.
-    zoneQuotaOverrides: {
-      nS: { turret: 2, feature: 0 },      // TUNING
-      fS: { turret: 2, feature: 3 },      // TUNING
-    },
+    zoneQuotaOverrides: {},
     decorSeed: 3131,
     decorDensity: 0.8,                    // TUNING — the water patches take much of the ground
     // Dark water patches (outside corridors and candidates), each with a sunken roof or broken
@@ -517,14 +512,7 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [5, 148, 200],  // TUNING
     sectorNames: ['E', 'W', 'N'],
     nearRadius: 480,                      // TUNING
-    // The wide corridors leave nW and nN room for 2 candidates each: both turret slots. Their
-    // resource spots move to fE and fW.
-    zoneQuotaOverrides: {
-      nW: { turret: 2, feature: 0 },      // TUNING
-      nN: { turret: 2, feature: 0 },      // TUNING
-      fE: { turret: 2, feature: 3 },      // TUNING
-      fW: { turret: 2, feature: 3 },      // TUNING
-    },
+    zoneQuotaOverrides: {},
     decorSeed: 5150,
     decorDensity: 1.1,                    // TUNING
     gnarledTrees: true,                   // twisted old trees (M2b §3.3)
@@ -572,13 +560,7 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [130, 263, 329], // TUNING
     sectorNames: ['W', 'N', 'E'],
     nearRadius: 480,                      // TUNING
-    // nE fits 2 candidates and fN 3; their resource spots move to fW and fE.
-    zoneQuotaOverrides: {
-      nE: { turret: 2, feature: 0 },      // TUNING
-      fN: { turret: 2, feature: 1 },      // TUNING
-      fW: { turret: 2, feature: 3 },      // TUNING
-      fE: { turret: 2, feature: 3 },      // TUNING
-    },
+    zoneQuotaOverrides: {},
     decorSeed: 6066,
     decorDensity: 0.75,                   // TUNING — open, dry grassland
     // The burial mound beside the Druid: base centre, size = half-width (px).
@@ -624,6 +606,8 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [4, 115, 220], // TUNING
     sectorNames: ['SE', 'W', 'NE'],
     nearRadius: 460,                      // TUNING
+    // Kept (route check): with its default 2 resource spots, the cramped far corner fSE puts
+    // features so far out that most layouts fail the route band. Its spots go to nSE and fW.
     zoneQuotaOverrides: {
       fSE: { turret: 2, feature: 0 }, // TUNING
       nSE: { turret: 2, feature: 2 }, // TUNING
@@ -668,15 +652,7 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [355, 160, 212], // TUNING
     sectorNames: ['S', 'W', 'E'],
     nearRadius: 480,                      // TUNING
-    zoneQuotaOverrides: {
-      nW: { turret: 2, feature: 0 }, // TUNING
-      nS: { turret: 2, feature: 0 }, // TUNING
-      fE: { turret: 2, feature: 3 }, // TUNING
-      fW: { turret: 2, feature: 3 }, // TUNING
-      // fS lost its corner candidate (under the level-name label): one resource spot moves to nE.
-      fS: { turret: 2, feature: 1 }, // TUNING
-      nE: { turret: 2, feature: 2 }, // TUNING
-    },
+    zoneQuotaOverrides: {},
     decorSeed: 7002,
     decorDensity: 1,                      // TUNING
     // Signature: a shallow stream across the map, crossed by the corridors as fords (drawn under them).
@@ -765,10 +741,7 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [150, 240, 75], // TUNING
     sectorNames: ['W', 'SE', 'S'],
     nearRadius: 460,                      // TUNING
-    zoneQuotaOverrides: {
-      nS: { turret: 2, feature: 0 }, // TUNING
-      fS: { turret: 2, feature: 3 }, // TUNING
-    },
+    zoneQuotaOverrides: {},
     decorSeed: 7004,
     decorDensity: 0.8,                    // TUNING
     // Signature: broken causeway stones half under water, in the water patches.
@@ -810,12 +783,7 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [175, 340, 32], // TUNING
     sectorNames: ['N', 'E', 'W'],
     nearRadius: 480,                      // TUNING
-    zoneQuotaOverrides: {
-      nE: { turret: 2, feature: 0 }, // TUNING
-      nN: { turret: 2, feature: 0 }, // TUNING
-      fW: { turret: 2, feature: 3 }, // TUNING
-      fE: { turret: 2, feature: 3 }, // TUNING
-    },
+    zoneQuotaOverrides: {},
     decorSeed: 7005,
     decorDensity: 1.15,                   // TUNING
     gnarledTrees: true,                   // signature: gnarled orchard trees
@@ -857,12 +825,7 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [50, 211, 277], // TUNING
     sectorNames: ['W', 'N', 'E'],
     nearRadius: 480,                      // TUNING
-    zoneQuotaOverrides: {
-      nW: { turret: 2, feature: 0 }, // TUNING
-      fN: { turret: 2, feature: 1 }, // TUNING
-      fE: { turret: 2, feature: 3 }, // TUNING
-      fW: { turret: 2, feature: 3 }, // TUNING
-    },
+    zoneQuotaOverrides: {},
     decorSeed: 7006,
     decorDensity: 1.05,                   // TUNING
     // Signature: a large moss-covered cairn near the Druid (base centre; size = half-width).
@@ -903,15 +866,7 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [185, 328, 20], // TUNING
     sectorNames: ['W', 'E', 'S'],
     nearRadius: 480,                      // TUNING
-    zoneQuotaOverrides: {
-      nE: { turret: 2, feature: 0 }, // TUNING
-      nS: { turret: 2, feature: 0 }, // TUNING
-      fW: { turret: 2, feature: 3 }, // TUNING
-      fE: { turret: 2, feature: 3 }, // TUNING
-      // fS lost its corner candidate (under the level-name label): its second resource spot moves to nW.
-      fS: { turret: 2, feature: 1 }, // TUNING
-      nW: { turret: 2, feature: 2 }, // TUNING
-    },
+    zoneQuotaOverrides: {},
     decorSeed: 7007,
     decorDensity: 0.85,                   // TUNING
     // Signature: burnt tree stumps, and very subtle ash flecks drifting over the ground.
@@ -996,6 +951,8 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [184, 295, 40], // TUNING
     sectorNames: ['NW', 'E', 'SW'],
     nearRadius: 460,                      // TUNING
+    // Kept (route check): with its default 2 resource spots, the cramped far corner fNW puts
+    // features so far out that most layouts fail the route band. Its spots go to nNW and fE.
     zoneQuotaOverrides: {
       fNW: { turret: 2, feature: 0 }, // TUNING
       nNW: { turret: 2, feature: 2 }, // TUNING
@@ -1041,14 +998,7 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [310, 83, 149], // TUNING
     sectorNames: ['E', 'S', 'W'],
     nearRadius: 480,                      // TUNING
-    zoneQuotaOverrides: {
-      nW: { turret: 2, feature: 1 }, // TUNING — 3 candidates, one added at a free spot
-      nS: { turret: 2, feature: 0 }, // TUNING — 2 candidates with the wider corridors
-      // The wider corridors leave fS 2 candidates: its resource spot moves to fE.
-      fS: { turret: 2, feature: 0 }, // TUNING
-      fE: { turret: 2, feature: 4 }, // TUNING
-      fW: { turret: 2, feature: 3 }, // TUNING
-    },
+    zoneQuotaOverrides: {},
     decorSeed: 7010,
     decorDensity: 1,                      // TUNING
     // Signature: a cracked bronze bell half-buried near the Druid (base centre; size = half-width).
@@ -1089,11 +1039,7 @@ export const LEVEL_GEOMETRY = {
     sectorBoundaryAngles: [300, 60, 188], // TUNING
     sectorNames: ['E', 'SW', 'N'],
     nearRadius: 400,                      // TUNING
-    // nSW fits 2 candidates with the wider corridors: its resource spot moves to nN.
-    zoneQuotaOverrides: {
-      nSW: { turret: 2, feature: 0 }, // TUNING
-      nN: { turret: 2, feature: 2 },  // TUNING
-    },
+    zoneQuotaOverrides: {},
     decorSeed: 7011,
     decorDensity: 1.2,                    // TUNING
     // Signature: huge ancient roots round the Druid (left out where a corridor or candidate is in the way).

@@ -101,11 +101,12 @@ function validateZones(scene) {
     if (n < q.turret + q.feature) {
       console.error(`${levelId}: zone ${zone} has ${n} candidates, fewer than its quota of ${q.turret} turret + ${q.feature} feature`);
     }
-    // A zoneQuotaOverrides entry can lower a zone's quota to what it holds, which hides a far zone
-    // that is short of room: also check far zones against the default far quota.
-    const base = level.zoneQuotas.far;
-    if (!isNearZone(zone) && n < base.turret + base.feature) {
-      console.warn(`${levelId}: far zone ${zone} has ${n} candidates, fewer than the default far quota of `
+    // A zoneQuotaOverrides entry can lower a zone's quota to what it holds, which hides a zone that
+    // is short of room: also check every zone against the default near / far quota.
+    const kind = isNearZone(zone) ? 'near' : 'far';
+    const base = level.zoneQuotas[kind];
+    if (n < base.turret + base.feature) {
+      console.warn(`${levelId}: ${kind} zone ${zone} has ${n} candidates, fewer than the default ${kind} quota of `
         + `${base.turret} turret + ${base.feature} feature${level.zoneQuotaOverrides[zone] ? ' (its quota override hides this)' : ''}`);
     }
   }
