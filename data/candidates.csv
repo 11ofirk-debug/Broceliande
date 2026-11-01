@@ -24,6 +24,9 @@ tornville,21,1070,1010,nSW
 tornville,22,865,740,nSW
 tornville,23,375,870,fSW
 tornville,24,465,1005,fSW
+tornville,25,1545,150,fNW
+tornville,26,1390,200,fNW
+tornville,27,1710,150,fE
 gallows,0,465,460,nW
 gallows,1,385,600,nW
 gallows,2,715,760,nW
@@ -104,6 +107,8 @@ drowned,21,1615,345,fE
 drowned,22,1365,385,fE
 drowned,23,1850,490,fE
 drowned,24,1510,670,fE
+drowned,25,1495,1010,fS
+drowned,26,1840,685,fE
 wychwood,0,1470,580,nE
 wychwood,1,1275,655,nE
 wychwood,2,720,790,nE
@@ -128,6 +133,7 @@ wychwood,20,230,150,fN
 wychwood,21,1640,150,fN
 wychwood,22,1745,290,fN
 wychwood,23,1750,455,fN
+wychwood,24,415,1010,fE
 barrow,0,615,495,nW
 barrow,1,635,710,nW
 barrow,2,410,895,nW
@@ -151,6 +157,8 @@ barrow,19,1410,690,fE
 barrow,20,1820,740,fE
 barrow,21,1510,850,fE
 barrow,22,1845,945,fE
+barrow,23,380,355,fW
+barrow,24,70,705,fW
 charcoal,0,810,370,nNE
 charcoal,1,1045,570,nNE
 charcoal,2,750,210,nNE
@@ -175,6 +183,10 @@ charcoal,20,850,1010,nSE
 charcoal,21,1055,740,nSE
 charcoal,22,1545,870,fSE
 charcoal,23,1455,1005,fSE
+charcoal,24,1850,1010,fSE
+charcoal,25,265,150,fW
+charcoal,26,425,195,fW
+charcoal,27,590,150,fNE
 stags,0,1470,580,nE
 stags,1,1275,505,nE
 stags,2,720,370,nE
@@ -197,6 +209,8 @@ stags,18,1270,665,nS
 stags,19,1640,1010,fS
 stags,20,1745,870,fS
 stags,21,1750,705,fS
+stags,22,355,150,fW
+stags,23,70,925,fW
 briar,0,1000,570,nN
 briar,1,1160,550,nN
 briar,2,1050,415,nN
@@ -225,6 +239,7 @@ briar,24,140,435,fW
 briar,25,425,240,fW
 briar,26,125,160,fW
 briar,27,285,155,fW
+briar,28,1575,150,fN
 causeway,0,1090,605,nS
 causeway,1,1235,675,nS
 causeway,2,830,750,fS
@@ -250,6 +265,9 @@ causeway,21,305,345,fW
 causeway,22,555,385,fW
 causeway,23,70,490,fW
 causeway,24,410,670,fW
+causeway,25,80,685,fW
+causeway,26,1635,1010,fSE
+causeway,27,425,1010,fS
 widows,0,450,580,nW
 widows,1,645,655,nW
 widows,2,1200,790,nW
@@ -273,6 +291,8 @@ widows,19,1690,150,fN
 widows,20,280,150,fN
 widows,21,175,290,fN
 widows,22,170,455,fN
+widows,23,1530,995,fE
+widows,24,1695,1010,fE
 mossbound,0,1305,495,nE
 mossbound,1,1285,710,nE
 mossbound,2,1510,895,nE
@@ -295,6 +315,8 @@ mossbound,18,385,590,fW
 mossbound,19,510,690,fW
 mossbound,20,100,740,fW
 mossbound,21,410,850,fW
+mossbound,22,1540,355,fE
+mossbound,23,1850,705,fE
 ashen,0,450,580,nW
 ashen,1,645,505,nW
 ashen,2,1200,370,nW
@@ -318,6 +340,7 @@ ashen,19,650,665,nS
 ashen,20,1690,1010,fS
 ashen,21,175,870,fS
 ashen,22,170,705,fS
+ashen,23,1550,150,fW
 bone,0,1455,460,nE
 bone,1,1540,597,nE
 bone,2,1205,760,nE
@@ -343,6 +366,8 @@ bone,21,262,571,fSW
 bone,22,360,705,fSW
 bone,23,80,830,fSW
 bone,24,430,1000,fSW
+bone,25,645,580,fSW
+bone,26,1850,1010,fE
 weeping,0,1114,790,nSW
 weeping,1,876,583,nSW
 weeping,2,1170,950,nSW
@@ -366,6 +391,10 @@ weeping,19,1070,150,nNW
 weeping,20,865,420,nNW
 weeping,21,375,290,fNW
 weeping,22,465,155,fNW
+weeping,23,70,150,fNW
+weeping,24,1495,965,fE
+weeping,25,1655,1010,fE
+weeping,26,1330,1010,fSW
 bells,0,1140,190,nW
 bells,1,1305,665,nE
 bells,2,1283,449,nE
@@ -387,6 +416,8 @@ bells,17,510,470,fW
 bells,18,96,423,fW
 bells,19,410,310,fW
 bells,20,70,212,fW
+bells,21,1850,380,fE
+bells,22,1545,810,fE
 heartwood,0,920,570,nN
 heartwood,1,760,550,nN
 heartwood,2,870,415,nN
@@ -413,3 +444,4 @@ heartwood,22,1781,437,fE
 heartwood,23,1495,240,fE
 heartwood,24,1795,160,fE
 heartwood,25,1635,155,fE
+heartwood,26,325,150,fN
